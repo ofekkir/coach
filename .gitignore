@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+*.log
+.DS_Store
+
+# Personal, machine-local Claude Code settings (committed counterpart: .claude/settings.json)
+.claude/settings.local.json
