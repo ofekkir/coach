@@ -15,7 +15,9 @@ interface ParsedSpan {
   readonly outputTokens: number | null;
   // enriched attributes
   readonly querySource: string | null;
+  readonly rawRequestBody: string | null;
   readonly requestPrompt: string | null;
+  readonly rawResponseBody: string | null;
   readonly responseText: string | null;
   readonly costUsd: string | null;
   readonly toolInputSummary: string | null;
@@ -74,7 +76,9 @@ function parseSpans(trace: TempoTrace): ParsedSpan[] {
           inputTokens: getIntAttr(span.attributes, 'input_tokens'),
           outputTokens: getIntAttr(span.attributes, 'output_tokens'),
           querySource: getStringAttr(span.attributes, 'query_source'),
+          rawRequestBody: getStringAttr(span.attributes, 'raw_request_body'),
           requestPrompt: getStringAttr(span.attributes, 'request_prompt'),
+          rawResponseBody: getStringAttr(span.attributes, 'raw_response_body'),
           responseText: getStringAttr(span.attributes, 'response_text'),
           costUsd: getStringAttr(span.attributes, 'cost_usd'),
           toolInputSummary: getStringAttr(span.attributes, 'tool_input_summary'),
@@ -108,7 +112,9 @@ function spanToNode(span: ParsedSpan): TraceNode {
     case 'llm_request':
       if (span.model != null) node.model = span.model;
       if (span.querySource != null) node.source = span.querySource;
-      if (span.requestPrompt != null) node.prompt = span.requestPrompt;
+      if (span.rawRequestBody != null) node.raw_request = span.rawRequestBody;
+      if (span.requestPrompt != null) node.request = span.requestPrompt;
+      if (span.rawResponseBody != null) node.raw_response = span.rawResponseBody;
       if (span.responseText != null) node.response = span.responseText;
       if (span.inputTokens != null) node.tokens_in = span.inputTokens;
       if (span.outputTokens != null) node.tokens_out = span.outputTokens;

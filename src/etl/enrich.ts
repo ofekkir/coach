@@ -121,6 +121,29 @@ function attributeLogsToSpans(
   return bySpan;
 }
 
+// ── Request body index ────────────────────────────────────────────────────────
+
+// api_request_body logs lack request_id; pair them positionally with
+// api_response_body logs (both ordered by event_sequence) to get a
+// request_id → raw_request_body map that works even when timestamps
+// place the request log outside the span's time window.
+function buildRequestBodyIndex(logs: readonly LogEntry[]): Map<string, string> {
+  const sorted = [...logs].sort(
+    (a, b) => parseInt(a.event_sequence, 10) - parseInt(b.event_sequence, 10),
+  );
+  const requestBodies = sorted.filter((l) => l.event_name === 'api_request_body' && l.body != null);
+  const responseBodies = sorted.filter(
+    (l) => l.event_name === 'api_response_body' && l.request_id != null,
+  );
+  const index = new Map<string, string>();
+  for (let i = 0; i < requestBodies.length && i < responseBodies.length; i++) {
+    const reqId = responseBodies[i]?.request_id;
+    const body = requestBodies[i]?.body;
+    if (reqId != null && body != null) index.set(reqId, body);
+  }
+  return index;
+}
+
 // ── Tool input lookup ─────────────────────────────────────────────────────────
 
 function buildToolInputIndex(
@@ -324,22 +347,31 @@ function enrichSpan(
   logs: LogEntry[],
   toolInput: string | null,
   newParentB64: string | null,
+  requestBodyIndex: Map<string, string>,
 ): OtlpSpan {
   const extra: OtlpAttribute[] = [];
   const spanType = meta.spanType;
 
   if (spanType === 'llm_request') {
     const apiLog = logs.find((l) => l.event_name === 'api_request');
-    const bodyLog = logs.find((l) => l.event_name === 'api_request_body' && l.body != null);
     const responseLog = logs.find((l) => l.event_name === 'api_response_body' && l.body != null);
+
+    // Prefer the positional index (reliable even when the log timestamp falls
+    // outside the span's window); fall back to the attributed log.
+    const rawRequestBody =
+      (meta.requestId != null ? requestBodyIndex.get(meta.requestId) : undefined) ??
+      logs.find((l) => l.event_name === 'api_request_body' && l.body != null)?.body ??
+      null;
 
     if (apiLog?.query_source != null) extra.push(strAttr('query_source', apiLog.query_source));
     if (apiLog?.cost_usd != null) extra.push(strAttr('cost_usd', apiLog.cost_usd));
-    if (bodyLog?.body != null) {
-      const text = extractLastUserText(bodyLog.body);
+    if (rawRequestBody != null) {
+      extra.push(strAttr('raw_request_body', rawRequestBody));
+      const text = extractLastUserText(rawRequestBody);
       if (text != null) extra.push(strAttr('request_prompt', text.trim()));
     }
     if (responseLog?.body != null) {
+      extra.push(strAttr('raw_response_body', responseLog.body));
       const text = extractResponseText(responseLog.body);
       if (text != null) extra.push(strAttr('response_text', text.trim()));
     }
@@ -376,6 +408,7 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
   const metas = collectSpanMeta(trace);
   const logsBySpan = attributeLogsToSpans(metas, logs);
   const toolInputBySpanId = buildToolInputIndex(metas, logs, logsBySpan);
+  const requestBodyIndex = buildRequestBodyIndex(logs);
   const hooks = extractHooks(logs);
 
   // For each PreToolUse hook, record the reparenting: tool-span-b64 → hook-span-b64
@@ -408,7 +441,7 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
         const spanLogs = logsBySpan.get(meta.id) ?? [];
         const toolInput = toolInputBySpanId.get(meta.id) ?? null;
         const newParent = reparentMap.get(span.spanId) ?? null;
-        return enrichSpan(span, meta, spanLogs, toolInput, newParent);
+        return enrichSpan(span, meta, spanLogs, toolInput, newParent, requestBodyIndex);
       }),
     })),
   }));
