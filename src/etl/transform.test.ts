@@ -44,8 +44,23 @@ const minimalTrace: TempoTrace = {
                 { key: 'input_tokens', value: { intValue: '100' } },
                 { key: 'output_tokens', value: { intValue: '50' } },
                 { key: 'query_source', value: { stringValue: 'repl_main_thread' } },
-                { key: 'request_prompt', value: { stringValue: 'Do the thing' } },
-                { key: 'response_text', value: { stringValue: 'Done.' } },
+                {
+                  key: 'raw_request_body',
+                  value: {
+                    stringValue: JSON.stringify({
+                      messages: [{ role: 'user', content: 'Do the thing' }],
+                    }),
+                  },
+                },
+                {
+                  key: 'raw_response_body',
+                  value: {
+                    stringValue: JSON.stringify({
+                      content: [{ type: 'text', text: 'Done.' }],
+                      stop_reason: 'end_turn',
+                    }),
+                  },
+                },
                 { key: 'cost_usd', value: { stringValue: '0.001234' } },
               ],
             },

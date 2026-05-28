@@ -82,6 +82,8 @@ function extractStopReason(bodyJson: string): string | null {
 interface ParsedSpan {
   readonly id: string;
   readonly parentId: string | null;
+  readonly startNs: string;
+  readonly endNs: string;
   readonly durationMs: number;
   readonly spanType: string;
   readonly model: string | null;
@@ -137,12 +139,14 @@ function parseSpans(trace: TempoTrace): ParsedSpan[] {
   for (const batch of trace.batches) {
     for (const ss of batch.scopeSpans) {
       for (const span of ss.spans) {
-        const startNs = BigInt(span.startTimeUnixNano);
-        const endNs = BigInt(span.endTimeUnixNano);
+        const startNsBig = BigInt(span.startTimeUnixNano);
+        const endNsBig = BigInt(span.endTimeUnixNano);
         spans.push({
           id: 's' + b64toHex(span.spanId),
           parentId: span.parentSpanId ? 's' + b64toHex(span.parentSpanId) : null,
-          durationMs: Number(endNs - startNs) / 1_000_000,
+          startNs: span.startTimeUnixNano,
+          endNs: span.endTimeUnixNano,
+          durationMs: Number(endNsBig - startNsBig) / 1_000_000,
           spanType: getStringAttr(span.attributes, 'span.type') ?? span.name,
           model: getStringAttr(span.attributes, 'model'),
           toolName: getStringAttr(span.attributes, 'tool_name'),
@@ -168,14 +172,17 @@ function parseSpans(trace: TempoTrace): ParsedSpan[] {
 
 // ── Node building ─────────────────────────────────────────────────────────────
 
-function spanToNode(span: ParsedSpan): TraceNode {
+function spanToNode(span: ParsedSpan, rootId: string | null): TraceNode {
   const node: TraceNode = {
     id: span.id,
     type: isNodeType(span.spanType) ? span.spanType : 'interaction',
+    start_time_ns: span.startNs,
+    end_time_ns: span.endNs,
     duration_ms: span.durationMs,
   };
 
-  if (span.parentId !== null) node.parent = span.parentId;
+  const effectiveParent = span.spanType === 'hook' && rootId !== null ? rootId : span.parentId;
+  if (effectiveParent !== null) node.parent = effectiveParent;
 
   switch (span.spanType) {
     case 'interaction':
@@ -218,5 +225,7 @@ function spanToNode(span: ParsedSpan): TraceNode {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export function transformTrace(trace: TempoTrace): TraceNode[] {
-  return parseSpans(trace).map(spanToNode);
+  const spans = parseSpans(trace);
+  const rootId = spans.find((s) => s.parentId === null)?.id ?? null;
+  return spans.map((s) => spanToNode(s, rootId));
 }

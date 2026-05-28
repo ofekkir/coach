@@ -146,62 +146,6 @@ describe('enrichTrace', () => {
     expect(hookSpan?.parentSpanId).toBe(hex2b64(PARENT_HEX));
   });
 
-  it('makes PreToolUse hook the parent of its tool span', () => {
-    const TOOL_HEX = '0000000000000003';
-    const traceWithTool: TempoTrace = {
-      batches: [
-        {
-          scopeSpans: [
-            {
-              spans: [
-                {
-                  traceId: hex2b64(TRACE_HEX),
-                  spanId: hex2b64(PARENT_HEX),
-                  name: 'claude_code.interaction',
-                  startTimeUnixNano: '1000000000',
-                  endTimeUnixNano: '5000000000',
-                  attributes: [{ key: 'span.type', value: { stringValue: 'interaction' } }],
-                },
-                {
-                  traceId: hex2b64(TRACE_HEX),
-                  spanId: hex2b64(TOOL_HEX),
-                  parentSpanId: hex2b64(PARENT_HEX),
-                  name: 'claude_code.tool',
-                  startTimeUnixNano: '1500000000',
-                  endTimeUnixNano: '2000000000',
-                  attributes: [
-                    { key: 'span.type', value: { stringValue: 'tool' } },
-                    { key: 'tool_name', value: { stringValue: 'Read' } },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-    const logs: LogEntry[] = [
-      {
-        timestamp_ns: 1400000000,
-        event_sequence: '1',
-        span_id: PARENT_HEX,
-        event_name: 'hook_execution_start',
-        hook_name: 'PreToolUse:Read',
-      },
-    ];
-    const enriched = enrichTrace(traceWithTool, logs);
-    expect(TempoTraceSchema.safeParse(enriched).success).toBe(true);
-
-    const spans = allSpans(enriched);
-    const hookSpan = spans.find((s) => getStringAttr(s.attributes, 'span.type') === 'hook');
-    const toolSpan = spans.find((s) => s.spanId === hex2b64(TOOL_HEX));
-
-    // Hook's parent is the interaction (tool's original parent)
-    expect(hookSpan?.parentSpanId).toBe(hex2b64(PARENT_HEX));
-    // Tool is reparented to the hook
-    expect(toolSpan?.parentSpanId).toBe(hookSpan?.spanId);
-  });
-
   it('real fixture: llm_request spans gain query_source and cost_usd', () => {
     const enriched = enrichTrace(traceFixture, logsFixture);
     const llmSpans = allSpans(enriched).filter(

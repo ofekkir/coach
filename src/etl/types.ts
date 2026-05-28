@@ -64,6 +64,8 @@ export interface TraceNode {
   id: string;
   type: NodeType;
   parent?: string;
+  start_time_ns?: string;
+  end_time_ns?: string;
   duration_ms?: number;
   name?: string;
   model?: string;

@@ -280,7 +280,6 @@ function enrichSpan(
   meta: SpanMeta,
   logs: LogEntry[],
   toolInput: string | null,
-  newParentB64: string | null,
   requestBodyIndex: Map<string, string>,
 ): OtlpSpan {
   const extra: OtlpAttribute[] = [];
@@ -308,12 +307,7 @@ function enrichSpan(
     if (summary != null) extra.push(strAttr('tool_input_summary', summary));
   }
 
-  const attributes = extra.length > 0 ? [...span.attributes, ...extra] : span.attributes;
-
-  if (newParentB64 !== null) {
-    return { ...span, parentSpanId: newParentB64, attributes };
-  }
-  return extra.length > 0 ? { ...span, attributes } : span;
+  return extra.length > 0 ? { ...span, attributes: [...span.attributes, ...extra] } : span;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -337,25 +331,6 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
   const requestBodyIndex = buildRequestBodyIndex(logs);
   const hooks = extractHooks(logs);
 
-  // For each PreToolUse hook, record the reparenting: tool-span-b64 → hook-span-b64
-  const reparentMap = new Map<string, string>(); // tool b64 → new parent b64 (hook)
-  const hookParentOverride = new Map<number, string>(); // hook index → parent b64 override
-
-  for (const hook of hooks) {
-    const { event, toolName } = parseHookEvent(hook.hookName);
-    if (event !== 'PreToolUse' || toolName == null) continue;
-
-    const target = metas
-      .filter((m) => m.spanType === 'tool' && m.toolName === toolName && m.startNs >= hook.startNs)
-      .sort((a, b) => (a.startNs < b.startNs ? -1 : 1))[0];
-
-    if (target == null) continue;
-
-    const hookB64 = hookSpanB64(hook.index);
-    reparentMap.set(target.b64, hookB64);
-    hookParentOverride.set(hook.index, target.parentB64 ?? '');
-  }
-
   // Build enriched span batches
   const enrichedBatches: OtlpBatch[] = trace.batches.map((batch) => ({
     ...batch,
@@ -366,8 +341,7 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
         if (meta == null) return span;
         const spanLogs = logsBySpan.get(meta.id) ?? [];
         const toolInput = toolInputBySpanId.get(meta.id) ?? null;
-        const newParent = reparentMap.get(span.spanId) ?? null;
-        return enrichSpan(span, meta, spanLogs, toolInput, newParent, requestBodyIndex);
+        return enrichSpan(span, meta, spanLogs, toolInput, requestBodyIndex);
       }),
     })),
   }));
@@ -375,8 +349,7 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
   // Build hook spans
   const hookSpans: OtlpSpan[] = hooks.map((hook) => {
     const hookB64 = hookSpanB64(hook.index);
-    const parentOverride = hookParentOverride.get(hook.index);
-    const parentB64 = parentOverride ?? resolveHookParentB64(metas, hook);
+    const parentB64 = resolveHookParentB64(metas, hook);
 
     const span: OtlpSpan = {
       traceId,
