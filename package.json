@@ -26,7 +26,6 @@
     "etl": "node --experimental-strip-types scripts/etl.ts",
     "e2e": "pnpm enrich && pnpm etl && pnpm graph",
     "graph": "node --experimental-strip-types scripts/graph.ts",
-    "timeline": "node --experimental-strip-types scripts/timeline.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
     "prepare": "husky"
   },
