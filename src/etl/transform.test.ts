@@ -10,6 +10,7 @@ function hex2b64(hex: string): string {
   return Buffer.from(hex, 'hex').toString('base64');
 }
 
+const TRACE_HEX = '00000000000000000000000000000001';
 const PARENT_HEX = '0000000000000001';
 const CHILD_HEX = '0000000000000002';
 
@@ -20,6 +21,7 @@ const minimalTrace: TempoTrace = {
         {
           spans: [
             {
+              traceId: hex2b64(TRACE_HEX),
               spanId: hex2b64(PARENT_HEX),
               name: 'claude_code.interaction',
               startTimeUnixNano: '1000000000',
@@ -30,6 +32,7 @@ const minimalTrace: TempoTrace = {
               ],
             },
             {
+              traceId: hex2b64(TRACE_HEX),
               spanId: hex2b64(CHILD_HEX),
               parentSpanId: hex2b64(PARENT_HEX),
               name: 'claude_code.llm_request',

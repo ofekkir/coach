@@ -13,6 +13,7 @@ export interface OtlpAttribute {
 }
 
 export interface OtlpSpan {
+  readonly traceId: string;
   readonly spanId: string;
   readonly parentSpanId?: string;
   readonly name: string;

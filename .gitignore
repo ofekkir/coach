@@ -6,9 +6,13 @@ coverage
 
 # Pipeline output artifacts
 out.enriched-trace.json
+out.enriched-trace.otlp.json
 out.nodes.json
 out.mmd
 out.timeline
 
 # Personal, machine-local Claude Code settings (committed counterpart: .claude/settings.json)
 .claude/settings.local.json
+
+# MCP server config — contains secrets (service account tokens)
+.mcp.json

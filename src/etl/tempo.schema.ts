@@ -9,6 +9,14 @@ const b64SpanId = z.string().refine((s) => {
   }
 }, 'must be base64-encoded 8 bytes');
 
+const b64TraceId = z.string().refine((s) => {
+  try {
+    return Buffer.from(s, 'base64').length === 16;
+  } catch {
+    return false;
+  }
+}, 'must be base64-encoded 16 bytes');
+
 const OtlpAttributeValueSchema = z.union([
   z.object({ stringValue: z.string() }),
   z.object({ boolValue: z.boolean() }),
@@ -19,6 +27,7 @@ const OtlpAttributeValueSchema = z.union([
 
 const OtlpSpanSchema = z
   .object({
+    traceId: b64TraceId,
     spanId: b64SpanId,
     parentSpanId: b64SpanId.optional(),
     name: z.string().min(1),

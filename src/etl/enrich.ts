@@ -360,7 +360,19 @@ function enrichSpan(
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+function getTraceId(trace: TempoTrace): string {
+  for (const batch of trace.batches) {
+    for (const ss of batch.scopeSpans) {
+      for (const span of ss.spans) {
+        return span.traceId;
+      }
+    }
+  }
+  return '';
+}
+
 export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): TempoTrace {
+  const traceId = getTraceId(trace);
   const metas = collectSpanMeta(trace);
   const logsBySpan = attributeLogsToSpans(metas, logs);
   const toolInputBySpanId = buildToolInputIndex(metas, logs, logsBySpan);
@@ -408,6 +420,7 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
     const parentB64 = parentOverride ?? resolveHookParentB64(metas, hook);
 
     const span: OtlpSpan = {
+      traceId,
       spanId: hookB64,
       name: 'claude_code.hook',
       startTimeUnixNano: String(hook.startNs),
@@ -425,12 +438,16 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
 
   if (hookSpans.length === 0) return { batches: enrichedBatches };
 
-  // Add hook spans as a new scopeSpans entry in the first batch
+  // Append hook spans into the first existing scopeSpan to preserve its scope metadata
   if (enrichedBatches.length === 0) return { batches: [] };
   const [first, ...rest] = enrichedBatches as [OtlpBatch, ...OtlpBatch[]];
+  const [firstScope, ...otherScopes] = first.scopeSpans as [
+    { spans: readonly OtlpSpan[] },
+    ...{ spans: readonly OtlpSpan[] }[],
+  ];
   const enrichedFirst: OtlpBatch = {
     ...first,
-    scopeSpans: [...first.scopeSpans, { spans: hookSpans }],
+    scopeSpans: [{ ...firstScope, spans: [...firstScope.spans, ...hookSpans] }, ...otherScopes],
   };
 
   return { batches: [enrichedFirst, ...rest] };
