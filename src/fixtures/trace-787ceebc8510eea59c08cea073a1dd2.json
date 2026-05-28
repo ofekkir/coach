@@ -1,0 +1,2767 @@
+{
+  "batches": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "darwin"
+            }
+          },
+          {
+            "key": "os.version",
+            "value": {
+              "stringValue": "25.4.0"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "2.1.152"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "claude-code"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "com.anthropic.claude_code.tracing",
+            "version": "1.0.0"
+          },
+          "spans": [
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "8/pxikQ/+/M=",
+              "name": "claude_code.interaction",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866340181000000",
+              "endTimeUnixNano": "1779866361497213000",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "user_prompt",
+                  "value": {
+                    "stringValue": "I want to add an mcp: {\n  \"mcpServers\": {\n    \"grafana\": {\n      \"command\": \"uvx\",\n      \"args\": [\"mcp-grafana\"],\n      \"env\": {\n        \"GRAFANA_URL\": \"http://localhost:3000\",\n        \"GRAFANA_SERVICE_ACCOUNT_TOKEN\": \"<your service account token>\"\n      }\n    }\n  }\n}"
+                  }
+                },
+                {
+                  "key": "user_prompt_length",
+                  "value": {
+                    "intValue": "268"
+                  }
+                },
+                {
+                  "key": "interaction.sequence",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "interaction.duration_ms",
+                  "value": {
+                    "intValue": "21316"
+                  }
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "MSO49woI+7Y=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.llm_request",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866340354000000",
+              "endTimeUnixNano": "1779866341318279750",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "964"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "534"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "16"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbSfdWvLrrkDv4WSMvVgS"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "req_011CbSfdWvLrrkDv4WSMvVgS"
+                  }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "6b03caba-34f9-459b-ba08-f56a8ffb57d7"
+                  }
+                },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "959"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "end_turn"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "end_turn"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866340355285083",
+                  "name": "gen_ai.request.attempt",
+                  "attributes": [
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
+                    {
+                      "key": "client_request_id",
+                      "value": {
+                        "stringValue": "6b03caba-34f9-459b-ba08-f56a8ffb57d7"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [
+                {
+                  "traceId": "RRMvSfU/8fdLvAmVcd5+6A==",
+                  "spanId": "10CKTJ2Bn9M=",
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "WFjJwH7NWeg=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.llm_request",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866340361000000",
+              "endTimeUnixNano": "1779866341373092000",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "1012"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "534"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "16"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbSfdX14BsfVKqQaba34T"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "req_011CbSfdX14BsfVKqQaba34T"
+                  }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "f7fde966-90ce-4540-b8eb-6aa340d93be1"
+                  }
+                },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "981"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "end_turn"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "end_turn"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866340361386333",
+                  "name": "gen_ai.request.attempt",
+                  "attributes": [
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
+                    {
+                      "key": "client_request_id",
+                      "value": {
+                        "stringValue": "f7fde966-90ce-4540-b8eb-6aa340d93be1"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [
+                {
+                  "traceId": "fG1axaTOT/daCeQmazp1Qg==",
+                  "spanId": "b9IXUrpoSaY=",
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "c0L6ZqAz4jU=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.llm_request",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866345064000000",
+              "endTimeUnixNano": "1779866351561684458",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "6498"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "3"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "277"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "21568"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "32551"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbSfds5JDW5mSqX89K6xQ"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "req_011CbSfds5JDW5mSqX89K6xQ"
+                  }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "01abd41c-fb20-4937-93c2-ec9ceead3a06"
+                  }
+                },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "2256"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "tool_use"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "tool_use"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866345064632750",
+                  "name": "gen_ai.request.attempt",
+                  "attributes": [
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
+                    {
+                      "key": "client_request_id",
+                      "value": {
+                        "stringValue": "01abd41c-fb20-4937-93c2-ec9ceead3a06"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [
+                {
+                  "traceId": "XKAUl/PKyXmV94LgyLfRGQ==",
+                  "spanId": "wLKafA1Y2Ug=",
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "awakl25umwg=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.tool",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866351559000000",
+              "endTimeUnixNano": "1779866351564434167",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool"
+                  }
+                },
+                {
+                  "key": "tool_name",
+                  "value": {
+                    "stringValue": "Read"
+                  }
+                },
+                {
+                  "key": "file_path",
+                  "value": {
+                    "stringValue": "/Users/ofek/.claude/settings.json"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "5"
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866351564391375",
+                  "name": "tool.output",
+                  "attributes": [
+                    {
+                      "key": "file_path",
+                      "value": {
+                        "stringValue": "/Users/ofek/.claude/settings.json"
+                      }
+                    },
+                    {
+                      "key": "content",
+                      "value": {
+                        "stringValue": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(npm install:*)\",\n      \"Bash(npm ls:*)\",\n      \"Bash(npm view:*)\",\n      \"Bash(npm remove:*)\",\n      \"Bash(npx tsc:*)\",\n      \"Bash(git init:*)\",\n      \"Bash(git commit:*)\",\n      \"Bash(git push:*)\",\n      \"Bash(git add:*)\",\n      \"Bash(npm test:*)\",\n      \"Bash(npx eslint:*)\",\n      \"Bash(node -e *)\",\n      \"Bash(gh api:*)\",\n      \"Bash(npx prettier:*)\",\n      \"Bash(git checkout:*)\",\n      \"Bash(which pandoc:*)\",\n      \"Bash(npm uninstall:*)\",\n      \"Bash(/Users/ofek/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/scripts/start-server.sh --project-dir /Users/ofek/projects/yb4)\",\n      \"Bash(/Users/ofek/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/skills/brainstorming/scripts/start-server.sh --project-dir /Users/ofek/projects/yb4)\"\n    ],\n    \"defaultMode\": \"plan\"\n  },\n  \"hooks\": {\n    \"Notification\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"osascript -e 'display notification \\\"Claude Code needs your attention\\\" with title \\\"Claude Code\\\"'\"\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"/Users/ofek/.claude/hooks/rtk-rewrite.sh\"\n          }\n        ]\n      }\n    ]\n  },\n  \"statusLine\": {\n    \"type\": \"command\",\n    \"command\": \"bash /Users/ofek/.claude/statusline-command.sh\"\n  },\n  \"enabledPlugins\": {\n    \"superpowers@claude-plugins-official\": false,\n    \"typescript-lsp@claude-plugins-official\": false,\n    \"minimalist-entrepreneur@minimalist-entrepreneur\": false,\n    \"adgen@yb4\": false,\n    \"frontend-design@claude-plugins-official\": false,\n    \"claude-seo@agricidaniel-seo\": false,\n    \"vercel@claude-plugins-official\": false,\n    \"agentmemory@agentmemory\": false,\n    \"langsmith-tracing@langsmith-claude-code-plugins\": true\n  },\n  \"extraKnownMarketplaces\": {\n    \"minimalist-entrepreneur\": {\n      \"source\": {\n        \"source\": \"github"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "1c+yxOOFnkE=",
+              "parentSpanId": "awakl25umwg=",
+              "name": "claude_code.tool.blocked_on_user",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866351559000000",
+              "endTimeUnixNano": "1779866351560686042",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.blocked_on_user"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "decision",
+                  "value": {
+                    "stringValue": "accept"
+                  }
+                },
+                {
+                  "key": "source",
+                  "value": {
+                    "stringValue": "config"
+                  }
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "cbMUgW3Se/A=",
+              "parentSpanId": "awakl25umwg=",
+              "name": "claude_code.tool.execution",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866351561000000",
+              "endTimeUnixNano": "1779866351564613166",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.execution"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "4"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "tYHnuBhjfxk=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.llm_request",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866351567000000",
+              "endTimeUnixNano": "1779866357301591625",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "5735"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "370"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "54119"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "1712"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbSfeLtNUrvWnX8VeowfF"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "req_011CbSfeLtNUrvWnX8VeowfF"
+                  }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "2273bb2b-3129-4419-9bbf-dc50d61b2192"
+                  }
+                },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "1919"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "tool_use"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "tool_use"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866351567619500",
+                  "name": "gen_ai.request.attempt",
+                  "attributes": [
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
+                    {
+                      "key": "client_request_id",
+                      "value": {
+                        "stringValue": "2273bb2b-3129-4419-9bbf-dc50d61b2192"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [
+                {
+                  "traceId": "hyEUzCiZXhzV6G53TUtViw==",
+                  "spanId": "2a0ecNrhfyA=",
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "Yj1jA6veQUo=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.tool",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866357096000000",
+              "endTimeUnixNano": "1779866357102602958",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool"
+                  }
+                },
+                {
+                  "key": "tool_name",
+                  "value": {
+                    "stringValue": "Edit"
+                  }
+                },
+                {
+                  "key": "file_path",
+                  "value": {
+                    "stringValue": "/Users/ofek/.claude/settings.json"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "7"
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866357102539791",
+                  "name": "tool.output",
+                  "attributes": [
+                    {
+                      "key": "file_path",
+                      "value": {
+                        "stringValue": "/Users/ofek/.claude/settings.json"
+                      }
+                    },
+                    {
+                      "key": "diff",
+                      "value": {
+                        "stringValue": "[{\"oldStart\":121,\"oldLines\":5,\"newStart\":121,\"newLines\":15,\"lines\":[\"       ]\",\"     }\",\"   ],\",\"-  \\\"model\\\": \\\"sonnet\\\"\",\"+  \\\"model\\\": \\\"sonnet\\\",\",\"+  \\\"mcpServers\\\": {\",\"+    \\\"grafana\\\": {\",\"+      \\\"command\\\": \\\"uvx\\\",\",\"+      \\\"args\\\": [\\\"mcp-grafana\\\"],\",\"+      \\\"env\\\": {\",\"+        \\\"GRAFANA_URL\\\": \\\"http://localhost:3000\\\",\",\"+        \\\"GRAFANA_SERVICE_ACCOUNT_TOKEN\\\": \\\"<your service account token>\\\"\",\"+      }\",\"+    }\",\"+  }\",\" }\"]}]"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "y2rFo4QvlOY=",
+              "parentSpanId": "Yj1jA6veQUo=",
+              "name": "claude_code.tool.blocked_on_user",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866357096000000",
+              "endTimeUnixNano": "1779866357097324041",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.blocked_on_user"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "decision",
+                  "value": {
+                    "stringValue": "accept"
+                  }
+                },
+                {
+                  "key": "source",
+                  "value": {
+                    "stringValue": "config"
+                  }
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "1wWkZcrltPE=",
+              "parentSpanId": "Yj1jA6veQUo=",
+              "name": "claude_code.tool.execution",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866357097000000",
+              "endTimeUnixNano": "1779866357102114084",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.execution"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "5"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "iBIHxAVrFPA=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.llm_request",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866357304000000",
+              "endTimeUnixNano": "1779866361433836125",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "4130"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "106"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "55831"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "434"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbSfemQWXPsKcVgT9oCUF"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "req_011CbSfemQWXPsKcVgT9oCUF"
+                  }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "d1e10f50-7a9b-4333-83f5-1e6b275b38e4"
+                  }
+                },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "2223"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "end_turn"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "end_turn"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866357305097750",
+                  "name": "gen_ai.request.attempt",
+                  "attributes": [
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
+                    {
+                      "key": "client_request_id",
+                      "value": {
+                        "stringValue": "d1e10f50-7a9b-4333-83f5-1e6b275b38e4"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [
+                {
+                  "traceId": "D53xNi3UPMlkWXr4BGec0g==",
+                  "spanId": "Fz2YeKwxQYs=",
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "darwin"
+            }
+          },
+          {
+            "key": "os.version",
+            "value": {
+              "stringValue": "25.4.0"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "2.1.152"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "claude-code"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "com.anthropic.claude_code.tracing",
+            "version": "1.0.0"
+          },
+          "spans": [
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "cOXe9iu/YIg=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.llm_request",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866340357000000",
+              "endTimeUnixNano": "1779866344996837750",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "4640"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "3"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "178"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "21568"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbSfdWwL7GJz3ojsgXBgN"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "req_011CbSfdWwL7GJz3ojsgXBgN"
+                  }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "15903e29-b7d3-4255-8ce7-82d11074d859"
+                  }
+                },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "2787"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "tool_use"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "tool_use"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866340357505083",
+                  "name": "gen_ai.request.attempt",
+                  "attributes": [
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
+                    {
+                      "key": "client_request_id",
+                      "value": {
+                        "stringValue": "15903e29-b7d3-4255-8ce7-82d11074d859"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [
+                {
+                  "traceId": "9ss4fQT1xDr982MXFHUBcA==",
+                  "spanId": "3W3fqS9176Y=",
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "xPtsCqxFWl4=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.tool",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866345050000000",
+              "endTimeUnixNano": "1779866345057649875",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool"
+                  }
+                },
+                {
+                  "key": "tool_name",
+                  "value": {
+                    "stringValue": "Skill"
+                  }
+                },
+                {
+                  "key": "skill_name",
+                  "value": {
+                    "stringValue": "update-config"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "8"
+                  }
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "TA0gJIhD3pw=",
+              "parentSpanId": "xPtsCqxFWl4=",
+              "name": "claude_code.tool.execution",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866345051000000",
+              "endTimeUnixNano": "1779866345057632083",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.execution"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "7"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "jfLokJGwSp0=",
+              "parentSpanId": "xPtsCqxFWl4=",
+              "name": "claude_code.tool.blocked_on_user",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866345051000000",
+              "endTimeUnixNano": "1779866345051875041",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.blocked_on_user"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "decision",
+                  "value": {
+                    "stringValue": "accept"
+                  }
+                },
+                {
+                  "key": "source",
+                  "value": {
+                    "stringValue": "config"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "darwin"
+            }
+          },
+          {
+            "key": "os.version",
+            "value": {
+              "stringValue": "25.4.0"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "2.1.152"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "claude-code"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "com.anthropic.claude_code.tracing",
+            "version": "1.0.0"
+          },
+          "spans": [
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "RwEsk8RLTaI=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.llm_request",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866361440000000",
+              "endTimeUnixNano": "1779866363148105750",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "1708"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "343"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "9"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "56265"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "104"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbSff568UnnBUVRCdpmUq"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "req_011CbSff568UnnBUVRCdpmUq"
+                  }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "2c50eec3-ab06-42d7-930d-dac2ce82edb7"
+                  }
+                },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "1327"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "end_turn"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "end_turn"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866361443160583",
+                  "name": "gen_ai.request.attempt",
+                  "attributes": [
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
+                    {
+                      "key": "client_request_id",
+                      "value": {
+                        "stringValue": "2c50eec3-ab06-42d7-930d-dac2ce82edb7"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [
+                {
+                  "traceId": "Le9hNJv+HWbX4IJWAblXzw==",
+                  "spanId": "Zhr+lau0K0Y=",
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "darwin"
+            }
+          },
+          {
+            "key": "os.version",
+            "value": {
+              "stringValue": "25.4.0"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "2.1.152"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "claude-code"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "com.anthropic.claude_code.tracing",
+            "version": "1.0.0"
+          },
+          "spans": [
+            {
+              "traceId": "B4fO68hRDupZwIzqBzod0g==",
+              "spanId": "AOuGqbErcD8=",
+              "parentSpanId": "8/pxikQ/+/M=",
+              "name": "claude_code.llm_request",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1779866541507000000",
+              "endTimeUnixNano": "1779866544777116500",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "f25880c49b74c06baa5b0d6c472edfe6fa70d469dc670b9be08d5eb614fb402d"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "d4aa60e8-ca67-4511-89c5-fb6283c59f85"
+                  }
+                },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.152"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "ofekkir@gmail.com"
+                  }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
+                },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "standalone"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "3270"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "72"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "42"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "56369"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbSftM9tJsXG2YrhGE4zG"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "req_011CbSftM9tJsXG2YrhGE4zG"
+                  }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "557c8e8d-4b3e-49a8-81cc-2369addde4df"
+                  }
+                },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "2107"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "end_turn"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "end_turn"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1779866541545385125",
+                  "name": "gen_ai.request.attempt",
+                  "attributes": [
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
+                    {
+                      "key": "client_request_id",
+                      "value": {
+                        "stringValue": "557c8e8d-4b3e-49a8-81cc-2369addde4df"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [
+                {
+                  "traceId": "VDay4O1NxNvPhlvsyK8sTQ==",
+                  "spanId": "pkUdXaN9KGw=",
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
