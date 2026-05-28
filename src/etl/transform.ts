@@ -1,6 +1,82 @@
 import { Buffer } from 'node:buffer';
 import type { NodeType, OtlpAttribute, TempoTrace, TraceNode } from './types.ts';
 
+// ── Raw body extraction ───────────────────────────────────────────────────────
+
+interface ReqBody {
+  messages?: { role: string; content: string | { type: string; text?: string }[] }[];
+}
+
+interface ResBody {
+  content?: { type: string; text?: string; thinking?: string; name?: string }[];
+  stop_reason?: string;
+}
+
+function firstText(content: string | { type: string; text?: string }[]): string | null {
+  if (typeof content === 'string') return content;
+  for (const b of content) {
+    if (b.type === 'text' && b.text) return b.text;
+  }
+  return null;
+}
+
+function unescape(s: string): string {
+  return s
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\\\/g, '\\');
+}
+
+function extractRequestPrompt(bodyJson: string): string | null {
+  try {
+    const parsed = JSON.parse(bodyJson) as ReqBody;
+    const messages = parsed.messages ?? [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg?.role !== 'user') continue;
+      const text = firstText(msg.content);
+      if (text) return text.trim();
+    }
+    return null;
+  } catch {
+    let lastIdx = -1;
+    const re = /"role":"user"/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(bodyJson)) !== null) lastIdx = m.index;
+    if (lastIdx === -1) return null;
+    const tm = /"text":"((?:[^"\\]|\\.)+)/.exec(bodyJson.slice(lastIdx));
+    if (!tm?.[1]) return null;
+    return unescape(tm[1]);
+  }
+}
+
+function extractResponseText(bodyJson: string): string | null {
+  try {
+    const parsed = JSON.parse(bodyJson) as ResBody;
+    for (const block of parsed.content ?? []) {
+      if (block.type === 'text' && block.text) return block.text;
+      if (block.type === 'tool_use' && block.name) return `tool_use: ${block.name}`;
+      if (block.type === 'thinking' && block.thinking && block.thinking !== '<REDACTED>') {
+        return block.thinking;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function extractStopReason(bodyJson: string): string | null {
+  try {
+    const parsed = JSON.parse(bodyJson) as ResBody;
+    return parsed.stop_reason ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Internal span representation ──────────────────────────────────────────────
 
 interface ParsedSpan {
@@ -16,9 +92,7 @@ interface ParsedSpan {
   // enriched attributes
   readonly querySource: string | null;
   readonly rawRequestBody: string | null;
-  readonly requestPrompt: string | null;
   readonly rawResponseBody: string | null;
-  readonly responseText: string | null;
   readonly costUsd: string | null;
   readonly toolInputSummary: string | null;
   readonly hookName: string | null;
@@ -77,9 +151,7 @@ function parseSpans(trace: TempoTrace): ParsedSpan[] {
           outputTokens: getIntAttr(span.attributes, 'output_tokens'),
           querySource: getStringAttr(span.attributes, 'query_source'),
           rawRequestBody: getStringAttr(span.attributes, 'raw_request_body'),
-          requestPrompt: getStringAttr(span.attributes, 'request_prompt'),
           rawResponseBody: getStringAttr(span.attributes, 'raw_response_body'),
-          responseText: getStringAttr(span.attributes, 'response_text'),
           costUsd: getStringAttr(span.attributes, 'cost_usd'),
           toolInputSummary: getStringAttr(span.attributes, 'tool_input_summary'),
           hookName: getStringAttr(span.attributes, 'hook.name'),
@@ -112,10 +184,18 @@ function spanToNode(span: ParsedSpan): TraceNode {
     case 'llm_request':
       if (span.model != null) node.model = span.model;
       if (span.querySource != null) node.source = span.querySource;
-      if (span.rawRequestBody != null) node.raw_request = span.rawRequestBody;
-      if (span.requestPrompt != null) node.request = span.requestPrompt;
-      if (span.rawResponseBody != null) node.raw_response = span.rawResponseBody;
-      if (span.responseText != null) node.response = span.responseText;
+      if (span.rawRequestBody != null) {
+        node.raw_request = span.rawRequestBody;
+        const prompt = extractRequestPrompt(span.rawRequestBody);
+        if (prompt != null) node.request = prompt;
+      }
+      if (span.rawResponseBody != null) {
+        node.raw_response = span.rawResponseBody;
+        const text = extractResponseText(span.rawResponseBody);
+        if (text != null) node.response = text;
+        const stopReason = extractStopReason(span.rawResponseBody);
+        if (stopReason != null) node.stop_reason = stopReason;
+      }
       if (span.inputTokens != null) node.tokens_in = span.inputTokens;
       if (span.outputTokens != null) node.tokens_out = span.outputTokens;
       if (span.costUsd != null) {

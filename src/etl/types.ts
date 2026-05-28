@@ -73,6 +73,7 @@ export interface TraceNode {
   request?: string;
   raw_response?: string;
   response?: string;
+  stop_reason?: string;
   tokens_in?: number;
   tokens_out?: number;
   cost_usd?: number;
