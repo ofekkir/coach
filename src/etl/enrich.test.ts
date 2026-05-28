@@ -25,6 +25,7 @@ function allSpans(trace: TempoTrace) {
   return trace.batches.flatMap((b) => b.scopeSpans.flatMap((ss) => ss.spans));
 }
 
+const TRACE_HEX = '00000000000000000000000000000001';
 const PARENT_HEX = '0000000000000001';
 const CHILD_HEX = '0000000000000002';
 
@@ -35,6 +36,7 @@ const minimalTrace: TempoTrace = {
         {
           spans: [
             {
+              traceId: hex2b64(TRACE_HEX),
               spanId: hex2b64(PARENT_HEX),
               name: 'claude_code.interaction',
               startTimeUnixNano: '1000000000',
@@ -42,6 +44,7 @@ const minimalTrace: TempoTrace = {
               attributes: [{ key: 'span.type', value: { stringValue: 'interaction' } }],
             },
             {
+              traceId: hex2b64(TRACE_HEX),
               spanId: hex2b64(CHILD_HEX),
               parentSpanId: hex2b64(PARENT_HEX),
               name: 'claude_code.llm_request',
@@ -152,6 +155,7 @@ describe('enrichTrace', () => {
             {
               spans: [
                 {
+                  traceId: hex2b64(TRACE_HEX),
                   spanId: hex2b64(PARENT_HEX),
                   name: 'claude_code.interaction',
                   startTimeUnixNano: '1000000000',
@@ -159,6 +163,7 @@ describe('enrichTrace', () => {
                   attributes: [{ key: 'span.type', value: { stringValue: 'interaction' } }],
                 },
                 {
+                  traceId: hex2b64(TRACE_HEX),
                   spanId: hex2b64(TOOL_HEX),
                   parentSpanId: hex2b64(PARENT_HEX),
                   name: 'claude_code.tool',
@@ -215,6 +220,23 @@ describe('enrichTrace', () => {
     );
     expect(hookSpans.length).toBeGreaterThan(0);
     expect(hookSpans.every((s) => getStringAttr(s.attributes, 'hook.name') != null)).toBe(true);
+  });
+
+  it('hook spans carry the traceId of the source trace', () => {
+    const logs: LogEntry[] = [
+      {
+        timestamp_ns: 1100000000,
+        event_sequence: '1',
+        span_id: PARENT_HEX,
+        event_name: 'hook_execution_start',
+        hook_name: 'UserPromptSubmit',
+      },
+    ];
+    const enriched = enrichTrace(minimalTrace, logs);
+    const hookSpan = allSpans(enriched).find(
+      (s) => getStringAttr(s.attributes, 'span.type') === 'hook',
+    );
+    expect(hookSpan?.traceId).toBe(hex2b64(TRACE_HEX));
   });
 
   it('real fixture: all hook span IDs are valid 8-byte base64', () => {
