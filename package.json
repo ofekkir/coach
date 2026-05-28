@@ -22,6 +22,10 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "enrich": "node --experimental-strip-types scripts/enrich.ts",
+    "etl": "node --experimental-strip-types scripts/etl.ts",
+    "e2e": "pnpm enrich && pnpm etl && pnpm graph",
+    "graph": "node --experimental-strip-types scripts/graph.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
     "prepare": "husky"
   },
@@ -48,6 +52,7 @@
     "prettier": "^3.4.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.18.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "zod": "^4.4.3"
   }
 }

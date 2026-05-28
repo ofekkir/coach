@@ -19,6 +19,7 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
 
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "declaration": true,
     "sourceMap": true,
@@ -26,5 +27,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "vitest.config.ts"]
+  "include": ["src", "scripts", "vitest.config.ts"]
 }

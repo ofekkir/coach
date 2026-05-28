@@ -55,6 +55,12 @@ errors** (`--max-warnings=0`). Don't weaken these to make code pass — fix the 
   required — see README).
 - Keep tests **basic** for now: cover the normal path and obvious error cases, not exotic edge cases.
 
+## Code style
+
+Prefer named functions and descriptive variable names over inline comments that narrate steps.
+A function named `groupLogsBySpan()` is better than a `// 2. Group logs by span_id` comment
+before an anonymous block. Comments are for non-obvious WHY, not for labelling WHAT.
+
 ## Layout
 
 ```

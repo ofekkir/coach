@@ -1,0 +1,108 @@
+import { Buffer } from 'node:buffer';
+import { describe, expect, it } from 'vitest';
+import logsFixture from '../fixtures/logs-787ceebc8510eea59c08cea073a1dd2.json';
+import traceFixture from '../fixtures/trace-787ceebc8510eea59c08cea073a1dd2.json';
+import { enrichTrace } from './enrich.ts';
+import { transformTrace } from './transform.ts';
+import type { TempoTrace } from './types.ts';
+
+function hex2b64(hex: string): string {
+  return Buffer.from(hex, 'hex').toString('base64');
+}
+
+const PARENT_HEX = '0000000000000001';
+const CHILD_HEX = '0000000000000002';
+
+const minimalTrace: TempoTrace = {
+  batches: [
+    {
+      scopeSpans: [
+        {
+          spans: [
+            {
+              spanId: hex2b64(PARENT_HEX),
+              name: 'claude_code.interaction',
+              startTimeUnixNano: '1000000000',
+              endTimeUnixNano: '3000000000',
+              attributes: [
+                { key: 'span.type', value: { stringValue: 'interaction' } },
+                { key: 'user_prompt', value: { stringValue: 'hello world' } },
+              ],
+            },
+            {
+              spanId: hex2b64(CHILD_HEX),
+              parentSpanId: hex2b64(PARENT_HEX),
+              name: 'claude_code.llm_request',
+              startTimeUnixNano: '1500000000',
+              endTimeUnixNano: '2000000000',
+              attributes: [
+                { key: 'span.type', value: { stringValue: 'llm_request' } },
+                { key: 'model', value: { stringValue: 'claude-sonnet-4-6' } },
+                { key: 'input_tokens', value: { intValue: '100' } },
+                { key: 'output_tokens', value: { intValue: '50' } },
+                { key: 'query_source', value: { stringValue: 'repl_main_thread' } },
+                { key: 'request_prompt', value: { stringValue: 'Do the thing' } },
+                { key: 'response_text', value: { stringValue: 'Done.' } },
+                { key: 'cost_usd', value: { stringValue: '0.001234' } },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+describe('transformTrace', () => {
+  it('produces one node per span', () => {
+    const nodes = transformTrace(minimalTrace);
+    expect(nodes).toHaveLength(2);
+  });
+
+  it('sets type and id', () => {
+    const nodes = transformTrace(minimalTrace);
+    expect(nodes.find((n) => n.id === `s${PARENT_HEX}`)?.type).toBe('interaction');
+    expect(nodes.find((n) => n.id === `s${CHILD_HEX}`)?.type).toBe('llm_request');
+  });
+
+  it('sets parent from parentSpanId', () => {
+    const nodes = transformTrace(minimalTrace);
+    expect(nodes.find((n) => n.id === `s${CHILD_HEX}`)?.parent).toBe(`s${PARENT_HEX}`);
+  });
+
+  it('computes duration_ms from span timestamps', () => {
+    const nodes = transformTrace(minimalTrace);
+    // (2000000000 - 1500000000) ns = 500ms
+    expect(nodes.find((n) => n.id === `s${CHILD_HEX}`)?.duration_ms).toBeCloseTo(500);
+  });
+
+  it('maps interaction user_prompt to node.prompt', () => {
+    const nodes = transformTrace(minimalTrace);
+    expect(nodes.find((n) => n.id === `s${PARENT_HEX}`)?.prompt).toBe('hello world');
+  });
+
+  it('maps llm_request enriched attributes to node fields', () => {
+    const nodes = transformTrace(minimalTrace);
+    const child = nodes.find((n) => n.id === `s${CHILD_HEX}`);
+    expect(child?.model).toBe('claude-sonnet-4-6');
+    expect(child?.source).toBe('repl_main_thread');
+    expect(child?.prompt).toBe('Do the thing');
+    expect(child?.response).toBe('Done.');
+    expect(child?.tokens_in).toBe(100);
+    expect(child?.tokens_out).toBe(50);
+    expect(child?.cost_usd).toBeCloseTo(0.001234);
+  });
+
+  it('smoke test: enrich then transform real fixture produces nodes', () => {
+    const enriched = enrichTrace(traceFixture, logsFixture);
+    const nodes = transformTrace(enriched);
+    expect(nodes.length).toBeGreaterThan(0);
+    expect(nodes.some((n) => n.type === 'interaction')).toBe(true);
+    expect(nodes.some((n) => n.type === 'llm_request')).toBe(true);
+    expect(nodes.some((n) => n.type === 'hook')).toBe(true);
+    const llm = nodes.find((n) => n.type === 'llm_request' && n.source != null);
+    expect(llm?.model).toBeDefined();
+    expect(llm?.cost_usd).toBeDefined();
+    expect(llm?.tokens_in).toBeDefined();
+  });
+});
