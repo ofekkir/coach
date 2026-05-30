@@ -121,6 +121,29 @@ function attributeLogsToSpans(
   return bySpan;
 }
 
+// ── Request body index ────────────────────────────────────────────────────────
+
+// api_request_body logs lack request_id; pair them positionally with
+// api_response_body logs (both ordered by event_sequence) to get a
+// request_id → raw_request_body map that works even when timestamps
+// place the request log outside the span's time window.
+function buildRequestBodyIndex(logs: readonly LogEntry[]): Map<string, string> {
+  const sorted = [...logs].sort(
+    (a, b) => parseInt(a.event_sequence, 10) - parseInt(b.event_sequence, 10),
+  );
+  const requestBodies = sorted.filter((l) => l.event_name === 'api_request_body' && l.body != null);
+  const responseBodies = sorted.filter(
+    (l) => l.event_name === 'api_response_body' && l.request_id != null,
+  );
+  const index = new Map<string, string>();
+  for (let i = 0; i < requestBodies.length && i < responseBodies.length; i++) {
+    const reqId = responseBodies[i]?.request_id;
+    const body = requestBodies[i]?.body;
+    if (reqId != null && body != null) index.set(reqId, body);
+  }
+  return index;
+}
+
 // ── Tool input lookup ─────────────────────────────────────────────────────────
 
 function buildToolInputIndex(
@@ -162,72 +185,6 @@ function summarizeToolInput(json: string, max = 120): string | null {
     return null;
   } catch {
     return json.slice(0, max);
-  }
-}
-
-// ── Content extraction ────────────────────────────────────────────────────────
-
-interface ReqBody {
-  messages?: { role: string; content: string | { type: string; text?: string }[] }[];
-}
-
-interface ResBody {
-  content?: { type: string; text?: string; thinking?: string; name?: string }[];
-}
-
-function firstText(content: string | { type: string; text?: string }[]): string | null {
-  if (typeof content === 'string') return content;
-  for (const b of content) {
-    if (b.type === 'text' && b.text) return b.text;
-  }
-  return null;
-}
-
-function unescape(s: string): string {
-  return s
-    .replace(/\\"/g, '"')
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\r')
-    .replace(/\\t/g, '\t')
-    .replace(/\\\\/g, '\\');
-}
-
-function extractLastUserText(bodyJson: string): string | null {
-  try {
-    const parsed = JSON.parse(bodyJson) as ReqBody;
-    const messages = parsed.messages ?? [];
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg?.role !== 'user') continue;
-      const text = firstText(msg.content);
-      if (text) return text;
-    }
-    return null;
-  } catch {
-    let lastIdx = -1;
-    const re = /"role":"user"/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(bodyJson)) !== null) lastIdx = m.index;
-    if (lastIdx === -1) return null;
-    const tm = /"text":"((?:[^"\\]|\\.)+)/.exec(bodyJson.slice(lastIdx));
-    if (!tm?.[1]) return null;
-    return unescape(tm[1]);
-  }
-}
-
-function extractResponseText(bodyJson: string): string | null {
-  try {
-    const parsed = JSON.parse(bodyJson) as ResBody;
-    for (const block of parsed.content ?? []) {
-      if (block.type === 'text' && block.text) return block.text;
-      if (block.type === 'tool_use' && block.name) return `tool_use: ${block.name}`;
-      if (block.type === 'thinking' && block.thinking && block.thinking !== '<REDACTED>') {
-        return block.thinking;
-      }
-    }
-    return null;
-  } catch {
-    return null;
   }
 }
 
@@ -323,26 +280,26 @@ function enrichSpan(
   meta: SpanMeta,
   logs: LogEntry[],
   toolInput: string | null,
-  newParentB64: string | null,
+  requestBodyIndex: Map<string, string>,
 ): OtlpSpan {
   const extra: OtlpAttribute[] = [];
   const spanType = meta.spanType;
 
   if (spanType === 'llm_request') {
     const apiLog = logs.find((l) => l.event_name === 'api_request');
-    const bodyLog = logs.find((l) => l.event_name === 'api_request_body' && l.body != null);
     const responseLog = logs.find((l) => l.event_name === 'api_response_body' && l.body != null);
+
+    // Prefer the positional index (reliable even when the log timestamp falls
+    // outside the span's window); fall back to the attributed log.
+    const rawRequestBody =
+      (meta.requestId != null ? requestBodyIndex.get(meta.requestId) : undefined) ??
+      logs.find((l) => l.event_name === 'api_request_body' && l.body != null)?.body ??
+      null;
 
     if (apiLog?.query_source != null) extra.push(strAttr('query_source', apiLog.query_source));
     if (apiLog?.cost_usd != null) extra.push(strAttr('cost_usd', apiLog.cost_usd));
-    if (bodyLog?.body != null) {
-      const text = extractLastUserText(bodyLog.body);
-      if (text != null) extra.push(strAttr('request_prompt', text.trim()));
-    }
-    if (responseLog?.body != null) {
-      const text = extractResponseText(responseLog.body);
-      if (text != null) extra.push(strAttr('response_text', text.trim()));
-    }
+    if (rawRequestBody != null) extra.push(strAttr('raw_request_body', rawRequestBody));
+    if (responseLog?.body != null) extra.push(strAttr('raw_response_body', responseLog.body));
   }
 
   if (spanType === 'tool' && toolInput != null) {
@@ -350,12 +307,7 @@ function enrichSpan(
     if (summary != null) extra.push(strAttr('tool_input_summary', summary));
   }
 
-  const attributes = extra.length > 0 ? [...span.attributes, ...extra] : span.attributes;
-
-  if (newParentB64 !== null) {
-    return { ...span, parentSpanId: newParentB64, attributes };
-  }
-  return extra.length > 0 ? { ...span, attributes } : span;
+  return extra.length > 0 ? { ...span, attributes: [...span.attributes, ...extra] } : span;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -376,26 +328,8 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
   const metas = collectSpanMeta(trace);
   const logsBySpan = attributeLogsToSpans(metas, logs);
   const toolInputBySpanId = buildToolInputIndex(metas, logs, logsBySpan);
+  const requestBodyIndex = buildRequestBodyIndex(logs);
   const hooks = extractHooks(logs);
-
-  // For each PreToolUse hook, record the reparenting: tool-span-b64 → hook-span-b64
-  const reparentMap = new Map<string, string>(); // tool b64 → new parent b64 (hook)
-  const hookParentOverride = new Map<number, string>(); // hook index → parent b64 override
-
-  for (const hook of hooks) {
-    const { event, toolName } = parseHookEvent(hook.hookName);
-    if (event !== 'PreToolUse' || toolName == null) continue;
-
-    const target = metas
-      .filter((m) => m.spanType === 'tool' && m.toolName === toolName && m.startNs >= hook.startNs)
-      .sort((a, b) => (a.startNs < b.startNs ? -1 : 1))[0];
-
-    if (target == null) continue;
-
-    const hookB64 = hookSpanB64(hook.index);
-    reparentMap.set(target.b64, hookB64);
-    hookParentOverride.set(hook.index, target.parentB64 ?? '');
-  }
 
   // Build enriched span batches
   const enrichedBatches: OtlpBatch[] = trace.batches.map((batch) => ({
@@ -407,8 +341,7 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
         if (meta == null) return span;
         const spanLogs = logsBySpan.get(meta.id) ?? [];
         const toolInput = toolInputBySpanId.get(meta.id) ?? null;
-        const newParent = reparentMap.get(span.spanId) ?? null;
-        return enrichSpan(span, meta, spanLogs, toolInput, newParent);
+        return enrichSpan(span, meta, spanLogs, toolInput, requestBodyIndex);
       }),
     })),
   }));
@@ -416,8 +349,7 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
   // Build hook spans
   const hookSpans: OtlpSpan[] = hooks.map((hook) => {
     const hookB64 = hookSpanB64(hook.index);
-    const parentOverride = hookParentOverride.get(hook.index);
-    const parentB64 = parentOverride ?? resolveHookParentB64(metas, hook);
+    const parentB64 = resolveHookParentB64(metas, hook);
 
     const span: OtlpSpan = {
       traceId,

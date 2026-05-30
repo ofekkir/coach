@@ -64,12 +64,18 @@ export interface TraceNode {
   id: string;
   type: NodeType;
   parent?: string;
+  start_time_ns?: string;
+  end_time_ns?: string;
   duration_ms?: number;
   name?: string;
   model?: string;
   source?: string;
   prompt?: string;
+  raw_request?: string;
+  request?: string;
+  raw_response?: string;
   response?: string;
+  stop_reason?: string;
   tokens_in?: number;
   tokens_out?: number;
   cost_usd?: number;

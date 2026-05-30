@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TraceNode } from '../etl/types.ts';
-import { traceToMermaid } from './mermaid.ts';
+import { traceToCausalMermaid, traceToMermaid } from './mermaid.ts';
 
 const interaction: TraceNode = {
   id: 's0001',
@@ -132,5 +132,99 @@ describe('traceToMermaid', () => {
     expect(() =>
       traceToMermaid([interaction, llmRequest, tool, blockedOnUser, execution, hook]),
     ).not.toThrow();
+  });
+});
+
+describe('traceToCausalMermaid', () => {
+  const llm1: TraceNode = {
+    id: 'llm1',
+    type: 'llm_request',
+    parent: 's0001',
+    source: 'repl_main_thread',
+    start_time_ns: '100000000',
+    end_time_ns: '200000000',
+  };
+  const toolA: TraceNode = {
+    id: 'toolA',
+    type: 'tool',
+    parent: 's0001',
+    name: 'Read',
+    start_time_ns: '210000000',
+    end_time_ns: '300000000',
+  };
+  const llm2: TraceNode = {
+    id: 'llm2',
+    type: 'llm_request',
+    parent: 's0001',
+    source: 'repl_main_thread',
+    start_time_ns: '310000000',
+    end_time_ns: '400000000',
+  };
+  const bgLlm: TraceNode = {
+    id: 'bgLlm',
+    type: 'llm_request',
+    parent: 's0001',
+    source: 'background',
+    start_time_ns: '150000000',
+    end_time_ns: '500000000',
+  };
+
+  it('starts with graph TD', () => {
+    expect(traceToCausalMermaid([interaction])).toMatch(/^graph TD/);
+  });
+
+  it('returns early with no interaction node', () => {
+    expect(traceToCausalMermaid([llmRequest])).toContain('%% no interaction node');
+  });
+
+  it('emits interaction as root node', () => {
+    const result = traceToCausalMermaid([interaction, llm1]);
+    expect(result).toContain('s0001');
+    expect(result).toContain('interaction');
+  });
+
+  it('groups llm_requests by source into thread subgraphs', () => {
+    const result = traceToCausalMermaid([interaction, llm1, llm2]);
+    expect(result).toContain('subgraph thread_repl_main_thread');
+    expect(result).toContain('llm1');
+    expect(result).toContain('llm2');
+  });
+
+  it('connects sequential llm_requests within a thread', () => {
+    const result = traceToCausalMermaid([interaction, llm1, llm2]);
+    expect(result).toMatch(/llm1.*-->.*llm2/);
+  });
+
+  it('assigns tool to the thread whose llm_request ended most recently before it', () => {
+    const result = traceToCausalMermaid([interaction, llm1, toolA, llm2, bgLlm]);
+    expect(result).toContain('toolA');
+    // toolA starts at 210ms, llm1 ends at 200ms — assigned to repl_main_thread
+    expect(result).toMatch(/subgraph thread_repl_main_thread[\s\S]*toolA[\s\S]*end/);
+  });
+
+  it('wraps tool nodes with children in a subgraph', () => {
+    const toolWithChild: TraceNode = {
+      id: 'twc',
+      type: 'tool',
+      parent: 's0001',
+      name: 'Skill',
+      start_time_ns: '210000000',
+      end_time_ns: '300000000',
+    };
+    const child: TraceNode = {
+      id: 'child1',
+      type: 'tool.execution',
+      parent: 'twc',
+      start_time_ns: '215000000',
+    };
+    const result = traceToCausalMermaid([interaction, llm1, toolWithChild, child]);
+    expect(result).toContain('subgraph sg_twc');
+    expect(result).toContain('child1');
+  });
+
+  it('emits separate subgraphs for distinct thread sources', () => {
+    const result = traceToCausalMermaid([interaction, llm1, bgLlm]);
+    expect(result).toContain('thread_repl_main_thread');
+    expect(result).toContain('thread_background');
   });
 });
