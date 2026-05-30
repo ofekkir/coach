@@ -9,6 +9,8 @@ out.enriched-trace.json
 out.enriched-trace.otlp.json
 out.nodes.json
 out.mmd
+out.mermaid
+out.causal.mmd
 out.timeline
 
 # Personal, machine-local Claude Code settings (committed counterpart: .claude/settings.json)
