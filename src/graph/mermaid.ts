@@ -1,8 +1,5 @@
 import type { TraceNode } from '../etl/types.ts';
 
-// Keep TempoTrace and LogEntry re-exported so existing imports don't break
-export type { TempoTrace, LogEntry } from '../etl/types.ts';
-
 function sanitize(text: string): string {
   return text.replace(/`/g, "'").replace(/"/g, "'");
 }
