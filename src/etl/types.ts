@@ -1,6 +1,6 @@
 // ── OTLP types (raw input) ────────────────────────────────────────────────────
 
-export type OtlpValue =
+type OtlpValue =
   | { readonly stringValue: string }
   | { readonly boolValue: boolean }
   | { readonly intValue: string }
