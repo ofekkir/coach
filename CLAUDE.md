@@ -14,6 +14,7 @@ targets the engineer** until we learn which problems are actually solvable.
 - **Language:** TypeScript (ESM, strict)
 - **Package manager:** pnpm (do not use npm/yarn)
 - **Lint/format:** ESLint (flat config, `strict-type-checked`) + Prettier
+- **Dead code:** Knip (unused files, exports, dependencies)
 - **Tests:** Vitest
 - **CI:** GitHub Actions
 
@@ -21,7 +22,7 @@ targets the engineer** until we learn which problems are actually solvable.
 
 ```bash
 pnpm install          # install dependencies
-pnpm check            # typecheck + lint + format:check + test (what CI runs)
+pnpm check            # typecheck + lint + format:check + test + knip (what CI runs)
 pnpm typecheck        # tsc --noEmit
 pnpm lint             # eslint, warnings = errors (--max-warnings=0)
 pnpm lint:fix         # eslint --fix
@@ -29,7 +30,8 @@ pnpm format           # prettier --write .
 pnpm format:check     # prettier --check .
 pnpm test             # vitest run
 pnpm test:watch       # vitest (watch)
-pnpm build            # emit dist/ via tsconfig.build.json
+pnpm knip             # check for unused files, exports, and dependencies
+pnpm build            # emit dist/ via tsup
 ```
 
 ## Quality gates are enforced by hooks, not by trust
@@ -37,12 +39,12 @@ pnpm build            # emit dist/ via tsconfig.build.json
 Linting/formatting/type/test rules are enforced **deterministically**, in three committed layers —
 not as polite requests in this file:
 
-1. **`.husky/pre-commit`** — runs `lint-staged` (ESLint `--fix` + Prettier on staged files) and a
-   full `pnpm typecheck` on **every commit, by every contributor**. This is the primary gate.
-2. **`.claude/hooks/lint.sh`** (wired via `.claude/settings.json` `PostToolUse`) — formats and lints
-   each file immediately after Claude edits it, surfacing errors back into the agent loop.
-3. **`.github/workflows/ci.yml`** — re-runs the full `pnpm check` as the backstop that cannot be
-   bypassed locally.
+1. **`.husky/pre-commit`** — runs `lint-staged` (ESLint `--fix` + Prettier on staged files),
+   `pnpm typecheck`, and `pnpm knip` on **every commit, by every contributor**. This is the primary gate.
+2. **`.claude/hooks/lint.sh`** and **`pnpm knip`** (wired via `.claude/settings.json` `PostToolUse`) —
+   formats, lints, and checks for dead code immediately after Claude edits a file.
+3. **`.github/workflows/ci.yml`** — re-runs the full `pnpm check` (including knip) as the backstop
+   that cannot be bypassed locally.
 
 Strictness: TypeScript runs with `strict` plus extra safety flags; ESLint treats **warnings as
 errors** (`--max-warnings=0`). Don't weaken these to make code pass — fix the code.
@@ -66,11 +68,11 @@ before an anonymous block. Comments are for non-obvious WHY, not for labelling W
 ```
 src/
   index.ts            # public exports
-  trace/span.ts       # OTEL span model coach reasons about
-  analysis/           # trace-analysis logic (+ co-located *.test.ts)
+  etl/                # enrich + transform pipeline (+ co-located *.test.ts)
+  graph/              # mermaid graph generation
 .claude/
-  settings.json       # committed Claude Code config (PostToolUse lint hook)
-  hooks/lint.sh       # the hook script
+  settings.json       # committed Claude Code config (PostToolUse lint + knip hooks)
+  hooks/lint.sh       # per-file lint hook script
 .husky/pre-commit     # git pre-commit gate
 .github/workflows/    # CI
 ```
