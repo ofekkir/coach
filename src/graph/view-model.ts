@@ -60,7 +60,7 @@ function formatGap(prev: TraceNode, next: TraceNode): string | null {
   return ms > 0 ? `+${formatDuration(ms)}` : `-${formatDuration(-ms)}`;
 }
 
-function truncate(text: string, max: number): string {
+export function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + '…';
 }
 
@@ -70,22 +70,22 @@ function buildLabelLines(node: TraceNode): string[] {
   switch (node.type) {
     case 'agent':
       lines.push('agent');
-      if (node.user_id != null) lines.push(truncate(node.user_id, 40));
+      if (node.user_id != null) lines.push(node.user_id);
       break;
     case 'session':
       lines.push('session');
-      if (node.session_id != null) lines.push(truncate(node.session_id, 40));
+      if (node.session_id != null) lines.push(node.session_id);
       break;
     case 'interaction':
       lines.push('interaction');
-      if (node.prompt != null) lines.push(truncate(node.prompt.replace(/\s+/g, ' '), 80));
+      if (node.prompt != null) lines.push(node.prompt.replace(/\s+/g, ' '));
       break;
     case 'llm_request':
       lines.push('llm_request');
       if (node.model != null) lines.push(`model: ${node.model}`);
       if (node.source != null) lines.push(`source: ${node.source}`);
-      if (node.prompt != null) lines.push(truncate(node.prompt.replace(/\s+/g, ' '), 80));
-      if (node.response != null) lines.push(truncate(node.response.replace(/\s+/g, ' '), 80));
+      if (node.prompt != null) lines.push(node.prompt.replace(/\s+/g, ' '));
+      if (node.response != null) lines.push(node.response.replace(/\s+/g, ' '));
       break;
     case 'tool':
       lines.push('tool');
