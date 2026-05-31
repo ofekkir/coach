@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
-import logsFixture from '../fixtures/logs-787ceebc8510eea59c08cea073a1dd2.json';
-import traceFixture from '../fixtures/trace-787ceebc8510eea59c08cea073a1dd2.json';
+import logsFixture from '../fixtures/update-claude-config/logs.json';
+import traceFixture from '../fixtures/update-claude-config/trace.json';
 import { enrichTrace } from './enrich.ts';
 import { transformTrace } from './transform.ts';
 import type { TempoTrace } from './types.ts';

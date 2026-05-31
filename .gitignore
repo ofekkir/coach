@@ -4,13 +4,10 @@ coverage
 *.log
 .DS_Store
 
-# Pipeline output artifacts
-out.enriched-trace.json
-out.enriched-trace.otlp.json
-out.nodes.json
-out.mmd
+# Pipeline output artifacts (out/ dir is committed empty via .gitkeep)
+out/*
+!out/.gitkeep
 out.mermaid
-out.causal.mmd
 out.timeline
 
 # Personal, machine-local Claude Code settings (committed counterpart: .claude/settings.json)

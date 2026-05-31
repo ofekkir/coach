@@ -1,6 +1,11 @@
 import type { TraceNode } from '../etl/types.ts';
 import type { CausalGraphView, CompositionGraphView, GraphViewNode } from './view-model.ts';
-import { buildCausalGraphView, buildCompositionGraphView } from './view-model.ts';
+import {
+  buildAgentCausalGraphView,
+  buildCausalGraphView,
+  buildCompositionGraphView,
+  buildSessionCausalGraphView,
+} from './view-model.ts';
 
 function sanitize(text: string): string {
   return text.replace(/`/g, "'").replace(/"/g, "'");
@@ -61,5 +66,17 @@ export function traceToMermaid(nodes: readonly TraceNode[]): string {
 export function traceToCausalMermaid(nodes: readonly TraceNode[]): string {
   const view = buildCausalGraphView(nodes);
   if (view == null) return 'graph TD\n  %% no interaction node';
+  return renderCausalView(view);
+}
+
+export function sessionToCausalMermaid(nodes: readonly TraceNode[]): string {
+  const view = buildSessionCausalGraphView(nodes);
+  if (view == null) return 'graph TD\n  %% no session node';
+  return renderCausalView(view);
+}
+
+export function agentToCausalMermaid(nodes: readonly TraceNode[]): string {
+  const view = buildAgentCausalGraphView(nodes);
+  if (view == null) return 'graph TD\n  %% no agent node';
   return renderCausalView(view);
 }
