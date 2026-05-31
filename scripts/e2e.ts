@@ -5,11 +5,18 @@ import { enrichTrace } from '../src/etl/enrich.ts';
 import { transformTrace } from '../src/etl/transform.ts';
 import type { LogEntry, TempoTrace, TraceNode } from '../src/etl/types.ts';
 import {
+  buildAgentCausalHtml,
+  buildCausalHtml,
+  buildCompositionHtml,
+  buildSessionCausalHtml,
+} from '../src/graph/html.ts';
+import {
   agentToCausalMermaid,
   sessionToCausalMermaid,
   traceToCausalMermaid,
   traceToMermaid,
 } from '../src/graph/mermaid.ts';
+import { buildCausalGraphView, buildCompositionGraphView } from '../src/graph/view-model.ts';
 
 const name = process.argv[2];
 if (!name) {
@@ -41,13 +48,11 @@ function writeNodes(nodes: readonly TraceNode[], suffix: string): void {
   console.log(`wrote ${path} (${String(nodes.length)} nodes)`);
 }
 
-function writeMermaid(nodes: readonly TraceNode[], suffix: string, causal: boolean): void {
-  writeFileSync(`${outDir}/composition${suffix}.mmd`, traceToMermaid(nodes) + '\n');
-  console.log(`wrote ${outDir}/composition${suffix}.mmd`);
-  if (causal) {
-    writeFileSync(`${outDir}/causal${suffix}.mmd`, traceToCausalMermaid(nodes) + '\n');
-    console.log(`wrote ${outDir}/causal${suffix}.mmd`);
-  }
+function writeDiagram(stem: string, mermaid: string, html: string): void {
+  writeFileSync(`${outDir}/${stem}.mmd`, mermaid + '\n');
+  console.log(`wrote ${outDir}/${stem}.mmd`);
+  writeFileSync(`${outDir}/${stem}.html`, html);
+  console.log(`wrote ${outDir}/${stem}.html`);
 }
 
 function processTrace(traceFile: string, suffix: string): TraceNode[] {
@@ -60,7 +65,20 @@ function processTrace(traceFile: string, suffix: string): TraceNode[] {
 
   const traceNodes = addSessionNode(transformTrace(enriched));
   writeNodes(traceNodes, suffix);
-  writeMermaid(traceNodes, suffix, true);
+
+  const compositionView = buildCompositionGraphView(traceNodes);
+  writeDiagram(
+    `composition${suffix}`,
+    traceToMermaid(traceNodes),
+    buildCompositionHtml(compositionView, `Composition${suffix}`),
+  );
+
+  const causalView = buildCausalGraphView(traceNodes);
+  writeDiagram(
+    `causal${suffix}`,
+    traceToCausalMermaid(traceNodes),
+    causalView != null ? buildCausalHtml(causalView, `Causal${suffix}`) : '<p>No causal view</p>',
+  );
 
   return traceNodes;
 }
@@ -78,18 +96,36 @@ if (isSession) {
   console.log('\n── session');
   const sessionNodes = aggregateSession(allTraceNodes);
   writeNodes(sessionNodes, '-session');
-  writeFileSync(`${outDir}/composition-session.mmd`, traceToMermaid(sessionNodes) + '\n');
-  console.log(`wrote ${outDir}/composition-session.mmd`);
-  writeFileSync(`${outDir}/causal-session.mmd`, sessionToCausalMermaid(sessionNodes) + '\n');
-  console.log(`wrote ${outDir}/causal-session.mmd`);
+
+  const sessionCompositionView = buildCompositionGraphView(sessionNodes);
+  writeDiagram(
+    'composition-session',
+    traceToMermaid(sessionNodes),
+    buildCompositionHtml(sessionCompositionView, 'Composition — Session'),
+  );
+
+  writeDiagram(
+    'causal-session',
+    sessionToCausalMermaid(sessionNodes),
+    buildSessionCausalHtml(sessionNodes, 'Causal — Session'),
+  );
 
   console.log('\n── agent');
   const agentNodes = aggregateAgent(sessionNodes);
   writeNodes(agentNodes, '-agent');
-  writeFileSync(`${outDir}/composition-agent.mmd`, traceToMermaid(agentNodes) + '\n');
-  console.log(`wrote ${outDir}/composition-agent.mmd`);
-  writeFileSync(`${outDir}/causal-agent.mmd`, agentToCausalMermaid(agentNodes) + '\n');
-  console.log(`wrote ${outDir}/causal-agent.mmd`);
+
+  const agentCompositionView = buildCompositionGraphView(agentNodes);
+  writeDiagram(
+    'composition-agent',
+    traceToMermaid(agentNodes),
+    buildCompositionHtml(agentCompositionView, 'Composition — Agent'),
+  );
+
+  writeDiagram(
+    'causal-agent',
+    agentToCausalMermaid(agentNodes),
+    buildAgentCausalHtml(agentNodes, 'Causal — Agent'),
+  );
 } else {
   processTrace('trace.json', '');
 }

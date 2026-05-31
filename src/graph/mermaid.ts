@@ -5,14 +5,17 @@ import {
   buildCausalGraphView,
   buildCompositionGraphView,
   buildSessionCausalGraphView,
+  truncate,
 } from './view-model.ts';
+
+const MERMAID_LINE_MAX = 80;
 
 function sanitize(text: string): string {
   return text.replace(/`/g, "'").replace(/"/g, "'");
 }
 
 function renderLabel(labelLines: readonly string[]): string {
-  return sanitize(labelLines.join('\n'));
+  return sanitize(labelLines.map((l) => truncate(l, MERMAID_LINE_MAX)).join('\n'));
 }
 
 function renderViewNode(node: GraphViewNode, out: string[], indent: string): void {
