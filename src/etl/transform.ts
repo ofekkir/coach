@@ -91,6 +91,8 @@ interface ParsedSpan {
   readonly userPrompt: string | null;
   readonly inputTokens: number | null;
   readonly outputTokens: number | null;
+  readonly sessionId: string | null;
+  readonly userId: string | null;
   // enriched attributes
   readonly querySource: string | null;
   readonly rawRequestBody: string | null;
@@ -153,6 +155,8 @@ function parseSpans(trace: TempoTrace): ParsedSpan[] {
           userPrompt: getStringAttr(span.attributes, 'user_prompt'),
           inputTokens: getIntAttr(span.attributes, 'input_tokens'),
           outputTokens: getIntAttr(span.attributes, 'output_tokens'),
+          sessionId: getStringAttr(span.attributes, 'session.id'),
+          userId: getStringAttr(span.attributes, 'user.id'),
           querySource: getStringAttr(span.attributes, 'query_source'),
           rawRequestBody: getStringAttr(span.attributes, 'raw_request_body'),
           rawResponseBody: getStringAttr(span.attributes, 'raw_response_body'),
@@ -187,6 +191,8 @@ function spanToNode(span: ParsedSpan, rootId: string | null): TraceNode {
   switch (span.spanType) {
     case 'interaction':
       if (span.userPrompt != null) node.prompt = span.userPrompt;
+      if (span.sessionId != null) node.session_id = span.sessionId;
+      if (span.userId != null) node.user_id = span.userId;
       break;
     case 'llm_request':
       if (span.model != null) node.model = span.model;

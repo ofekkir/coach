@@ -53,6 +53,8 @@ export interface LogEntry {
 // ── Transformed node (ETL output) ────────────────────────────────────────────
 
 export type NodeType =
+  | 'agent'
+  | 'session'
   | 'interaction'
   | 'llm_request'
   | 'tool'
@@ -64,6 +66,10 @@ export interface TraceNode {
   id: string;
   type: NodeType;
   parent?: string;
+  // Ambient identifiers — present on interaction nodes and synthesized aggregation nodes
+  session_id?: string;
+  user_id?: string;
+  // Span timing — absent on synthesized nodes
   start_time_ns?: string;
   end_time_ns?: string;
   duration_ms?: number;

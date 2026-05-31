@@ -68,6 +68,14 @@ function buildLabelLines(node: TraceNode): string[] {
   const lines: string[] = [];
 
   switch (node.type) {
+    case 'agent':
+      lines.push('agent');
+      if (node.user_id != null) lines.push(truncate(node.user_id, 40));
+      break;
+    case 'session':
+      lines.push('session');
+      if (node.session_id != null) lines.push(truncate(node.session_id, 40));
+      break;
     case 'interaction':
       lines.push('interaction');
       if (node.prompt != null) lines.push(truncate(node.prompt.replace(/\s+/g, ' '), 80));
@@ -197,10 +205,9 @@ function assignNodeToThread(
   return bestByEnd ?? firstByStart;
 }
 
-export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphView | null {
+function buildChildrenOf(nodes: readonly TraceNode[]): Map<string, TraceNode[]> {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const childrenOf = new Map<string, TraceNode[]>();
-
   for (const n of nodes) {
     if (n.parent != null && byId.has(n.parent)) {
       const list = childrenOf.get(n.parent) ?? [];
@@ -208,6 +215,11 @@ export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphVi
       childrenOf.set(n.parent, list);
     }
   }
+  return childrenOf;
+}
+
+export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphView | null {
+  const childrenOf = buildChildrenOf(nodes);
 
   const interaction = nodes.find((n) => n.type === 'interaction');
   if (interaction == null) return null;
@@ -286,6 +298,69 @@ export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphVi
     threads,
     rootToThreadIds: threads.map((t) => t.id),
   };
+}
+
+// Builds a causal graph with the session node as root and one thread per
+// interaction, each thread containing the full span subtree of that interaction.
+export function buildSessionCausalGraphView(nodes: readonly TraceNode[]): CausalGraphView | null {
+  const session = nodes.find((n) => n.type === 'session');
+  if (session == null) return null;
+
+  const childrenOf = buildChildrenOf(nodes);
+  const interactions = sortByStart(
+    (childrenOf.get(session.id) ?? []).filter((n) => n.type === 'interaction'),
+  );
+  if (interactions.length === 0) return null;
+
+  const root: GraphViewNode = {
+    id: session.id,
+    labelLines: buildLabelLines(session),
+    children: [],
+    innerEdges: [],
+  };
+
+  const threads: GraphViewThread[] = interactions.map((interaction, i) => {
+    const threadId = `thread_interaction_${String(i + 1)}`;
+    const title =
+      interaction.prompt != null
+        ? truncate(interaction.prompt, 60)
+        : `interaction ${String(i + 1)}`;
+    const memberViewNode = toViewNode(interaction, childrenOf);
+    const edges: GraphViewEdge[] = [];
+    return { id: threadId, title, members: [memberViewNode], edges };
+  });
+
+  return { root, threads, rootToThreadIds: threads.map((t) => t.id) };
+}
+
+// Builds a causal graph with the agent node as root and one thread per session,
+// each thread containing that session's interactions as nested view nodes.
+export function buildAgentCausalGraphView(nodes: readonly TraceNode[]): CausalGraphView | null {
+  const agent = nodes.find((n) => n.type === 'agent');
+  if (agent == null) return null;
+
+  const childrenOf = buildChildrenOf(nodes);
+  const sessions = sortByStart(
+    (childrenOf.get(agent.id) ?? []).filter((n) => n.type === 'session'),
+  );
+  if (sessions.length === 0) return null;
+
+  const root: GraphViewNode = {
+    id: agent.id,
+    labelLines: buildLabelLines(agent),
+    children: [],
+    innerEdges: [],
+  };
+
+  const threads: GraphViewThread[] = sessions.map((session, i) => {
+    const threadId = `thread_session_${String(i + 1)}`;
+    const title =
+      session.session_id != null ? truncate(session.session_id, 40) : `session ${String(i + 1)}`;
+    const memberViewNode = toViewNode(session, childrenOf);
+    return { id: threadId, title, members: [memberViewNode], edges: [] };
+  });
+
+  return { root, threads, rootToThreadIds: threads.map((t) => t.id) };
 }
 
 export function buildCompositionGraphView(nodes: readonly TraceNode[]): CompositionGraphView {

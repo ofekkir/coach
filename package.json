@@ -24,8 +24,9 @@
     "test:watch": "vitest",
     "enrich": "node --experimental-strip-types scripts/enrich.ts",
     "etl": "node --experimental-strip-types scripts/etl.ts",
-    "e2e": "pnpm enrich && pnpm etl && pnpm graph",
     "graph": "node --experimental-strip-types scripts/graph.ts",
+    "e2e": "node --experimental-strip-types scripts/e2e.ts",
+    "viz": "node --experimental-strip-types scripts/viz.ts",
     "knip": "knip",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm knip",
     "prepare": "husky"
