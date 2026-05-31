@@ -24,7 +24,6 @@
     "test:watch": "vitest",
     "enrich": "node --experimental-strip-types scripts/enrich.ts",
     "etl": "node --experimental-strip-types scripts/etl.ts",
-    "graph": "node --experimental-strip-types scripts/graph.ts",
     "e2e": "node --experimental-strip-types scripts/e2e.ts",
     "viz": "node --experimental-strip-types scripts/viz.ts",
     "knip": "knip",

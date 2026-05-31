@@ -9,60 +9,38 @@ learn which problems are solvable.
 
 ## Pipeline
 
-```mermaid
-flowchart TD
-    subgraph inputs["Inputs (per trace)"]
-        T["trace.json\nTempoTrace"]
-        L["logs.json\nLogEntry[]"]
-    end
-
-    subgraph etl["ETL"]
-        E["enrichTrace(trace, logs)\n→ logs attached to spans"]
-        X["transformTrace(enriched)\n→ TraceNode[]"]
-        S["addSessionNode(nodes)\n→ TraceNode[] with session wrapper"]
-        E --> X --> S
-    end
-
-    subgraph agg["Aggregation (multi-trace only)"]
-        AS["aggregateSession(allTraceNodes[])\n→ session-level TraceNode[]"]
-        AA["aggregateAgent(sessionNodes)\n→ agent-level TraceNode[]"]
-        AS --> AA
-    end
-
-    subgraph vm["View Model"]
-        VM1["buildCompositionGraphView"]
-        VM2["buildCausalGraphView"]
-        VM3["buildSessionCausalGraphView"]
-        VM4["buildAgentCausalGraphView"]
-    end
-
-    subgraph out["Outputs"]
-        O1["composition.mmd"]
-        O2["causal.mmd"]
-        O3["causal-session.mmd"]
-        O4["causal-agent.mmd"]
-        O5["agent.html"]
-    end
-
-    T & L --> E
-    S -->|one trace| VM1 & VM2
-    S -->|multi-trace| AS
-    AS --> VM3
-    AA --> VM4
-    VM1 --> O1
-    VM2 --> O2
-    VM3 --> O3
-    VM4 --> O4
-    VM4 -.->|planned| O5
+```
+trace.json / logs.json
+        │
+        ▼ ETL (per trace)
+   enrichTrace → transformTrace → addSessionNode
+        │
+        ▼ Aggregation
+   aggregateSession (per session)
+   groupSessionsByAgent → aggregateAgent (per user_id)
+        │
+        ▼ View model (bottom-up)
+   buildCausalGraphView        → CausalGraphView
+   buildSessionCausalGraphView → SessionCausalGraphView
+   buildAgentCausalGraphView   → AgentCausalGraphView
+        │
+        ▼ HTML
+   buildCausalHtml / buildSessionCausalHtml / buildAgentCausalHtml
 ```
 
-| Output                   | Root node   | Structure                  |
-| ------------------------ | ----------- | -------------------------- |
-| `composition.mmd`        | flat list   | parent→child edges         |
-| `causal.mmd`             | interaction | one thread per LLM source  |
-| `causal-session.mmd`     | session     | one thread per interaction |
-| `causal-agent.mmd`       | agent       | one thread per session     |
-| `agent.html` _(planned)_ | agent       | same as above, interactive |
+View models are built bottom-up and consumed only by HTML renderers — no raw `TraceNode[]` reaches the rendering layer.
+
+### Fixture modes
+
+`pnpm e2e` accepts a path (relative to cwd) or a fixture name under `src/fixtures/`.
+
+| Input shape                        | Mode                | HTML outputs                                            |
+| ---------------------------------- | ------------------- | ------------------------------------------------------- |
+| `<dir>/trace.json` + `logs.json`   | Single trace        | `composition`, `causal`                                 |
+| `<dir>/trace-*.json` + `logs.json` | Multi-trace session | above + `causal-session`, `causal-agent`                |
+| `<dir>/` containing session dirs   | Multi-session       | per-session outputs + `causal-agent-{userId}` per agent |
+
+In multi-session mode the `user_id` embedded in each trace determines the agent — one HTML is produced per unique `user_id` across all sessions.
 
 ## Quick start
 

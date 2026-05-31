@@ -46,6 +46,23 @@ export function aggregateSession(nodesByTrace: readonly (readonly TraceNode[])[]
   return result;
 }
 
+// Groups session-level node arrays by user_id for multi-session agent aggregation.
+// Sessions without a user_id are dropped.
+export function groupSessionsByAgent(
+  sessionNodeArrays: readonly (readonly TraceNode[])[],
+): Map<string, TraceNode[][]> {
+  const groups = new Map<string, TraceNode[][]>();
+  for (const nodes of sessionNodeArrays) {
+    const session = nodes.find((n) => n.type === 'session' && n.parent == null);
+    const userId = session?.user_id;
+    if (userId == null) continue;
+    const group = groups.get(userId) ?? [];
+    group.push([...nodes]);
+    groups.set(userId, group);
+  }
+  return groups;
+}
+
 // Synthesizes an agent node and re-parents root session nodes under it.
 export function aggregateAgent(sessionNodes: readonly TraceNode[]): TraceNode[] {
   const session = sessionNodes.find((n) => n.type === 'session' && n.parent == null);

@@ -26,6 +26,16 @@ export interface CausalGraphView {
   rootToThreadIds: readonly string[];
 }
 
+export interface SessionCausalGraphView {
+  root: GraphViewNode;
+  interactions: readonly { readonly title: string; readonly view: CausalGraphView }[];
+}
+
+export interface AgentCausalGraphView {
+  root: GraphViewNode;
+  sessions: readonly { readonly title: string; readonly view: SessionCausalGraphView }[];
+}
+
 export interface CompositionGraphView {
   nodes: readonly GraphViewNode[];
   edges: readonly GraphViewEdge[];
@@ -60,7 +70,7 @@ function formatGap(prev: TraceNode, next: TraceNode): string | null {
   return ms > 0 ? `+${formatDuration(ms)}` : `-${formatDuration(-ms)}`;
 }
 
-export function truncate(text: string, max: number): string {
+function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + '…';
 }
 
@@ -300,9 +310,27 @@ export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphVi
   };
 }
 
-// Builds a causal graph with the session node as root and one thread per
-// interaction, each thread containing the full span subtree of that interaction.
-export function buildSessionCausalGraphView(nodes: readonly TraceNode[]): CausalGraphView | null {
+function nodeSubtree(nodes: readonly TraceNode[], rootId: string): TraceNode[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const childrenOf = buildChildrenOf(nodes);
+  const result: TraceNode[] = [];
+  const queue: string[] = [rootId];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (id == null) continue;
+    const node = byId.get(id);
+    if (node == null) continue;
+    result.push(node);
+    for (const child of childrenOf.get(id) ?? []) {
+      queue.push(child.id);
+    }
+  }
+  return result;
+}
+
+export function buildSessionCausalGraphView(
+  nodes: readonly TraceNode[],
+): SessionCausalGraphView | null {
   const session = nodes.find((n) => n.type === 'session');
   if (session == null) return null;
 
@@ -319,23 +347,31 @@ export function buildSessionCausalGraphView(nodes: readonly TraceNode[]): Causal
     innerEdges: [],
   };
 
-  const threads: GraphViewThread[] = interactions.map((interaction, i) => {
-    const threadId = `thread_interaction_${String(i + 1)}`;
+  const interactionViews = interactions.map((interaction, i) => {
     const title =
       interaction.prompt != null
-        ? truncate(interaction.prompt, 60)
+        ? truncate(interaction.prompt.replace(/\s+/g, ' '), 60)
         : `interaction ${String(i + 1)}`;
-    const memberViewNode = toViewNode(interaction, childrenOf);
-    const edges: GraphViewEdge[] = [];
-    return { id: threadId, title, members: [memberViewNode], edges };
+    const interactionNodes = nodeSubtree(nodes, interaction.id);
+    const view = buildCausalGraphView(interactionNodes) ?? {
+      root: {
+        id: interaction.id,
+        labelLines: buildLabelLines(interaction),
+        children: [],
+        innerEdges: [],
+      },
+      threads: [],
+      rootToThreadIds: [],
+    };
+    return { title, view };
   });
 
-  return { root, threads, rootToThreadIds: threads.map((t) => t.id) };
+  return { root, interactions: interactionViews };
 }
 
-// Builds a causal graph with the agent node as root and one thread per session,
-// each thread containing that session's interactions as nested view nodes.
-export function buildAgentCausalGraphView(nodes: readonly TraceNode[]): CausalGraphView | null {
+export function buildAgentCausalGraphView(
+  nodes: readonly TraceNode[],
+): AgentCausalGraphView | null {
   const agent = nodes.find((n) => n.type === 'agent');
   if (agent == null) return null;
 
@@ -352,15 +388,18 @@ export function buildAgentCausalGraphView(nodes: readonly TraceNode[]): CausalGr
     innerEdges: [],
   };
 
-  const threads: GraphViewThread[] = sessions.map((session, i) => {
-    const threadId = `thread_session_${String(i + 1)}`;
+  const sessionViews = sessions.map((session, i) => {
     const title =
       session.session_id != null ? truncate(session.session_id, 40) : `session ${String(i + 1)}`;
-    const memberViewNode = toViewNode(session, childrenOf);
-    return { id: threadId, title, members: [memberViewNode], edges: [] };
+    const sessionNodes = nodeSubtree(nodes, session.id);
+    const view = buildSessionCausalGraphView(sessionNodes) ?? {
+      root: { id: session.id, labelLines: buildLabelLines(session), children: [], innerEdges: [] },
+      interactions: [],
+    };
+    return { title, view };
   });
 
-  return { root, threads, rootToThreadIds: threads.map((t) => t.id) };
+  return { root, sessions: sessionViews };
 }
 
 export function buildCompositionGraphView(nodes: readonly TraceNode[]): CompositionGraphView {
