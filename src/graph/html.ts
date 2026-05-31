@@ -1,6 +1,10 @@
-import type { TraceNode } from '../etl/types.ts';
-import type { CausalGraphView, CompositionGraphView, GraphViewNode } from './view-model.ts';
-import { buildCausalGraphView, truncate } from './view-model.ts';
+import type {
+  AgentCausalGraphView,
+  CausalGraphView,
+  CompositionGraphView,
+  GraphViewNode,
+  SessionCausalGraphView,
+} from './view-model.ts';
 
 function esc(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -42,46 +46,7 @@ function renderThreadColumns(view: CausalGraphView): string {
     .join('');
 }
 
-// Returns all nodes in the subtree rooted at rootId (inclusive).
-function getSubtree(nodes: readonly TraceNode[], rootId: string): TraceNode[] {
-  const result: TraceNode[] = [];
-  const queue = [rootId];
-  while (queue.length > 0) {
-    const id = queue.shift();
-    if (id == null) continue;
-    const node = nodes.find((n) => n.id === id);
-    if (node == null) continue;
-    result.push(node);
-    for (const child of nodes.filter((n) => n.parent === id)) {
-      queue.push(child.id);
-    }
-  }
-  return result;
-}
-
-function sortedChildren(nodes: readonly TraceNode[], parentId: string): TraceNode[] {
-  return nodes
-    .filter((n) => n.parent === parentId)
-    .sort((a, b) => {
-      const aStart = a.start_time_ns != null ? BigInt(a.start_time_ns) : 0n;
-      const bStart = b.start_time_ns != null ? BigInt(b.start_time_ns) : 0n;
-      return aStart < bStart ? -1 : aStart > bStart ? 1 : 0;
-    });
-}
-
-function renderInteractionSection(
-  interaction: TraceNode,
-  allNodes: readonly TraceNode[],
-  index: number,
-): string {
-  const view = buildCausalGraphView(getSubtree(allNodes, interaction.id));
-  if (view == null) return '';
-
-  const title =
-    interaction.prompt != null
-      ? truncate(interaction.prompt.replace(/\s+/g, ' '), 60)
-      : `interaction ${String(index + 1)}`;
-
+function renderInteraction(title: string, view: CausalGraphView): string {
   return `<details class="interaction" open>
   <summary>${esc(title)}</summary>
   <div class="interaction-body">
@@ -152,43 +117,30 @@ ${rootHtml}
   );
 }
 
-export function buildSessionCausalHtml(nodes: readonly TraceNode[], title: string): string {
-  const session = nodes.find((n) => n.type === 'session');
-  if (session == null) return page(title, '<p>No session node</p>');
-
-  const sessionLabel = ['session', session.session_id].filter(Boolean).join('\n');
-  const interactions = sortedChildren(nodes, session.id).filter((n) => n.type === 'interaction');
-
-  const sectionsHtml = interactions
-    .map((interaction, i) => renderInteractionSection(interaction, nodes, i))
+export function buildSessionCausalHtml(view: SessionCausalGraphView, title: string): string {
+  const sectionsHtml = view.interactions
+    .map(({ title: interactionTitle, view: causalView }) =>
+      renderInteraction(interactionTitle, causalView),
+    )
     .join('');
 
   return page(
     title,
     `
 <h1>${esc(title)}</h1>
-<div class="root-node"><div class="label">${esc(sessionLabel)}</div></div>
+<div class="root-node">${labelDiv(view.root.labelLines)}</div>
 <div class="down-arrow">↓</div>
 <div style="display:flex;flex-direction:column;gap:0.5rem">${sectionsHtml}</div>`,
   );
 }
 
-export function buildAgentCausalHtml(nodes: readonly TraceNode[], title: string): string {
-  const agent = nodes.find((n) => n.type === 'agent');
-  if (agent == null) return page(title, '<p>No agent node</p>');
-
-  const agentLabel = ['agent', agent.user_id].filter(Boolean).join('\n');
-  const sessions = sortedChildren(nodes, agent.id).filter((n) => n.type === 'session');
-
-  const sessionsHtml = sessions
-    .map((session, si) => {
-      const sessionTitle =
-        session.session_id != null ? truncate(session.session_id, 40) : `session ${String(si + 1)}`;
-      const interactions = sortedChildren(nodes, session.id).filter(
-        (n) => n.type === 'interaction',
-      );
-      const interactionsHtml = interactions
-        .map((interaction, i) => renderInteractionSection(interaction, nodes, i))
+export function buildAgentCausalHtml(view: AgentCausalGraphView, title: string): string {
+  const sessionsHtml = view.sessions
+    .map(({ title: sessionTitle, view: sessionView }) => {
+      const interactionsHtml = sessionView.interactions
+        .map(({ title: interactionTitle, view: causalView }) =>
+          renderInteraction(interactionTitle, causalView),
+        )
         .join('');
       return `<details class="session" open>
   <summary>${esc(sessionTitle)}</summary>
@@ -201,7 +153,7 @@ export function buildAgentCausalHtml(nodes: readonly TraceNode[], title: string)
     title,
     `
 <h1>${esc(title)}</h1>
-<div class="root-node"><div class="label">${esc(agentLabel)}</div></div>
+<div class="root-node">${labelDiv(view.root.labelLines)}</div>
 <div class="down-arrow">↓</div>
 <div>${sessionsHtml}</div>`,
   );
