@@ -1,12 +1,13 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { log } from '@coach/logger';
 import { buildVizResults } from '@coach/pipeline';
 import type { UploadedFile, VizResult } from '@coach/pipeline';
 
 const arg = process.argv[2];
 if (!arg) {
-  console.error(
+  log.error(
     'Usage: pnpm e2e <path-or-fixture-name>  (e.g. pnpm e2e fetch-website or pnpm e2e packages/pipeline/fixtures)',
   );
   process.exit(1);
@@ -58,7 +59,7 @@ const isMultiSession = sessionDirNames.length > 0;
 let allFiles: UploadedFile[];
 
 if (isMultiSession) {
-  console.log(`multi-session mode: ${String(sessionDirNames.length)} sessions`);
+  log.info({ sessions: sessionDirNames.length }, 'multi-session mode');
   allFiles = sessionDirNames.flatMap((name) =>
     gatherSessionDir(join(fixtureDir, name), fixtureDir),
   );
@@ -69,7 +70,7 @@ if (isMultiSession) {
 const results: VizResult[] = buildVizResults(allFiles);
 
 if (results.length === 0) {
-  console.error('No visualisable results produced. Check the input files.');
+  log.error('No visualisable results produced. Check the input files.');
   process.exit(1);
 }
 
@@ -77,9 +78,9 @@ for (const result of results) {
   const safe = result.title.replace(/[^a-zA-Z0-9_-]/g, '_');
   const jsonPath = `${outDir}/vizdata-${safe}.json`;
   writeFileSync(jsonPath, JSON.stringify(result, null, 2) + '\n');
-  console.log(`wrote ${jsonPath}  [${result.data.kind}]`);
+  log.info({ kind: result.data.kind }, `wrote ${jsonPath}`);
 }
 
-console.log(
-  `\nTo visualise: pnpm --filter @coach/app dev  then upload the source files from ${fixtureDir}`,
+log.info(
+  `To visualise: pnpm --filter @coach/app dev — then upload the source files from ${fixtureDir}`,
 );

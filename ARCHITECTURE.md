@@ -10,7 +10,7 @@ Coach processes agent execution traces and renders them as an interactive causal
 The core thesis: harness-agnostic OTEL traces feed a pure data pipeline whose output can
 be reflected back to the agent (or its engineer) for improvement.
 
-The system is split into two packages plus a Node CLI layer:
+The system is split into three packages plus a Node CLI layer:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -27,15 +27,20 @@ The system is split into two packages plus a Node CLI layer:
 └─────────────────────────────────────────────────────────┘
 
 scripts/          Node CLI — reads from disk, writes JSON artifacts
+                  depends on @coach/logger for structured output
+
+@coach/logger (packages/logger)   shared pino logger; transport/stream
+                                  is the single seam for OTEL/Coralogix/Datadog
 ```
 
 ## Package layout
 
-| Package / dir       | Purpose                                                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `packages/pipeline` | Pure data pipeline: ETL, aggregation, view-model, orchestration. Zero `node:*` imports — runs in browser and Node alike. |
-| `packages/app`      | React SPA: upload landing page, graph visualization, data-source seam.                                                   |
-| `scripts/`          | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts.                           |
+| Package / dir       | Purpose                                                                                                                                        |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/logger`   | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                  |
+| `packages/pipeline` | Pure data pipeline: ETL, aggregation, view-model, orchestration. Zero `node:*` imports — runs in browser and Node alike.                       |
+| `packages/app`      | React SPA: upload landing page, graph visualization, data-source seam.                                                                         |
+| `scripts/`          | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output. |
 
 ## Data flow
 

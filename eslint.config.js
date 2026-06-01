@@ -58,6 +58,9 @@ export default tseslint.config(
       'max-nested-callbacks': 'off',
     },
   },
+  // Forbid stray console.* — route through @coach/logger. Sanctioned escape hatch when
+  // console is genuinely wanted: a per-line `// eslint-disable-next-line no-console`.
+  { files: ['**/*.{ts,tsx}'], rules: { 'no-console': 'error' } },
   // Keep the Prettier compatibility layer last so it wins any formatting conflicts.
   prettier,
 );

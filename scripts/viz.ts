@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { log } from '@coach/logger';
 import {
   buildAgentCausalGraphView,
   buildSessionCausalGraphView,
@@ -9,7 +10,7 @@ import type { TraceNode, VizData } from '@coach/pipeline';
 
 const nodesPath = process.argv[2];
 if (!nodesPath) {
-  console.error('Usage: pnpm viz <out/fixture/nodes-suffix.json>');
+  log.error('Usage: pnpm viz <out/fixture/nodes-suffix.json>');
   process.exit(1);
 }
 
@@ -30,4 +31,4 @@ const vizData: VizData =
 
 const outPath = nodesPath.replace(/\.json$/, '-vizdata.json');
 writeFileSync(outPath, JSON.stringify({ title, data: vizData }, null, 2) + '\n');
-console.log(`wrote ${outPath}`);
+log.info(`wrote ${outPath}`);

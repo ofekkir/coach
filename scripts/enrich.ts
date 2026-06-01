@@ -1,11 +1,12 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { log } from '@coach/logger';
 import { enrichTrace } from '@coach/pipeline';
 import type { LogEntry, TempoTrace } from '@coach/pipeline';
 
 const name = process.argv[2];
 if (!name) {
-  console.error('Usage: pnpm enrich <fixture-name>  (e.g. pnpm enrich fetch-website)');
+  log.error('Usage: pnpm enrich <fixture-name>  (e.g. pnpm enrich fetch-website)');
   process.exit(1);
 }
 
@@ -21,4 +22,4 @@ const enriched = enrichTrace(trace, logs);
 const spanCount = enriched.batches.flatMap((b) => b.scopeSpans.flatMap((ss) => ss.spans)).length;
 
 writeFileSync(`${outDir}/enriched-trace.json`, JSON.stringify(enriched, null, 2) + '\n');
-console.log(`wrote ${outDir}/enriched-trace.json (${String(spanCount)} spans)`);
+log.info({ spans: spanCount }, `wrote ${outDir}/enriched-trace.json`);
