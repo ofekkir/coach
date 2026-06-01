@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   addSessionNode,
   aggregateAgent,
@@ -12,15 +13,8 @@ import { nativeSessionToTrace } from '../src/etl/native.ts';
 import { transformTrace } from '../src/etl/transform.ts';
 import type { LogEntry, TempoTrace, TraceNode } from '../src/etl/types.ts';
 import {
-  buildAgentCausalHtml,
-  buildCausalHtml,
-  buildCompositionHtml,
-  buildSessionCausalHtml,
-} from '../src/graph/html.ts';
-import {
   buildAgentCausalGraphView,
   buildCausalGraphView,
-  buildCompositionGraphView,
   buildSessionCausalGraphView,
 } from '../src/graph/view-model.ts';
 
@@ -40,14 +34,35 @@ const outDir = `out/${basename(fixtureDir)}`;
 
 mkdirSync(outDir, { recursive: true });
 
+const templatePath = resolve(fileURLToPath(import.meta.url), '../../viz/dist/index.html');
+let template: string;
+try {
+  template = readFileSync(templatePath, 'utf8');
+} catch {
+  console.error('Viz template not found. Build it first:\n  pnpm viz:build');
+  process.exit(1);
+}
+
 function writeNodes(nodes: readonly TraceNode[], suffix: string): void {
   const path = `${outDir}/nodes${suffix}.json`;
   writeFileSync(path, JSON.stringify(nodes, null, 2) + '\n');
   console.log(`wrote ${path} (${String(nodes.length)} nodes)`);
 }
 
-function writeHtml(stem: string, html: string): void {
-  const path = `${outDir}/${stem}.html`;
+function writeViz(nodes: readonly TraceNode[], suffix: string): void {
+  const agentView = buildAgentCausalGraphView(nodes);
+  const sessionView = agentView == null ? buildSessionCausalGraphView(nodes) : null;
+  const causalView = agentView == null && sessionView == null ? buildCausalGraphView(nodes) : null;
+  const vizData =
+    agentView != null
+      ? { kind: 'agent' as const, data: agentView }
+      : sessionView != null
+        ? { kind: 'session' as const, data: sessionView }
+        : { kind: 'interaction' as const, data: causalView };
+  const title = `${basename(outDir)}${suffix}`;
+  const injection = `<script>window.__TRACE_DATA__=${JSON.stringify(vizData)};window.__TRACE_TITLE__=${JSON.stringify(title)};</script>`;
+  const html = template.replace('</head>', `${injection}</head>`);
+  const path = `${outDir}/nodes${suffix}.html`;
   writeFileSync(path, html);
   console.log(`wrote ${path}`);
 }
@@ -71,15 +86,7 @@ function processNativeFile(jsonlPath: string, suffix: string): TraceNode[] {
   const trace = nativeSessionToTrace(jsonl);
   const traceNodes = sortByTime(addSessionNode(transformTrace(trace)));
   writeNodes(traceNodes, suffix);
-  writeHtml(
-    `composition${suffix}`,
-    buildCompositionHtml(buildCompositionGraphView(traceNodes), `Composition${suffix}`),
-  );
-  const causalView = buildCausalGraphView(traceNodes);
-  writeHtml(
-    `causal${suffix}`,
-    causalView != null ? buildCausalHtml(causalView, `Causal${suffix}`) : '<p>No causal view</p>',
-  );
+  writeViz(traceNodes, suffix);
   return traceNodes;
 }
 
@@ -98,17 +105,7 @@ function processTrace(
 
   const traceNodes = addSessionNode(transformTrace(enriched));
   writeNodes(traceNodes, suffix);
-
-  writeHtml(
-    `composition${suffix}`,
-    buildCompositionHtml(buildCompositionGraphView(traceNodes), `Composition${suffix}`),
-  );
-
-  const causalView = buildCausalGraphView(traceNodes);
-  writeHtml(
-    `causal${suffix}`,
-    causalView != null ? buildCausalHtml(causalView, `Causal${suffix}`) : '<p>No causal view</p>',
-  );
+  writeViz(traceNodes, suffix);
 
   return traceNodes;
 }
@@ -145,19 +142,7 @@ function processSessionDir(sessionDir: string, sessionName: string): TraceNode[]
   console.log(`\n── ${sessionName} session`);
   const sessionNodes = aggregateSession(allTraceNodes);
   writeNodes(sessionNodes, `-session-${sessionName}`);
-
-  writeHtml(
-    `composition-session-${sessionName}`,
-    buildCompositionHtml(buildCompositionGraphView(sessionNodes), `Composition — ${sessionName}`),
-  );
-
-  const sessionView = buildSessionCausalGraphView(sessionNodes);
-  writeHtml(
-    `causal-session-${sessionName}`,
-    sessionView != null
-      ? buildSessionCausalHtml(sessionView, `Causal — ${sessionName}`)
-      : '<p>No session view</p>',
-  );
+  writeViz(sessionNodes, `-session-${sessionName}`);
 
   return sessionNodes;
 }
@@ -194,19 +179,7 @@ if (isMultiSession) {
     const mergedNodes = aggregateSession(sessionArrays);
     const agentNodes = aggregateAgent(mergedNodes);
     writeNodes(agentNodes, `-agent-${userId}`);
-
-    writeHtml(
-      `composition-agent-${userId}`,
-      buildCompositionHtml(buildCompositionGraphView(agentNodes), `Composition — Agent ${userId}`),
-    );
-
-    const agentView = buildAgentCausalGraphView(agentNodes);
-    writeHtml(
-      `causal-agent-${userId}`,
-      agentView != null
-        ? buildAgentCausalHtml(agentView, `Causal — Agent ${userId}`)
-        : '<p>No agent view</p>',
-    );
+    writeViz(agentNodes, `-agent-${userId}`);
   }
 } else {
   const jsonlFile = findJsonlFile(fixtureDir);
@@ -241,36 +214,12 @@ if (isMultiSession) {
     console.log('\n── session');
     const sessionNodes = aggregateSession(allTraceNodes);
     writeNodes(sessionNodes, '-session');
-
-    writeHtml(
-      'composition-session',
-      buildCompositionHtml(buildCompositionGraphView(sessionNodes), 'Composition — Session'),
-    );
-
-    const sessionView = buildSessionCausalGraphView(sessionNodes);
-    writeHtml(
-      'causal-session',
-      sessionView != null
-        ? buildSessionCausalHtml(sessionView, 'Causal — Session')
-        : '<p>No session view</p>',
-    );
+    writeViz(sessionNodes, '-session');
 
     console.log('\n── agent');
     const agentNodes = aggregateAgent(sessionNodes);
     writeNodes(agentNodes, '-agent');
-
-    writeHtml(
-      'composition-agent',
-      buildCompositionHtml(buildCompositionGraphView(agentNodes), 'Composition — Agent'),
-    );
-
-    const agentView = buildAgentCausalGraphView(agentNodes);
-    writeHtml(
-      'causal-agent',
-      agentView != null
-        ? buildAgentCausalHtml(agentView, 'Causal — Agent')
-        : '<p>No agent view</p>',
-    );
+    writeViz(agentNodes, '-agent');
   } else {
     processTrace(fixtureDir, logs, 'trace.json', '');
   }

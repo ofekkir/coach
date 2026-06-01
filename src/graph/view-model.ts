@@ -6,7 +6,7 @@ interface GraphViewEdge {
   label?: string;
 }
 
-export interface GraphViewNode {
+interface GraphViewNode {
   id: string;
   labelLines: readonly string[];
   children: readonly GraphViewNode[];
@@ -34,11 +34,6 @@ export interface SessionCausalGraphView {
 export interface AgentCausalGraphView {
   root: GraphViewNode;
   sessions: readonly { readonly title: string; readonly view: SessionCausalGraphView }[];
-}
-
-export interface CompositionGraphView {
-  nodes: readonly GraphViewNode[];
-  edges: readonly GraphViewEdge[];
 }
 
 function nsOf(ns: string | undefined): bigint {
@@ -400,19 +395,4 @@ export function buildAgentCausalGraphView(
   });
 
   return { root, sessions: sessionViews };
-}
-
-export function buildCompositionGraphView(nodes: readonly TraceNode[]): CompositionGraphView {
-  const viewNodes: GraphViewNode[] = nodes.map((n) => ({
-    id: n.id,
-    labelLines: buildLabelLines(n),
-    children: [],
-    innerEdges: [],
-  }));
-
-  const edges: GraphViewEdge[] = nodes
-    .filter((n): n is TraceNode & { parent: string } => n.parent != null)
-    .map((n) => ({ fromId: n.parent, toId: n.id }));
-
-  return { nodes: viewNodes, edges };
 }

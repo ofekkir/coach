@@ -26,7 +26,7 @@
     "etl": "node --experimental-strip-types scripts/etl.ts",
     "e2e": "node --experimental-strip-types scripts/e2e.ts",
     "viz": "node --experimental-strip-types scripts/viz.ts",
-    "viz:build": "cd viz && pnpm install && pnpm build",
+    "viz:build": "pnpm --filter coach-viz build",
     "knip": "knip",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm knip",
     "prepare": "husky"

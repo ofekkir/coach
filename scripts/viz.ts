@@ -14,10 +14,7 @@ if (!nodesPath) {
   process.exit(1);
 }
 
-const templatePath = path.resolve(
-  fileURLToPath(import.meta.url),
-  '../../src/graph/viz-dist/index.html',
-);
+const templatePath = path.resolve(fileURLToPath(import.meta.url), '../../viz/dist/index.html');
 
 let template: string;
 try {
