@@ -40,7 +40,7 @@ command -v pnpm >/dev/null 2>&1 || exit 0
 
 pnpm exec prettier --write "$file_path" >/dev/null 2>&1 || true
 
-if ! out="$(pnpm exec eslint --fix --max-warnings=0 "$file_path" 2>&1)"; then
+if ! out="$(pnpm exec eslint --fix --max-warnings=0 --no-warn-ignored "$file_path" 2>&1)"; then
   {
     echo "ESLint reported unresolved issues in $file_path:"
     echo "$out"

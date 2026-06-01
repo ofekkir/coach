@@ -1,6 +1,10 @@
 node_modules
 dist
 coverage
+
+# viz sub-project build output (committed template lives in src/graph/viz-dist/)
+viz/node_modules
+viz/dist
 *.log
 .DS_Store
 

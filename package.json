@@ -26,17 +26,18 @@
     "etl": "node --experimental-strip-types scripts/etl.ts",
     "e2e": "node --experimental-strip-types scripts/e2e.ts",
     "viz": "node --experimental-strip-types scripts/viz.ts",
+    "viz:build": "cd viz && pnpm install && pnpm build",
     "knip": "knip",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm knip",
     "prepare": "husky"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix --max-warnings=0",
+      "eslint --fix --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
     "*.{js,cjs,mjs}": [
-      "eslint --fix --max-warnings=0",
+      "eslint --fix --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
     "*.{json,md,yml,yaml}": [
