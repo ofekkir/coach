@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -211,6 +211,7 @@ function FlowInner({
   onSelectId: (id: string | null) => void;
 }) {
   const { fitView } = useReactFlow();
+  const didFit = useRef(false);
 
   const elements = useMemo(() => buildElements(DATA, expanded, selectedId), [expanded, selectedId]);
 
@@ -220,15 +221,25 @@ function FlowInner({
   useEffect(() => {
     setNodes(elements.nodes);
     setEdges(elements.edges);
-    const t = setTimeout(() => {
-      void fitView({ padding: 0.12 });
-    }, 40);
-    return () => {
-      clearTimeout(t);
-    };
+    if (!didFit.current) {
+      didFit.current = true;
+      const t = setTimeout(() => {
+        void fitView({ padding: 0.12 });
+      }, 40);
+      return () => {
+        clearTimeout(t);
+      };
+    }
   }, [elements, setNodes, setEdges, fitView]);
 
   const onNodeClick: NodeMouseHandler = useCallback(
+    (_, node) => {
+      onSelectId(node.id);
+    },
+    [onSelectId],
+  );
+
+  const onNodeDoubleClick: NodeMouseHandler = useCallback(
     (_, node) => {
       const d = node.data as unknown as TraceRFNodeData;
       if (d.hasRFChildren) {
@@ -236,12 +247,9 @@ function FlowInner({
         if (next.has(node.id)) next.delete(node.id);
         else next.add(node.id);
         onExpandedChange(next);
-        onSelectId(null);
-      } else {
-        onSelectId(node.id === selectedId ? null : node.id);
       }
     },
-    [expanded, selectedId, onExpandedChange, onSelectId],
+    [expanded, onExpandedChange],
   );
 
   const onPaneClick = useCallback(() => {
@@ -255,6 +263,7 @@ function FlowInner({
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onNodeClick={onNodeClick}
+      onNodeDoubleClick={onNodeDoubleClick}
       onPaneClick={onPaneClick}
       nodeTypes={nodeTypes}
       fitView
