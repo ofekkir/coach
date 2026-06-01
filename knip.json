@@ -1,3 +1,10 @@
 {
-  "ignore": ["viz/**"]
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts"],
+      "project": ["scripts/**/*.ts"]
+    },
+    "packages/pipeline": {},
+    "packages/app": {}
+  }
 }

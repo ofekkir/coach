@@ -7,60 +7,63 @@ Unlike tracing built for engineers to observe agents, coach aims to reflect find
 **agent itself**, with the engineer monitoring that loop. Stage one targets the engineer until we
 learn which problems are solvable.
 
+See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the full picture: package layout, data flow, upload
+seam, and Vercel deployment.
+
 ## Pipeline
 
 ```
-trace.json / logs.json
+*.jsonl / logs.json + trace*.json
         │
-        ▼ ETL (per trace)
-   enrichTrace → transformTrace → addSessionNode
+        ▼ ETL  (@coach/pipeline)
+   nativeSessionToTrace / enrichTrace → transformTrace → addSessionNode
         │
         ▼ Aggregation
-   aggregateSession (per session)
-   groupSessionsByAgent → aggregateAgent (per user_id)
+   aggregateSession  ·  groupSessionsByAgent → aggregateAgent
         │
-        ▼ View model (bottom-up)
+        ▼ View model
    buildCausalGraphView        → CausalGraphView
    buildSessionCausalGraphView → SessionCausalGraphView
    buildAgentCausalGraphView   → AgentCausalGraphView
         │
-        ▼ HTML
-   buildCausalHtml / buildSessionCausalHtml / buildAgentCausalHtml
+        ▼ VizData  { kind: 'agent' | 'session' | 'interaction', data }
+        │
+        ▼ React Flow graph  (@coach/app)
 ```
 
-View models are built bottom-up and consumed only by HTML renderers — no raw `TraceNode[]` reaches the rendering layer.
+View models are built bottom-up and consumed only by the graph renderer — no raw
+`TraceNode[]` reaches the visualization layer.
 
 ### Fixture modes
 
-`pnpm e2e` accepts a path (relative to cwd) or a fixture name under `src/fixtures/`.
+`pnpm e2e` accepts a path (relative to cwd) or a fixture name under
+`packages/pipeline/fixtures/`.
 
-| Input shape                        | Mode                | HTML outputs                                            |
-| ---------------------------------- | ------------------- | ------------------------------------------------------- |
-| `<dir>/trace.json` + `logs.json`   | Single trace        | `composition`, `causal`                                 |
-| `<dir>/trace-*.json` + `logs.json` | Multi-trace session | above + `causal-session`, `causal-agent`                |
-| `<dir>/` containing session dirs   | Multi-session       | per-session outputs + `causal-agent-{userId}` per agent |
-
-In multi-session mode the `user_id` embedded in each trace determines the agent — one HTML is produced per unique `user_id` across all sessions.
+| Input shape                        | Mode                | Artifacts in `out/`                                       |
+| ---------------------------------- | ------------------- | --------------------------------------------------------- |
+| `<dir>/*.jsonl`                    | Native session      | `vizdata-<name>.json` per file                            |
+| `<dir>/logs.json` + `trace.json`   | Single OTEL trace   | `vizdata-trace.json`                                      |
+| `<dir>/logs.json` + `trace-*.json` | Multi-trace session | per-trace + `vizdata-session.json` + `vizdata-agent.json` |
+| `<dir>/` containing session dirs   | Multi-session       | all of the above grouped by dir                           |
 
 ## Quick start
 
 ```bash
 pnpm install
-pnpm check     # typecheck + lint + format + test (same as CI)
+pnpm check             # typecheck + lint + format + test + knip (same as CI)
+pnpm --filter @coach/app dev   # upload landing page at http://localhost:5173
 ```
 
 ## Development
 
-| Command           | What it does                             |
-| ----------------- | ---------------------------------------- |
-| `pnpm check`      | Full gate: typecheck, lint, format, test |
-| `pnpm lint:fix`   | Auto-fix lint issues                     |
-| `pnpm format`     | Auto-format with Prettier                |
-| `pnpm test:watch` | Vitest in watch mode                     |
-| `pnpm build`      | Emit `dist/`                             |
-
-Quality is enforced deterministically by committed hooks — a git `pre-commit` hook (Husky +
-lint-staged), a Claude Code `PostToolUse` hook, and GitHub Actions CI. See `CLAUDE.md` for details.
+| Command                                    | What it does                                   |
+| ------------------------------------------ | ---------------------------------------------- |
+| `pnpm check`                               | Full gate: typecheck, lint, format, test, knip |
+| `pnpm lint:fix`                            | Auto-fix lint issues                           |
+| `pnpm format`                              | Auto-format with Prettier                      |
+| `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                           |
+| `pnpm e2e <fixture>`                       | Run pipeline on a fixture, write `out/`        |
+| `pnpm enrich <fixture>`                    | Enrich a single OTEL trace fixture             |
 
 ## Contributing workflow
 

@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { TraceRFNodeData } from './layout.ts';
+import type { TraceRFNode, TraceRFNodeData } from './layout.ts';
 
 // Keys must match labelLines[0] values from view-model.ts buildLabelLines().
 const TYPE_BADGES: Record<string, string> = {
@@ -40,9 +40,8 @@ const LINE: React.CSSProperties = {
   textOverflow: 'ellipsis',
 };
 
-export function TraceNodeView({ data, selected }: NodeProps) {
-  const d = data as unknown as TraceRFNodeData;
-  const { gvNode, color, fill, hasRFChildren, isExpanded } = d;
+export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
+  const { gvNode, color, fill, hasRFChildren, isExpanded }: TraceRFNodeData = data;
   const type = gvNode.labelLines[0] ?? '';
   const badge = TYPE_BADGES[type] ?? type.toUpperCase();
   const { name, details, timing } = splitLines(gvNode.labelLines);

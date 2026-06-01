@@ -20,15 +20,11 @@ import {
   colorOf,
   initialExpanded,
   toAgent,
+  type TraceRFNode,
   type TraceRFNodeData,
 } from './layout.ts';
 import { TraceNodeView } from './TraceNode.tsx';
-import type { GraphViewNode, VizData } from './types.ts';
-
-const DATA: VizData = window.__TRACE_DATA__;
-const TITLE: string = window.__TRACE_TITLE__ ?? 'Trace Viewer';
-const ALL_EXPANDABLE = allExpandableIds(DATA);
-const ROOT_ID = agentRoot(DATA);
+import type { GraphViewNode, VizData } from '@coach/pipeline';
 
 const nodeTypes: NodeTypes = { trace: TraceNodeView };
 
@@ -145,9 +141,11 @@ function DetailsPanel({ node, onClose }: { node: GraphViewNode; onClose: () => v
 // ── toolbar ───────────────────────────────────────────────────────────────────
 
 function Toolbar({
+  title,
   onExpandAll,
   onCollapseAll,
 }: {
+  title: string;
   onExpandAll: () => void;
   onCollapseAll: () => void;
 }) {
@@ -183,7 +181,7 @@ function Toolbar({
           textTransform: 'uppercase',
         }}
       >
-        {TITLE}
+        {title}
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <button style={btnStyle} onClick={onExpandAll}>
@@ -200,11 +198,13 @@ function Toolbar({
 // ── inner flow ────────────────────────────────────────────────────────────────
 
 function FlowInner({
+  data,
   expanded,
   onExpandedChange,
   selectedId,
   onSelectId,
 }: {
+  data: VizData;
   expanded: Set<string>;
   onExpandedChange: (e: Set<string>) => void;
   selectedId: string | null;
@@ -213,9 +213,12 @@ function FlowInner({
   const { fitView } = useReactFlow();
   const didFit = useRef(false);
 
-  const elements = useMemo(() => buildElements(DATA, expanded, selectedId), [expanded, selectedId]);
+  const elements = useMemo(
+    () => buildElements(data, expanded, selectedId),
+    [data, expanded, selectedId],
+  );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(elements.nodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState<TraceRFNode>(elements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(elements.edges);
 
   useEffect(() => {
@@ -230,18 +233,19 @@ function FlowInner({
         clearTimeout(t);
       };
     }
+    return undefined;
   }, [elements, setNodes, setEdges, fitView]);
 
-  const onNodeClick: NodeMouseHandler = useCallback(
+  const onNodeClick: NodeMouseHandler<TraceRFNode> = useCallback(
     (_, node) => {
       onSelectId(node.id);
     },
     [onSelectId],
   );
 
-  const onNodeDoubleClick: NodeMouseHandler = useCallback(
+  const onNodeDoubleClick: NodeMouseHandler<TraceRFNode> = useCallback(
     (_, node) => {
-      const d = node.data as unknown as TraceRFNodeData;
+      const d: TraceRFNodeData = node.data;
       if (d.hasRFChildren) {
         const next = new Set(expanded);
         if (next.has(node.id)) next.delete(node.id);
@@ -287,7 +291,7 @@ function FlowInner({
           borderRadius: 8,
           boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
         }}
-        nodeColor={(n) => (n.data as unknown as TraceRFNodeData).color ?? '#94a3b8'}
+        nodeColor={(n: TraceRFNode) => n.data.color}
         maskColor="rgba(248,250,252,0.75)"
       />
     </ReactFlow>
@@ -296,8 +300,11 @@ function FlowInner({
 
 // ── root ──────────────────────────────────────────────────────────────────────
 
-export function App() {
-  const [expanded, setExpanded] = useState<Set<string>>(() => initialExpanded(DATA));
+export function App({ data, title }: { data: VizData; title: string }) {
+  const allExpandable = useMemo(() => allExpandableIds(data), [data]);
+  const rootId = useMemo(() => agentRoot(data), [data]);
+
+  const [expanded, setExpanded] = useState<Set<string>>(() => initialExpanded());
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selectedNode = useMemo((): GraphViewNode | null => {
@@ -310,7 +317,7 @@ export function App() {
       }
       return null;
     }
-    const agent = toAgent(DATA);
+    const agent = toAgent(data);
     for (const { view: sv } of agent.sessions) {
       for (const { view: iv } of sv.interactions) {
         for (const thread of iv.threads) {
@@ -322,24 +329,26 @@ export function App() {
       }
     }
     return null;
-  }, [selectedId]);
+  }, [selectedId, data]);
 
   const onExpandAll = useCallback(() => {
-    setExpanded(new Set(ALL_EXPANDABLE));
-  }, []);
+    setExpanded(new Set(allExpandable));
+  }, [allExpandable]);
+
   const onCollapseAll = useCallback(() => {
-    setExpanded(new Set([ROOT_ID]));
-  }, []);
+    setExpanded(new Set([rootId]));
+  }, [rootId]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#f8fafc' }}>
       <FlowInner
+        data={data}
         expanded={expanded}
         onExpandedChange={setExpanded}
         selectedId={selectedId}
         onSelectId={setSelectedId}
       />
-      <Toolbar onExpandAll={onExpandAll} onCollapseAll={onCollapseAll} />
+      <Toolbar title={title} onExpandAll={onExpandAll} onCollapseAll={onCollapseAll} />
       {selectedNode != null && (
         <DetailsPanel
           node={selectedNode}

@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { transformTrace } from '../src/etl/transform.ts';
-import type { TempoTrace } from '../src/etl/types.ts';
+import { transformTrace } from '@coach/pipeline';
+import type { TempoTrace } from '@coach/pipeline';
 
 const name = process.argv[2];
 if (!name) {
