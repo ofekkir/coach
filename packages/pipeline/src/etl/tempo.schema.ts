@@ -48,32 +48,22 @@ export const TempoTraceSchema = z
     ),
   })
   .superRefine((trace, ctx) => {
-    const allSpanIds = new Set<string>();
-    for (const batch of trace.batches) {
-      for (const ss of batch.scopeSpans) {
-        for (const span of ss.spans) allSpanIds.add(span.spanId);
-      }
-    }
+    const allScopeSpans = trace.batches.flatMap((b) => b.scopeSpans);
+    const allSpans = allScopeSpans.flatMap((ss) => ss.spans);
+    const allSpanIds = new Set(allSpans.map((s) => s.spanId));
 
     const seen = new Set<string>();
-    for (const batch of trace.batches) {
-      for (const ss of batch.scopeSpans) {
-        for (const span of ss.spans) {
-          if (seen.has(span.spanId)) {
-            ctx.addIssue({
-              code: 'custom',
-              message: `duplicate spanId: ${span.spanId}`,
-            });
-          }
-          seen.add(span.spanId);
+    for (const span of allSpans) {
+      if (seen.has(span.spanId)) {
+        ctx.addIssue({ code: 'custom', message: `duplicate spanId: ${span.spanId}` });
+      }
+      seen.add(span.spanId);
 
-          if (span.parentSpanId != null && !allSpanIds.has(span.parentSpanId)) {
-            ctx.addIssue({
-              code: 'custom',
-              message: `parentSpanId ${span.parentSpanId} references unknown span`,
-            });
-          }
-        }
+      if (span.parentSpanId != null && !allSpanIds.has(span.parentSpanId)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `parentSpanId ${span.parentSpanId} references unknown span`,
+        });
       }
     }
   });

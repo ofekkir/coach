@@ -318,15 +318,12 @@ export function App({ data, title }: { data: VizData; title: string }) {
       return null;
     }
     const agent = toAgent(data);
-    for (const { view: sv } of agent.sessions) {
-      for (const { view: iv } of sv.interactions) {
-        for (const thread of iv.threads) {
-          for (const m of thread.members) {
-            const r = find(m);
-            if (r != null) return r;
-          }
-        }
-      }
+    const allInteractions = agent.sessions.flatMap((s) => s.view.interactions);
+    const allThreads = allInteractions.flatMap((i) => i.view.threads);
+    const allMembers = allThreads.flatMap((t) => t.members);
+    for (const m of allMembers) {
+      const r = find(m);
+      if (r != null) return r;
     }
     return null;
   }, [selectedId, data]);

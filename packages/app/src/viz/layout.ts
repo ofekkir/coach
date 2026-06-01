@@ -122,6 +122,44 @@ function link(src: string, tgt: string, label: string | undefined, ctx: Ctx): vo
 
 // ── placement ─────────────────────────────────────────────────────────────────
 
+// Returns the y-position after placing all expanded children of a member node.
+function lastChildY(member: GraphViewNode, startY: number): number {
+  return member.children.reduce((y, child) => y + estimateNodeH(child) + VG, startY);
+}
+
+// Places expanded children of a member node and returns the last child's id.
+function placeExpandedChildren(
+  member: GraphViewNode,
+  tx: number,
+  startY: number,
+  ctx: Ctx,
+): string {
+  let y = startY;
+  let lastId = member.id;
+  for (const child of member.children) {
+    const childType = child.labelLines[0] ?? '';
+    push(
+      child.id,
+      tx,
+      y,
+      {
+        kind: 'member',
+        gvNode: child,
+        color: colorOf(childType),
+        fill: fillOf(childType),
+        hasRFChildren: false,
+        isExpanded: false,
+        selected: child.id === ctx.selected,
+      },
+      ctx,
+    );
+    link(lastId, child.id, undefined, ctx);
+    lastId = child.id;
+    y += estimateNodeH(child) + VG;
+  }
+  return lastId;
+}
+
 function placeThread(
   thread: GraphViewThread,
   parentId: string,
@@ -165,27 +203,8 @@ function placeThread(
     // RF nodes only when this member is expanded.
     let lastId = member.id;
     if (isExpandedMember) {
-      for (const child of member.children) {
-        const childType = child.labelLines[0] ?? '';
-        push(
-          child.id,
-          tx,
-          y,
-          {
-            kind: 'member',
-            gvNode: child,
-            color: colorOf(childType),
-            fill: fillOf(childType),
-            hasRFChildren: false,
-            isExpanded: false,
-            selected: child.id === ctx.selected,
-          },
-          ctx,
-        );
-        link(lastId, child.id, undefined, ctx);
-        lastId = child.id;
-        y += estimateNodeH(child) + VG;
-      }
+      lastId = placeExpandedChildren(member, tx, y, ctx);
+      y = lastChildY(member, y);
     }
 
     prevId = lastId;
@@ -340,15 +359,12 @@ export function buildElements(
 ): { nodes: TraceRFNode[]; edges: Edge[] } {
   const agent = toAgent(data);
   // Center all hierarchy nodes over the widest possible thread group.
-  const maxThreadsW = Math.max(
-    NW,
-    ...agent.sessions.flatMap((s) =>
-      s.view.interactions.map((i) => {
-        const n = i.view.threads.length;
-        return n * NW + Math.max(0, n - 1) * HG;
-      }),
+  const interactionWidths = agent.sessions.flatMap((s) =>
+    s.view.interactions.map(
+      (i) => i.view.threads.length * NW + Math.max(0, i.view.threads.length - 1) * HG,
     ),
   );
+  const maxThreadsW = Math.max(NW, ...interactionWidths);
   const ctx: Ctx = {
     cx: maxThreadsW / 2 + 50,
     expanded,
@@ -364,22 +380,24 @@ export function initialExpanded(): Set<string> {
   return new Set<string>();
 }
 
+function expandableInteractionIds(iv: {
+  root: GraphViewNode;
+  threads: readonly GraphViewThread[];
+}): string[] {
+  const memberIds = iv.threads
+    .flatMap((thread) => thread.members)
+    .filter((m) => m.children.length > 0)
+    .map((m) => m.id);
+  return [iv.root.id, ...memberIds];
+}
+
 export function allExpandableIds(data: VizData): Set<string> {
   const agent = toAgent(data);
-  const ids = new Set<string>();
-  ids.add(agent.root.id);
-  for (const { view: sv } of agent.sessions) {
-    ids.add(sv.root.id);
-    for (const { view: iv } of sv.interactions) {
-      ids.add(iv.root.id);
-      // Thread members that have sub-nodes (tool nodes) are also expandable.
-      for (const thread of iv.threads) {
-        for (const m of thread.members) {
-          if (m.children.length > 0) ids.add(m.id);
-        }
-      }
-    }
-  }
+  const sessionIds = agent.sessions.map((s) => s.view.root.id);
+  const interactionExpandables = agent.sessions.flatMap((s) =>
+    s.view.interactions.flatMap((i) => expandableInteractionIds(i.view)),
+  );
+  const ids = new Set([agent.root.id, ...sessionIds, ...interactionExpandables]);
   return ids;
 }
 

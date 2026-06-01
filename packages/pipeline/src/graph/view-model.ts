@@ -76,47 +76,51 @@ function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + '…';
 }
 
-function buildLabelLines(node: TraceNode): string[] {
-  const lines: string[] = [];
+function llmRequestLines(node: TraceNode): string[] {
+  const lines = ['llm_request'];
+  if (node.model != null) lines.push(`model: ${node.model}`);
+  if (node.source != null) lines.push(`source: ${node.source}`);
+  if (node.prompt != null) lines.push(node.prompt.replace(/\s+/g, ' '));
+  if (node.response != null) lines.push(node.response.replace(/\s+/g, ' '));
+  return lines;
+}
 
+function optionalLine(
+  value: string | null | undefined,
+  format: (v: string) => string = (v) => v,
+): string[] {
+  return value != null ? [format(value)] : [];
+}
+
+function buildTypeLines(node: TraceNode): string[] {
   switch (node.type) {
     case 'agent':
-      lines.push('agent');
-      if (node.user_id != null) lines.push(node.user_id);
-      break;
+      return ['agent', ...optionalLine(node.user_id)];
     case 'session':
-      lines.push('session');
-      if (node.session_id != null) lines.push(node.session_id);
-      break;
+      return ['session', ...optionalLine(node.session_id)];
     case 'interaction':
-      lines.push('interaction');
-      if (node.prompt != null) lines.push(node.prompt.replace(/\s+/g, ' '));
-      break;
+      return ['interaction', ...optionalLine(node.prompt, (p) => p.replace(/\s+/g, ' '))];
     case 'llm_request':
-      lines.push('llm_request');
-      if (node.model != null) lines.push(`model: ${node.model}`);
-      if (node.source != null) lines.push(`source: ${node.source}`);
-      if (node.prompt != null) lines.push(node.prompt.replace(/\s+/g, ' '));
-      if (node.response != null) lines.push(node.response.replace(/\s+/g, ' '));
-      break;
+      return llmRequestLines(node);
     case 'tool':
-      lines.push('tool');
-      if (node.name != null) lines.push(`name: ${node.name}`);
-      if (node.tool_input != null) lines.push(`input: ${node.tool_input}`);
-      break;
+      return [
+        'tool',
+        ...optionalLine(node.name, (n) => `name: ${n}`),
+        ...optionalLine(node.tool_input, (i) => `input: ${i}`),
+      ];
     case 'tool.blocked_on_user':
-      lines.push('blocked_on_user');
-      break;
+      return ['blocked_on_user'];
     case 'tool.execution':
-      lines.push('execution');
-      break;
+      return ['execution'];
     case 'hook':
-      lines.push('hook');
-      if (node.name != null) lines.push(`name: ${node.name}`);
-      break;
+      return ['hook', ...optionalLine(node.name, (n) => `name: ${n}`)];
     default:
-      lines.push(node.type);
+      return [node.type];
   }
+}
+
+function buildLabelLines(node: TraceNode): string[] {
+  const lines = buildTypeLines(node);
 
   if (node.duration_ms != null) lines.push(`duration: ${formatDuration(node.duration_ms)}`);
   if (node.tokens_in != null) lines.push(`tokens in: ${String(node.tokens_in)}`);
@@ -153,6 +157,61 @@ function toViewNode(node: TraceNode, childrenOf: Map<string, TraceNode[]>): Grap
   return { id: node.id, labelLines, children: childNodes, innerEdges };
 }
 
+interface ThreadReq {
+  source: string;
+  req: TraceNode;
+}
+
+function flattenThreadReqs(llmsByThread: Map<string, TraceNode[]>): ThreadReq[] {
+  return [...llmsByThread.entries()].flatMap(([source, reqs]) =>
+    reqs.map((req) => ({ source, req })),
+  );
+}
+
+// Find the thread whose llm_request overlaps (or most recently preceded) nodeStart.
+function findOverlappingThread(
+  llmsByThread: Map<string, TraceNode[]>,
+  nodeStart: bigint,
+): string | null {
+  let overlappingThread: string | null = null;
+  let overlappingStart = -1n;
+  for (const { source, req } of flattenThreadReqs(llmsByThread)) {
+    if (req.start_time_ns == null || req.end_time_ns == null) continue;
+    const s = BigInt(req.start_time_ns);
+    const e = BigInt(req.end_time_ns);
+    if (s <= nodeStart && nodeStart <= e && s > overlappingStart) {
+      overlappingStart = s;
+      overlappingThread = source;
+    }
+  }
+  return overlappingThread;
+}
+
+// Find the thread whose most recent llm_request ended before nodeStart,
+// or fall back to the thread with the earliest-starting llm_request.
+function findPrecedingThread(
+  llmsByThread: Map<string, TraceNode[]>,
+  nodeStart: bigint | null,
+): string | null {
+  let bestByEnd: string | null = null;
+  let bestEnd = -1n;
+  let firstByStart: string | null = null;
+  let firstStart = 99999999999999999999n;
+
+  for (const { source, req } of flattenThreadReqs(llmsByThread)) {
+    if (req.start_time_ns != null) {
+      const s = BigInt(req.start_time_ns);
+      firstStart = s < firstStart ? ((firstByStart = source), s) : firstStart;
+    }
+    if (nodeStart != null && req.end_time_ns != null) {
+      const e = BigInt(req.end_time_ns);
+      bestEnd = e <= nodeStart && e > bestEnd ? ((bestByEnd = source), e) : bestEnd;
+    }
+  }
+
+  return bestByEnd ?? firstByStart;
+}
+
 // Assigns a non-llm_request node (tool or hook) to a thread.
 // UserPromptSubmit always goes to repl_main_thread (it precedes the first LLM
 // call and belongs to the main conversation thread by definition).
@@ -173,48 +232,12 @@ function assignNodeToThread(
   // that thread (e.g. PreToolUse hooks fire just before the LLM span closes).
   // Among overlapping spans, pick the one that started most recently.
   if (nodeStart != null) {
-    let overlappingThread: string | null = null;
-    let overlappingStart = -1n;
-    for (const [source, reqs] of llmsByThread) {
-      for (const req of reqs) {
-        if (req.start_time_ns == null || req.end_time_ns == null) continue;
-        const s = BigInt(req.start_time_ns);
-        const e = BigInt(req.end_time_ns);
-        if (s <= nodeStart && nodeStart <= e && s > overlappingStart) {
-          overlappingStart = s;
-          overlappingThread = source;
-        }
-      }
-    }
-    if (overlappingThread != null) return overlappingThread;
+    const overlapping = findOverlappingThread(llmsByThread, nodeStart);
+    if (overlapping != null) return overlapping;
   }
 
   // Priority 2: pick the thread whose llm_request ended most recently before this node.
-  let bestByEnd: string | null = null;
-  let bestEnd = -1n;
-  let firstByStart: string | null = null;
-  let firstStart = 99999999999999999999n;
-
-  for (const [source, reqs] of llmsByThread) {
-    for (const req of reqs) {
-      if (req.start_time_ns != null) {
-        const s = BigInt(req.start_time_ns);
-        if (s < firstStart) {
-          firstStart = s;
-          firstByStart = source;
-        }
-      }
-      if (nodeStart != null && req.end_time_ns != null) {
-        const e = BigInt(req.end_time_ns);
-        if (e <= nodeStart && e > bestEnd) {
-          bestEnd = e;
-          bestByEnd = source;
-        }
-      }
-    }
-  }
-
-  return bestByEnd ?? firstByStart;
+  return findPrecedingThread(llmsByThread, nodeStart);
 }
 
 function buildChildrenOf(nodes: readonly TraceNode[]): Map<string, TraceNode[]> {
@@ -228,6 +251,46 @@ function buildChildrenOf(nodes: readonly TraceNode[]): Map<string, TraceNode[]> 
     }
   }
   return childrenOf;
+}
+
+function buildThreadMembers(
+  directChildren: TraceNode[],
+  llmsByThread: Map<string, TraceNode[]>,
+): Map<string, TraceNode[]> {
+  const threadMembers = new Map<string, TraceNode[]>();
+  for (const [src, reqs] of llmsByThread) {
+    threadMembers.set(src, [...reqs]);
+  }
+  for (const n of directChildren) {
+    if (n.type !== 'tool' && n.type !== 'hook') continue;
+    const thread = assignNodeToThread(n, llmsByThread);
+    if (thread != null) {
+      threadMembers.get(thread)?.push(n);
+    }
+  }
+  for (const [src, members] of threadMembers) {
+    threadMembers.set(src, sortByStart(members));
+  }
+  return threadMembers;
+}
+
+function buildThreadEdges(members: TraceNode[], memberViewNodes: GraphViewNode[]): GraphViewEdge[] {
+  const edges: GraphViewEdge[] = [];
+  for (let i = 0; i < memberViewNodes.length - 1; i += 1) {
+    const prevNode = members[i];
+    const nextNode = members[i + 1];
+    if (prevNode == null || nextNode == null) continue;
+    const prevView = memberViewNodes[i];
+    const nextView = memberViewNodes[i + 1];
+    if (prevView == null || nextView == null) continue;
+    const gap = formatGap(prevNode, nextNode);
+    edges.push({
+      fromId: resolveId(prevView),
+      toId: resolveId(nextView),
+      ...(gap !== null ? { label: gap } : {}),
+    });
+  }
+  return edges;
 }
 
 export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphView | null {
@@ -247,21 +310,7 @@ export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphVi
     llmsByThread.set(src, list);
   }
 
-  const threadMembers = new Map<string, TraceNode[]>();
-  for (const [src, reqs] of llmsByThread) {
-    threadMembers.set(src, [...reqs]);
-  }
-  for (const n of directChildren) {
-    if (n.type !== 'tool' && n.type !== 'hook') continue;
-    const thread = assignNodeToThread(n, llmsByThread);
-    if (thread != null) {
-      threadMembers.get(thread)?.push(n);
-    }
-  }
-
-  for (const [src, members] of threadMembers) {
-    threadMembers.set(src, sortByStart(members));
-  }
+  const threadMembers = buildThreadMembers(directChildren, llmsByThread);
 
   const sortedSources = [...threadMembers.keys()].sort((a, b) => {
     const aFirst = threadMembers.get(a)?.[0];
@@ -280,22 +329,7 @@ export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphVi
     const members = threadMembers.get(source) ?? [];
     const threadId = `thread_${source.replace(/\W+/g, '_')}`;
     const memberViewNodes = members.map((m) => toViewNode(m, childrenOf));
-
-    const edges: GraphViewEdge[] = [];
-    for (let i = 0; i < memberViewNodes.length - 1; i += 1) {
-      const prevNode = members[i];
-      const nextNode = members[i + 1];
-      if (prevNode == null || nextNode == null) continue;
-      const prevView = memberViewNodes[i];
-      const nextView = memberViewNodes[i + 1];
-      if (prevView == null || nextView == null) continue;
-      const gap = formatGap(prevNode, nextNode);
-      edges.push({
-        fromId: resolveId(prevView),
-        toId: resolveId(nextView),
-        ...(gap !== null ? { label: gap } : {}),
-      });
-    }
+    const edges = buildThreadEdges(members, memberViewNodes);
 
     return {
       id: threadId,

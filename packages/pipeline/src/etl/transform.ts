@@ -34,40 +34,63 @@ function unescape(s: string): string {
     .replace(/\\\\/g, '\\');
 }
 
+function lastUserTextFromParsed(messages: ReqBody['messages']): string | null {
+  if (!messages) return null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg?.role !== 'user') continue;
+    const text = firstText(msg.content);
+    if (text) return text.trim();
+  }
+  return null;
+}
+
+function lastUserTextFromRaw(bodyJson: string): string | null {
+  let lastIdx = -1;
+  const re = /"role":"user"/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(bodyJson)) !== null) lastIdx = m.index;
+  if (lastIdx === -1) return null;
+  const tm = /"text":"((?:[^"\\]|\\.)+)/.exec(bodyJson.slice(lastIdx));
+  if (!tm?.[1]) return null;
+  return unescape(tm[1]);
+}
+
 function extractRequestPrompt(bodyJson: string): string | null {
   try {
     const parsed = JSON.parse(bodyJson) as ReqBody;
-    const messages = parsed.messages ?? [];
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg?.role !== 'user') continue;
-      const text = firstText(msg.content);
-      if (text) return text.trim();
-    }
-    return null;
+    return lastUserTextFromParsed(parsed.messages);
   } catch {
-    let lastIdx = -1;
-    const re = /"role":"user"/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(bodyJson)) !== null) lastIdx = m.index;
-    if (lastIdx === -1) return null;
-    const tm = /"text":"((?:[^"\\]|\\.)+)/.exec(bodyJson.slice(lastIdx));
-    if (!tm?.[1]) return null;
-    return unescape(tm[1]);
+    return lastUserTextFromRaw(bodyJson);
   }
+}
+
+function extractResponseTextFromBlock(block: {
+  type: string;
+  text?: string;
+  thinking?: string;
+  name?: string;
+}): string | null {
+  if (block.type === 'text' && block.text) return block.text;
+  if (block.type === 'tool_use' && block.name) return `tool_use: ${block.name}`;
+  if (block.type === 'thinking' && block.thinking && block.thinking !== '<REDACTED>') {
+    return block.thinking;
+  }
+  return null;
+}
+
+function firstBlockText(content: ResBody['content']): string | null {
+  for (const block of content ?? []) {
+    const text = extractResponseTextFromBlock(block);
+    if (text != null) return text;
+  }
+  return null;
 }
 
 function extractResponseText(bodyJson: string): string | null {
   try {
     const parsed = JSON.parse(bodyJson) as ResBody;
-    for (const block of parsed.content ?? []) {
-      if (block.type === 'text' && block.text) return block.text;
-      if (block.type === 'tool_use' && block.name) return `tool_use: ${block.name}`;
-      if (block.type === 'thinking' && block.thinking && block.thinking !== '<REDACTED>') {
-        return block.thinking;
-      }
-    }
-    return null;
+    return firstBlockText(parsed.content);
   } catch {
     return null;
   }
@@ -138,36 +161,33 @@ function isNodeType(s: string): s is NodeType {
 }
 
 function parseSpans(trace: TempoTrace): ParsedSpan[] {
-  const spans: ParsedSpan[] = [];
-  for (const batch of trace.batches) {
-    for (const ss of batch.scopeSpans) {
-      for (const span of ss.spans) {
-        const startNsBig = BigInt(span.startTimeUnixNano);
-        const endNsBig = BigInt(span.endTimeUnixNano);
-        spans.push({
-          id: 's' + b64toHex(span.spanId),
-          parentId: span.parentSpanId ? 's' + b64toHex(span.parentSpanId) : null,
-          startNs: span.startTimeUnixNano,
-          endNs: span.endTimeUnixNano,
-          durationMs: Number(endNsBig - startNsBig) / 1_000_000,
-          spanType: getStringAttr(span.attributes, 'span.type') ?? span.name,
-          model: getStringAttr(span.attributes, 'model'),
-          toolName: getStringAttr(span.attributes, 'tool_name'),
-          userPrompt: getStringAttr(span.attributes, 'user_prompt'),
-          inputTokens: getIntAttr(span.attributes, 'input_tokens'),
-          outputTokens: getIntAttr(span.attributes, 'output_tokens'),
-          sessionId: getStringAttr(span.attributes, 'session.id'),
-          userId: getStringAttr(span.attributes, 'user.id'),
-          querySource: getStringAttr(span.attributes, 'query_source'),
-          rawRequestBody: getStringAttr(span.attributes, 'raw_request_body'),
-          rawResponseBody: getStringAttr(span.attributes, 'raw_response_body'),
-          costUsd: getStringAttr(span.attributes, 'cost_usd'),
-          toolInputSummary: getStringAttr(span.attributes, 'tool_input_summary'),
-          hookName: getStringAttr(span.attributes, 'hook.name'),
-        });
-      }
-    }
-  }
+  const spans = trace.batches
+    .flatMap((batch) => batch.scopeSpans.flatMap((ss) => ss.spans))
+    .map((span) => {
+      const startNsBig = BigInt(span.startTimeUnixNano);
+      const endNsBig = BigInt(span.endTimeUnixNano);
+      return {
+        id: 's' + b64toHex(span.spanId),
+        parentId: span.parentSpanId ? 's' + b64toHex(span.parentSpanId) : null,
+        startNs: span.startTimeUnixNano,
+        endNs: span.endTimeUnixNano,
+        durationMs: Number(endNsBig - startNsBig) / 1_000_000,
+        spanType: getStringAttr(span.attributes, 'span.type') ?? span.name,
+        model: getStringAttr(span.attributes, 'model'),
+        toolName: getStringAttr(span.attributes, 'tool_name'),
+        userPrompt: getStringAttr(span.attributes, 'user_prompt'),
+        inputTokens: getIntAttr(span.attributes, 'input_tokens'),
+        outputTokens: getIntAttr(span.attributes, 'output_tokens'),
+        sessionId: getStringAttr(span.attributes, 'session.id'),
+        userId: getStringAttr(span.attributes, 'user.id'),
+        querySource: getStringAttr(span.attributes, 'query_source'),
+        rawRequestBody: getStringAttr(span.attributes, 'raw_request_body'),
+        rawResponseBody: getStringAttr(span.attributes, 'raw_response_body'),
+        costUsd: getStringAttr(span.attributes, 'cost_usd'),
+        toolInputSummary: getStringAttr(span.attributes, 'tool_input_summary'),
+        hookName: getStringAttr(span.attributes, 'hook.name'),
+      };
+    });
   spans.sort((a, b) => {
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
@@ -175,6 +195,57 @@ function parseSpans(trace: TempoTrace): ParsedSpan[] {
 }
 
 // ── Node building ─────────────────────────────────────────────────────────────
+
+function applyInteractionFields(node: TraceNode, span: ParsedSpan): void {
+  if (span.userPrompt != null) node.prompt = span.userPrompt;
+  if (span.sessionId != null) node.session_id = span.sessionId;
+  if (span.userId != null) node.user_id = span.userId;
+}
+
+function applyRequestBody(node: TraceNode, rawRequestBody: string): void {
+  node.raw_request = rawRequestBody;
+  const prompt = extractRequestPrompt(rawRequestBody);
+  if (prompt != null) node.request = prompt;
+}
+
+function applyResponseBody(node: TraceNode, rawResponseBody: string): void {
+  node.raw_response = rawResponseBody;
+  const text = extractResponseText(rawResponseBody);
+  if (text != null) node.response = text;
+  const stopReason = extractStopReason(rawResponseBody);
+  if (stopReason != null) node.stop_reason = stopReason;
+}
+
+function applyLlmRequestFields(node: TraceNode, span: ParsedSpan): void {
+  if (span.model != null) node.model = span.model;
+  if (span.querySource != null) node.source = span.querySource;
+  if (span.rawRequestBody != null) applyRequestBody(node, span.rawRequestBody);
+  if (span.rawResponseBody != null) applyResponseBody(node, span.rawResponseBody);
+  if (span.inputTokens != null) node.tokens_in = span.inputTokens;
+  if (span.outputTokens != null) node.tokens_out = span.outputTokens;
+  if (span.costUsd != null) {
+    const n = parseFloat(span.costUsd);
+    if (!isNaN(n)) node.cost_usd = n;
+  }
+}
+
+function applySpanTypeFields(node: TraceNode, span: ParsedSpan): void {
+  switch (span.spanType) {
+    case 'interaction':
+      applyInteractionFields(node, span);
+      break;
+    case 'llm_request':
+      applyLlmRequestFields(node, span);
+      break;
+    case 'tool':
+      if (span.toolName != null) node.name = span.toolName;
+      if (span.toolInputSummary != null) node.tool_input = span.toolInputSummary;
+      break;
+    case 'hook':
+      if (span.hookName != null) node.name = span.hookName;
+      break;
+  }
+}
 
 function spanToNode(span: ParsedSpan, rootId: string | null): TraceNode {
   const node: TraceNode = {
@@ -187,43 +258,7 @@ function spanToNode(span: ParsedSpan, rootId: string | null): TraceNode {
 
   const effectiveParent = span.spanType === 'hook' && rootId !== null ? rootId : span.parentId;
   if (effectiveParent !== null) node.parent = effectiveParent;
-
-  switch (span.spanType) {
-    case 'interaction':
-      if (span.userPrompt != null) node.prompt = span.userPrompt;
-      if (span.sessionId != null) node.session_id = span.sessionId;
-      if (span.userId != null) node.user_id = span.userId;
-      break;
-    case 'llm_request':
-      if (span.model != null) node.model = span.model;
-      if (span.querySource != null) node.source = span.querySource;
-      if (span.rawRequestBody != null) {
-        node.raw_request = span.rawRequestBody;
-        const prompt = extractRequestPrompt(span.rawRequestBody);
-        if (prompt != null) node.request = prompt;
-      }
-      if (span.rawResponseBody != null) {
-        node.raw_response = span.rawResponseBody;
-        const text = extractResponseText(span.rawResponseBody);
-        if (text != null) node.response = text;
-        const stopReason = extractStopReason(span.rawResponseBody);
-        if (stopReason != null) node.stop_reason = stopReason;
-      }
-      if (span.inputTokens != null) node.tokens_in = span.inputTokens;
-      if (span.outputTokens != null) node.tokens_out = span.outputTokens;
-      if (span.costUsd != null) {
-        const n = parseFloat(span.costUsd);
-        if (!isNaN(n)) node.cost_usd = n;
-      }
-      break;
-    case 'tool':
-      if (span.toolName != null) node.name = span.toolName;
-      if (span.toolInputSummary != null) node.tool_input = span.toolInputSummary;
-      break;
-    case 'hook':
-      if (span.hookName != null) node.name = span.hookName;
-      break;
-  }
+  applySpanTypeFields(node, span);
 
   return node;
 }
