@@ -297,6 +297,13 @@ function placeSession(
   return y;
 }
 
+function sessionWidth(sv: SessionCausalGraphView): number {
+  return sv.interactions.reduce((max, i) => {
+    const w = i.view.threads.length * NW + Math.max(0, i.view.threads.length - 1) * HG;
+    return Math.max(max, w);
+  }, NW);
+}
+
 function placeAgent(agent: AgentCausalGraphView, ctx: Ctx): void {
   const root = agent.root;
   const isExpanded = ctx.expanded.has(root.id);
@@ -321,9 +328,21 @@ function placeAgent(agent: AgentCausalGraphView, ctx: Ctx): void {
 
   if (!isExpanded || !hasKids) return;
 
-  let y = 50 + estimateNodeH(root) + LG;
-  for (const { view: sv } of agent.sessions) {
-    y = placeSession(sv.root.id, sv.root, root.id, sv.interactions, y, ctx);
+  const y = 50 + estimateNodeH(root) + LG;
+  const sessionWidths = agent.sessions.map((s) => sessionWidth(s.view));
+  const totalW = sessionWidths.reduce((sum, w) => sum + w, 0) + (agent.sessions.length - 1) * HG;
+  let sx = ctx.cx - totalW / 2;
+
+  for (let i = 0; i < agent.sessions.length; i++) {
+    const session = agent.sessions[i];
+    if (session == null) continue;
+    const { view: sv } = session;
+    const sw = sessionWidths[i] ?? NW;
+    const savedCx = ctx.cx;
+    ctx.cx = sx + sw / 2;
+    placeSession(sv.root.id, sv.root, root.id, sv.interactions, y, ctx);
+    ctx.cx = savedCx;
+    sx += sw + HG;
   }
 }
 
@@ -358,15 +377,12 @@ export function buildElements(
   selected: string | null,
 ): { nodes: TraceRFNode[]; edges: Edge[] } {
   const agent = toAgent(data);
-  // Center all hierarchy nodes over the widest possible thread group.
-  const interactionWidths = agent.sessions.flatMap((s) =>
-    s.view.interactions.map(
-      (i) => i.view.threads.length * NW + Math.max(0, i.view.threads.length - 1) * HG,
-    ),
-  );
-  const maxThreadsW = Math.max(NW, ...interactionWidths);
+  // Center the agent root over the total width of all sessions laid out horizontally.
+  const totalSessionsW = agent.sessions.reduce((sum, s, i) => {
+    return sum + sessionWidth(s.view) + (i > 0 ? HG : 0);
+  }, 0);
   const ctx: Ctx = {
-    cx: maxThreadsW / 2 + 50,
+    cx: Math.max(NW, totalSessionsW) / 2 + 50,
     expanded,
     selected,
     nodes: [],
