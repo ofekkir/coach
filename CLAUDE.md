@@ -9,6 +9,9 @@ Coach instead aims to reflect findings back to the **agent itself**, with the en
 that loop. How the loop is ultimately "closed" back to the agent is undecided — so **stage one
 targets the engineer** until we learn which problems are actually solvable.
 
+**`ARCHITECTURE.md` is a living document** — update it in the same change whenever package
+layout, module boundaries, or data flow change. Consult it before architectural tasks.
+
 ## Tech stack
 
 - **Language:** TypeScript (ESM, strict)
@@ -66,13 +69,25 @@ before an anonymous block. Comments are for non-obvious WHY, not for labelling W
 ## Layout
 
 ```
-src/
-  index.ts            # public exports
-  etl/                # enrich + transform pipeline (+ co-located *.test.ts)
-  graph/              # mermaid graph generation
+packages/
+  pipeline/           # @coach/pipeline — pure ETL + view model (no node:* imports)
+    src/
+      etl/            # enrich + transform pipeline (+ co-located *.test.ts)
+      graph/          # view-model (CausalGraphView, VizData)
+      orchestrate.ts  # buildVizResults — file-system-free orchestration
+      index.ts        # public exports
+    fixtures/         # test fixtures (native .jsonl + OTEL sets)
+  app/                # @coach/app — React SPA (upload UI + graph renderer)
+    src/
+      upload/         # UploadPage.tsx — landing page + file intake
+      viz/            # App.tsx, layout.ts, TraceNode.tsx
+      data-source.ts  # processUploads seam (swap for HTTP call to add a backend)
+      main.tsx
+scripts/              # Node CLI — reads from disk, delegates to @coach/pipeline
 .claude/
   settings.json       # committed Claude Code config (PostToolUse lint + knip hooks)
   hooks/lint.sh       # per-file lint hook script
 .husky/pre-commit     # git pre-commit gate
 .github/workflows/    # CI
+ARCHITECTURE.md       # living architecture doc — keep in sync with changes
 ```

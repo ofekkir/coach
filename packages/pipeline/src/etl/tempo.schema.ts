@@ -1,21 +1,20 @@
-import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 
-const b64SpanId = z.string().refine((s) => {
+function b64ByteLength(s: string): number {
   try {
-    return Buffer.from(s, 'base64').length === 8;
+    return atob(s).length;
   } catch {
-    return false;
+    return -1;
   }
-}, 'must be base64-encoded 8 bytes');
+}
 
-const b64TraceId = z.string().refine((s) => {
-  try {
-    return Buffer.from(s, 'base64').length === 16;
-  } catch {
-    return false;
-  }
-}, 'must be base64-encoded 16 bytes');
+const b64SpanId = z
+  .string()
+  .refine((s) => b64ByteLength(s) === 8, 'must be base64-encoded 8 bytes');
+
+const b64TraceId = z
+  .string()
+  .refine((s) => b64ByteLength(s) === 16, 'must be base64-encoded 16 bytes');
 
 const OtlpAttributeValueSchema = z.union([
   z.object({ stringValue: z.string() }),

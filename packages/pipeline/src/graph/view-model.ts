@@ -1,19 +1,19 @@
 import type { TraceNode } from '../etl/types.ts';
 
-interface GraphViewEdge {
+export interface GraphViewEdge {
   fromId: string;
   toId: string;
   label?: string;
 }
 
-interface GraphViewNode {
+export interface GraphViewNode {
   id: string;
   labelLines: readonly string[];
   children: readonly GraphViewNode[];
   innerEdges: readonly GraphViewEdge[];
 }
 
-interface GraphViewThread {
+export interface GraphViewThread {
   id: string;
   title: string;
   members: readonly GraphViewNode[];
@@ -35,6 +35,13 @@ export interface AgentCausalGraphView {
   root: GraphViewNode;
   sessions: readonly { readonly title: string; readonly view: SessionCausalGraphView }[];
 }
+
+// VizData is the single payload consumed by the visualization layer.
+// It is the only type the app depends on — no pipeline internals cross this boundary.
+export type VizData =
+  | { kind: 'agent'; data: AgentCausalGraphView }
+  | { kind: 'session'; data: SessionCausalGraphView }
+  | { kind: 'interaction'; data: CausalGraphView | null };
 
 function nsOf(ns: string | undefined): bigint {
   return ns != null ? BigInt(ns) : 0n;

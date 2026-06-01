@@ -2,6 +2,7 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   {
@@ -9,8 +10,9 @@ export default tseslint.config(
       'dist/**',
       'coverage/**',
       'node_modules/**',
+      '.claire/**',
       '.claude/worktrees/**',
-      'viz/**',
+      'packages/*/dist/**',
       'src/graph/viz-dist/**',
     ],
   },
@@ -23,6 +25,16 @@ export default tseslint.config(
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
+    },
+  },
+  // React hooks rules for the app package
+  {
+    files: ['packages/app/**/*.{ts,tsx}'],
+    plugins: {
+      'react-hooks': reactHooks,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
     },
   },
   // Config files are plain JS and live outside the TS program; skip type-aware rules.

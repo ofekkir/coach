@@ -1,5 +1,10 @@
-import { Buffer } from 'node:buffer';
 import type { NodeType, OtlpAttribute, TempoTrace, TraceNode } from './types.ts';
+
+// ── Base64 / hex helpers (no node:buffer — browser-compatible) ────────────────
+
+function b64toHex(b64: string): string {
+  return Array.from(atob(b64), (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+}
 
 // ── Raw body extraction ───────────────────────────────────────────────────────
 
@@ -104,10 +109,6 @@ interface ParsedSpan {
 
 // ── OTLP parsing ──────────────────────────────────────────────────────────────
 
-function b64toHex(b64: string): string {
-  return Buffer.from(b64, 'base64').toString('hex');
-}
-
 function getStringAttr(attrs: readonly OtlpAttribute[], key: string): string | null {
   const a = attrs.find((x) => x.key === key);
   if (!a) return null;
@@ -168,7 +169,6 @@ function parseSpans(trace: TempoTrace): ParsedSpan[] {
     }
   }
   spans.sort((a, b) => {
-    // keep original sort order stable by id when needed; primary sort by start time is baked in
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
   return spans;

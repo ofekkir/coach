@@ -1,19 +1,36 @@
-import { Buffer } from 'node:buffer';
-import { createHash } from 'node:crypto';
 import type { LogEntry, OtlpAttribute, OtlpBatch, OtlpSpan, TempoTrace } from './types.ts';
 
-// ── ID helpers ────────────────────────────────────────────────────────────────
+// ── Browser-compatible ID helpers (no node:buffer / node:crypto) ──────────────
 
 function b64toHex(b64: string): string {
-  return Buffer.from(b64, 'base64').toString('hex');
+  return Array.from(atob(b64), (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+}
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
+// Deterministic pseudo-random bytes from a seed string (FNV-1a → LCG).
+// No imports required — works identically in browser and Node.js.
+function deterministicBytes(seed: string, len: number): Uint8Array {
+  let h = 2166136261 >>> 0; // FNV offset basis
+  for (let i = 0; i < seed.length; i++) {
+    h = (h ^ seed.charCodeAt(i)) >>> 0;
+    h = Math.imul(h, 16777619) >>> 0; // FNV prime
+  }
+  const out = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    h = (Math.imul(h, 1664525) + 1013904223) >>> 0; // LCG
+    out[i] = h >>> 24; // high byte has best distribution
+  }
+  return out;
 }
 
 // Deterministic 8-byte span ID for synthetic hook spans
 function hookSpanB64(index: number): string {
-  const hash = createHash('sha256')
-    .update(`coach-hook-span-${String(index)}`)
-    .digest();
-  return hash.subarray(0, 8).toString('base64');
+  return uint8ToBase64(deterministicBytes(`coach-hook-span-${String(index)}`, 8));
 }
 
 // ── Attribute helpers ─────────────────────────────────────────────────────────

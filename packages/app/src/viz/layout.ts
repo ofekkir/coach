@@ -6,7 +6,7 @@ import type {
   GraphViewThread,
   SessionCausalGraphView,
   VizData,
-} from './types.ts';
+} from '@coach/pipeline';
 
 // ── constants ─────────────────────────────────────────────────────────────────
 const NW = 210; // node width (fixed)
@@ -16,7 +16,7 @@ const LG = 60; // level gap – parent bottom to first child top
 
 // ── Paul Tol "Muted" palette ──────────────────────────────────────────────────
 // Keys must match labelLines[0] values produced by view-model.ts buildLabelLines().
-export const TYPE_COLORS: Record<string, string> = {
+const TYPE_COLORS: Record<string, string> = {
   agent: '#44AA99',
   session: '#332288',
   interaction: '#5599BB',
@@ -27,7 +27,7 @@ export const TYPE_COLORS: Record<string, string> = {
   hook: '#117733',
 };
 
-export const TYPE_FILLS: Record<string, string> = {
+const TYPE_FILLS: Record<string, string> = {
   agent: '#EAF6F4',
   session: '#EAEBF5',
   interaction: '#EDF5FB',
@@ -42,7 +42,7 @@ export function colorOf(type: string): string {
   return TYPE_COLORS[type] ?? '#94a3b8';
 }
 
-export function fillOf(type: string): string {
+function fillOf(type: string): string {
   return TYPE_FILLS[type] ?? '#f8fafc';
 }
 
@@ -56,7 +56,7 @@ export function fillOf(type: string): string {
 //  16px  × N detail lines
 //  20px  timing pill          (if present)
 //   8px  body bottom padding
-export function estimateNodeH(gvNode: GraphViewNode): number {
+function estimateNodeH(gvNode: GraphViewNode): number {
   const body = gvNode.labelLines.slice(1);
   const timingIdx = body.findIndex((l) => l.startsWith('duration:'));
   const hasTiming = timingIdx >= 0;
@@ -68,9 +68,10 @@ export function estimateNodeH(gvNode: GraphViewNode): number {
 }
 
 // ── RF node data shape ────────────────────────────────────────────────────────
-export type NodeKind = 'root' | 'session' | 'interaction' | 'member';
+type NodeKind = 'root' | 'session' | 'interaction' | 'member';
 
-export interface TraceRFNodeData {
+// Extends Record<string, unknown> to satisfy React Flow's Node<T> constraint.
+export interface TraceRFNodeData extends Record<string, unknown> {
   kind: NodeKind;
   gvNode: GraphViewNode;
   color: string;
@@ -80,12 +81,14 @@ export interface TraceRFNodeData {
   selected: boolean;
 }
 
+export type TraceRFNode = Node<TraceRFNodeData, 'trace'>;
+
 // ── build context ──────────────────────────────────────────────────────────────
 interface Ctx {
   cx: number;
   expanded: Set<string>;
   selected: string | null;
-  nodes: Node[];
+  nodes: TraceRFNode[];
   edges: Edge[];
 }
 
@@ -94,7 +97,7 @@ function push(id: string, x: number, y: number, data: TraceRFNodeData, ctx: Ctx)
     id,
     type: 'trace',
     position: { x, y },
-    data: data as unknown as Record<string, unknown>,
+    data,
     selected: data.selected,
   });
 }
@@ -131,6 +134,7 @@ function placeThread(
 
   for (let i = 0; i < thread.members.length; i++) {
     const member = thread.members[i];
+    if (member == null) continue;
     const type = member.labelLines[0] ?? '';
     const hasSubNodes = member.children.length > 0;
     const isExpandedMember = hasSubNodes && ctx.expanded.has(member.id);
@@ -322,7 +326,7 @@ export function toAgent(data: VizData): AgentCausalGraphView {
 
   const fakeSession: SessionCausalGraphView = {
     root: { id: '__session__', labelLines: ['session'], children: [], innerEdges: [] },
-    interactions: [{ title: 'interaction', view: data.data }],
+    interactions: data.data != null ? [{ title: 'interaction', view: data.data }] : [],
   };
   return { root: FAKE, sessions: [{ title: 'session', view: fakeSession }] };
 }
@@ -333,7 +337,7 @@ export function buildElements(
   data: VizData,
   expanded: Set<string>,
   selected: string | null,
-): { nodes: Node[]; edges: Edge[] } {
+): { nodes: TraceRFNode[]; edges: Edge[] } {
   const agent = toAgent(data);
   // Center all hierarchy nodes over the widest possible thread group.
   const maxThreadsW = Math.max(
@@ -356,7 +360,7 @@ export function buildElements(
   return { nodes: ctx.nodes, edges: ctx.edges };
 }
 
-export function initialExpanded(_data: VizData): Set<string> {
+export function initialExpanded(): Set<string> {
   return new Set<string>();
 }
 

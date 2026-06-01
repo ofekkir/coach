@@ -7,7 +7,7 @@ import { transformTrace } from './transform.ts';
 import { nativeSessionToTrace } from './native.ts';
 
 const FIXTURE_JSONL = readFileSync(
-  join(import.meta.dirname, '../fixtures/native-claude/fetch-website/session.jsonl'),
+  join(import.meta.dirname, '../../fixtures/native-claude/fetch-website/session.jsonl'),
   'utf8',
 );
 
