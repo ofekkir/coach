@@ -20,11 +20,14 @@ const outDir = `out/${basename(fixtureDir)}`;
 
 mkdirSync(outDir, { recursive: true });
 
-function readUploadedFile(filePath: string): UploadedFile {
-  return { name: basename(filePath), content: readFileSync(filePath, 'utf8') };
+function readUploadedFile(filePath: string, rootDir: string): UploadedFile {
+  const rel = filePath.startsWith(rootDir + '/')
+    ? filePath.slice(rootDir.length + 1)
+    : basename(filePath);
+  return { name: basename(filePath), content: readFileSync(filePath, 'utf8'), path: rel };
 }
 
-function gatherSessionDir(dir: string): UploadedFile[] {
+function gatherSessionDir(dir: string, rootDir: string): UploadedFile[] {
   return readdirSync(dir)
     .filter((f) => {
       const lower = f.toLowerCase();
@@ -35,7 +38,7 @@ function gatherSessionDir(dir: string): UploadedFile[] {
         (lower.startsWith('trace-') && lower.endsWith('.json'))
       );
     })
-    .map((f) => readUploadedFile(join(dir, f)));
+    .map((f) => readUploadedFile(join(dir, f), rootDir));
 }
 
 function isSessionSubdir(entry: Dirent): boolean {
@@ -56,9 +59,11 @@ let allFiles: UploadedFile[];
 
 if (isMultiSession) {
   console.log(`multi-session mode: ${String(sessionDirNames.length)} sessions`);
-  allFiles = sessionDirNames.flatMap((name) => gatherSessionDir(join(fixtureDir, name)));
+  allFiles = sessionDirNames.flatMap((name) =>
+    gatherSessionDir(join(fixtureDir, name), fixtureDir),
+  );
 } else {
-  allFiles = gatherSessionDir(fixtureDir);
+  allFiles = gatherSessionDir(fixtureDir, fixtureDir);
 }
 
 const results: VizResult[] = buildVizResults(allFiles);

@@ -46,35 +46,36 @@ export function aggregateSession(nodesByTrace: readonly (readonly TraceNode[])[]
   return result;
 }
 
-// Groups session-level node arrays by user_id for multi-session agent aggregation.
-// Sessions without a user_id are dropped.
+export const SYNTHETIC_AGENT_ID = 'agent-upload';
+
+// Groups session-level node arrays by agent id for multi-session aggregation.
+// Sessions with a user_id group under that id; sessions without one group under
+// the shared synthetic agent id so they are never dropped.
 export function groupSessionsByAgent(
   sessionNodeArrays: readonly (readonly TraceNode[])[],
 ): Map<string, TraceNode[][]> {
   const groups = new Map<string, TraceNode[][]>();
   for (const nodes of sessionNodeArrays) {
     const session = nodes.find((n) => n.type === 'session' && n.parent == null);
-    const userId = session?.user_id;
-    if (userId == null) continue;
-    const group = groups.get(userId) ?? [];
+    const agentId = session?.user_id ?? SYNTHETIC_AGENT_ID;
+    const group = groups.get(agentId) ?? [];
     group.push([...nodes]);
-    groups.set(userId, group);
+    groups.set(agentId, group);
   }
   return groups;
 }
 
 // Synthesizes an agent node and re-parents root session nodes under it.
+// Uses user_id from the first root session if present; falls back to SYNTHETIC_AGENT_ID.
 export function aggregateAgent(sessionNodes: readonly TraceNode[]): TraceNode[] {
   const session = sessionNodes.find((n) => n.type === 'session' && n.parent == null);
-  if (session?.user_id == null) return [...sessionNodes];
-
-  const userId = session.user_id;
-  const agentId = agentNodeId(userId);
+  const userId = session?.user_id ?? null;
+  const agentId = userId != null ? agentNodeId(userId) : SYNTHETIC_AGENT_ID;
 
   const agentNode: TraceNode = {
     id: agentId,
     type: 'agent',
-    user_id: userId,
+    ...(userId != null ? { user_id: userId } : {}),
   };
 
   const updated = sessionNodes.map((n) =>

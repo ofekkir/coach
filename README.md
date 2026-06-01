@@ -34,17 +34,22 @@ seam, and Vercel deployment.
 View models are built bottom-up and consumed only by the graph renderer — no raw
 `TraceNode[]` reaches the visualization layer.
 
+### Upload model
+
+Each uploaded file or OTEL set (one directory of `logs.json` + `trace*.json`) is treated as
+one **session**. All sessions roll up under a single **agent** view. Use the accumulating
+staging UI to add files and folders before submitting — mix `.jsonl` and OTEL sets freely.
+
 ### Fixture modes
 
 `pnpm e2e` accepts a path (relative to cwd) or a fixture name under
 `packages/pipeline/fixtures/`.
 
-| Input shape                        | Mode                | Artifacts in `out/`                                       |
-| ---------------------------------- | ------------------- | --------------------------------------------------------- |
-| `<dir>/*.jsonl`                    | Native session      | `vizdata-<name>.json` per file                            |
-| `<dir>/logs.json` + `trace.json`   | Single OTEL trace   | `vizdata-trace.json`                                      |
-| `<dir>/logs.json` + `trace-*.json` | Multi-trace session | per-trace + `vizdata-session.json` + `vizdata-agent.json` |
-| `<dir>/` containing session dirs   | Multi-session       | all of the above grouped by dir                           |
+| Input shape                         | Mode                      | Artifacts in `out/`  |
+| ----------------------------------- | ------------------------- | -------------------- |
+| `<dir>/*.jsonl`                     | Native sessions           | `vizdata-agent.json` |
+| `<dir>/logs.json` + `trace*.json`   | Single OTEL session       | `vizdata-agent.json` |
+| `<dir>/` containing session subdirs | Multi-session (multi-dir) | `vizdata-agent.json` |
 
 ## Quick start
 
