@@ -4,6 +4,7 @@
       "entry": ["scripts/*.ts"],
       "project": ["scripts/**/*.ts"]
     },
+    "packages/logger": {},
     "packages/pipeline": {},
     "packages/app": {}
   }

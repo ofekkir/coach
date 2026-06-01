@@ -38,6 +38,7 @@
     ]
   },
   "dependencies": {
+    "@coach/logger": "workspace:*",
     "@coach/pipeline": "workspace:*"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "paths": {
+      "@coach/logger": ["./packages/logger/src/index.ts"],
       "@coach/pipeline": ["./packages/pipeline/src/index.ts"]
     }
   },

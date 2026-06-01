@@ -1,10 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+import { log } from '@coach/logger';
 import { transformTrace } from '@coach/pipeline';
 import type { TempoTrace } from '@coach/pipeline';
 
 const name = process.argv[2];
 if (!name) {
-  console.error('Usage: pnpm etl <fixture-name>  (e.g. pnpm etl fetch-website)');
+  log.error('Usage: pnpm etl <fixture-name>  (e.g. pnpm etl fetch-website)');
   process.exit(1);
 }
 
@@ -14,4 +15,4 @@ const trace = JSON.parse(readFileSync(`${outDir}/enriched-trace.json`, 'utf8')) 
 const nodes = transformTrace(trace);
 
 writeFileSync(`${outDir}/nodes.json`, JSON.stringify(nodes, null, 2) + '\n');
-console.log(`wrote ${outDir}/nodes.json (${String(nodes.length)} nodes)`);
+log.info({ nodes: nodes.length }, `wrote ${outDir}/nodes.json`);
