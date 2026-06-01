@@ -8,6 +8,7 @@ import {
   groupSessionsByAgent,
 } from '../src/etl/aggregate.ts';
 import { enrichTrace } from '../src/etl/enrich.ts';
+import { nativeSessionToTrace } from '../src/etl/native.ts';
 import { transformTrace } from '../src/etl/transform.ts';
 import type { LogEntry, TempoTrace, TraceNode } from '../src/etl/types.ts';
 import {
@@ -51,6 +52,37 @@ function writeHtml(stem: string, html: string): void {
   console.log(`wrote ${path}`);
 }
 
+function findJsonlFile(dir: string): string | undefined {
+  return readdirSync(dir).find((f) => f.endsWith('.jsonl'));
+}
+
+function sortByTime(nodes: readonly TraceNode[]): TraceNode[] {
+  return [...nodes].sort((a, b) => {
+    if (!a.start_time_ns && !b.start_time_ns) return 0;
+    if (!a.start_time_ns) return -1;
+    if (!b.start_time_ns) return 1;
+    const diff = BigInt(a.start_time_ns) - BigInt(b.start_time_ns);
+    return diff < 0n ? -1 : diff > 0n ? 1 : 0;
+  });
+}
+
+function processNativeFile(jsonlPath: string, suffix: string): TraceNode[] {
+  const jsonl = readFileSync(jsonlPath, 'utf8');
+  const trace = nativeSessionToTrace(jsonl);
+  const traceNodes = sortByTime(addSessionNode(transformTrace(trace)));
+  writeNodes(traceNodes, suffix);
+  writeHtml(
+    `composition${suffix}`,
+    buildCompositionHtml(buildCompositionGraphView(traceNodes), `Composition${suffix}`),
+  );
+  const causalView = buildCausalGraphView(traceNodes);
+  writeHtml(
+    `causal${suffix}`,
+    causalView != null ? buildCausalHtml(causalView, `Causal${suffix}`) : '<p>No causal view</p>',
+  );
+  return traceNodes;
+}
+
 function processTrace(
   dir: string,
   traceLogs: readonly LogEntry[],
@@ -82,6 +114,12 @@ function processTrace(
 }
 
 function processSessionDir(sessionDir: string, sessionName: string): TraceNode[] {
+  const jsonlFile = findJsonlFile(sessionDir);
+  if (jsonlFile) {
+    console.log(`[native] ${sessionName}`);
+    return processNativeFile(join(sessionDir, jsonlFile), `-${sessionName}`);
+  }
+
   const sessionLogs = JSON.parse(readFileSync(join(sessionDir, 'logs.json'), 'utf8')) as LogEntry[];
 
   const traceFiles = readdirSync(sessionDir)
@@ -171,6 +209,12 @@ if (isMultiSession) {
     );
   }
 } else {
+  const jsonlFile = findJsonlFile(fixtureDir);
+  if (jsonlFile) {
+    processNativeFile(join(fixtureDir, jsonlFile), '');
+    process.exit(0);
+  }
+
   const logs = JSON.parse(readFileSync(join(fixtureDir, 'logs.json'), 'utf8')) as LogEntry[];
 
   const traceFiles = readdirSync(fixtureDir)

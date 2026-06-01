@@ -4,3 +4,4 @@ coverage
 pnpm-lock.yaml
 out.md
 out.timeline
+.claude/worktrees
