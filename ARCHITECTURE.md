@@ -40,9 +40,17 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 ## Data flow
 
 ```
-Input files
-  *.jsonl                 native Claude Code session logs
-  logs.json + trace*.json OTEL Tempo traces + structured log entries
+Input files (accumulating — user stages N files/folders before submitting)
+  *.jsonl                           native Claude Code session logs
+  <dir>/logs.json + trace*.json     OTEL Tempo traces + structured log entries
+        │
+        ▼  packages/pipeline/src/orchestrate.ts  buildVizResults()
+   Files bucketed by source directory (path prefix):
+     native .jsonl → one session per file
+     OTEL bucket  → processOtelSet() per directory, then aggregateSession()
+   All session node-arrays grouped by agent id:
+     user.id present  → group under that id
+     user.id absent   → group under shared synthetic id ("agent-upload")
         │
         ▼  packages/pipeline/src/etl/
    nativeSessionToTrace()    (*.jsonl → TempoTrace)
@@ -51,7 +59,8 @@ Input files
    addSessionNode()          (synthesise session node)
         │
         ▼  packages/pipeline/src/etl/aggregate.ts
-   aggregateSession()        (merge multi-trace → session forest)
+   aggregateSession()        (merge multi-trace/multi-session → forest)
+   groupSessionsByAgent()    (bucket by user.id or synthetic id)
    aggregateAgent()          (add agent root node)
         │
         ▼  packages/pipeline/src/graph/view-model.ts
@@ -64,6 +73,11 @@ Input files
         ▼  packages/app/src/viz/App.tsx  (React Flow graph renderer)
 ```
 
+`buildVizResults` always emits **one `VizResult` per agent** (expected: exactly one).
+Sessions are navigated by expand/collapse inside the agent graph — not by switching results.
+If multiple distinct `user.id`s appear in one upload, one result per agent is emitted with
+a console warning; a multi-agent selector UI is out of scope.
+
 View models are built bottom-up and consumed only by the renderer — no raw `TraceNode[]`
 reaches the visualization layer.
 
@@ -71,13 +85,18 @@ reaches the visualization layer.
 
 ```
 Browser
-  UploadPage.tsx
-    └── File.text() × N → UploadedFile[]
+  UploadPage.tsx  (accumulating staging UI)
+    ├── "Add files" button   → <input multiple>
+    ├── "Add folder" button  → <input multiple webkitdirectory>
+    └── Drag-and-drop        → DataTransferItem.webkitGetAsEntry() recursive walk
+          │  staged Map<path, UploadedFile> — deduped by relative path
+          ▼  "Visualize N files" button
+    File.text() × N → UploadedFile[] (name=basename, path=relative)
           └── data-source.ts :: processUploads(files)
-                └── @coach/pipeline :: buildVizResults(files)   ← CURRENT
-                        └── ETL + aggregate + view model
-                              └── VizResult[]
-                                    └── App.tsx renders graph
+                └── @coach/pipeline :: buildVizResults(files)
+                        └── bucket by dir → ETL → aggregate → view model
+                              └── VizResult[]  (one per agent; expected: one)
+                                    └── App.tsx renders agent graph
 ```
 
 **`packages/app/src/data-source.ts` is the single swap point** for moving processing to a
@@ -89,15 +108,15 @@ app changes — the visualization layer depends only on `VizResult` / `VizData`.
 `pnpm e2e` accepts a path (relative to cwd) or a fixture name under
 `packages/pipeline/fixtures/`.
 
-| Input shape                        | Mode                | Artifacts produced                                        |
-| ---------------------------------- | ------------------- | --------------------------------------------------------- |
-| `<dir>/*.jsonl`                    | Native session      | `vizdata-<name>.json` per file                            |
-| `<dir>/logs.json` + `trace.json`   | Single OTEL trace   | `vizdata-trace.json`                                      |
-| `<dir>/logs.json` + `trace-*.json` | Multi-trace session | per-trace + `vizdata-session.json` + `vizdata-agent.json` |
-| `<dir>/` containing session dirs   | Multi-session       | all of the above, grouped by dir                          |
+| Input shape                               | Mode                      | Artifacts in `out/`  |
+| ----------------------------------------- | ------------------------- | -------------------- |
+| `<dir>/*.jsonl`                           | Native sessions           | `vizdata-agent.json` |
+| `<dir>/logs.json` + `trace*.json`         | Single OTEL session       | `vizdata-agent.json` |
+| `<dir>/` containing session subdirs       | Multi-session (multi-dir) | `vizdata-agent.json` |
+| Mix of `.jsonl` + OTEL dirs in one upload | All sessions → one agent  | `vizdata-agent.json` |
 
-Multi-session-by-`user_id` is supported by the CLI (directory walking). Flat browser
-upload of multi-session data is a future item; consider `<input webkitdirectory>`.
+The CLI populates `UploadedFile.path` relative to the gather root so the same
+directory-bucketing logic in `buildVizResults` that powers the browser upload applies.
 
 ## Deploying to Vercel (static SPA)
 

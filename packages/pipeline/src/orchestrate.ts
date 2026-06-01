@@ -1,4 +1,10 @@
-import { addSessionNode, aggregateAgent, aggregateSession } from './etl/aggregate.ts';
+import {
+  SYNTHETIC_AGENT_ID,
+  addSessionNode,
+  aggregateAgent,
+  aggregateSession,
+  groupSessionsByAgent,
+} from './etl/aggregate.ts';
 import { enrichTrace } from './etl/enrich.ts';
 import { nativeSessionToTrace } from './etl/native.ts';
 import { transformTrace } from './etl/transform.ts';
@@ -14,10 +20,17 @@ import type { VizData } from './graph/view-model.ts';
 
 /** A single in-memory file presented by the caller (browser File.text() or Node fs.readFileSync). */
 export interface UploadedFile {
-  /** Filename only, e.g. "session.jsonl" or "trace-abc123.json". */
+  /** Filename only, e.g. "session.jsonl" or "trace-abc123.json". OTEL detection keys on this. */
   name: string;
   /** Full text content of the file. */
   content: string;
+  /**
+   * Relative path including directory, e.g. "projA/logs.json".
+   * Absent for loose files (top-level uploads with no subdirectory).
+   * Used to bucket OTEL sets by source directory so projA/logs.json only
+   * pairs with projA/trace-*.json.
+   */
+  path?: string;
 }
 
 /** One visualisable result produced from the uploaded files. */
@@ -62,66 +75,88 @@ function processOtelSet(logsContent: string, traceFiles: UploadedFile[]): TraceN
   });
 }
 
+/** Returns the directory portion of a file path (everything before the last '/'), or '' for loose files. */
+function dirOf(file: UploadedFile): string {
+  const p = file.path ?? file.name;
+  const idx = p.lastIndexOf('/');
+  return idx >= 0 ? p.slice(0, idx) : '';
+}
+
+function isTraceFile(name: string): boolean {
+  return name === 'trace.json' || (name.startsWith('trace-') && name.endsWith('.json'));
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Processes a flat list of in-memory files and returns one VizResult per
- * visualisable artifact.
+ * Processes a flat list of in-memory files and returns one VizResult per agent.
  *
- * Supported input shapes (v1):
- *   (a) One or more `*.jsonl` files  →  one result per file (native Claude Code logs).
- *   (b) `logs.json` + `trace.json`   →  single-trace OTEL result.
- *   (c) `logs.json` + `trace-*.json` →  per-trace results + session + agent views.
+ * Domain model:
+ *   - Each file/OTEL-set = one session.
+ *   - All sessions roll up under a single agent (identified by OTEL user.id, or
+ *     a shared synthetic id when user.id is absent — e.g. native .jsonl uploads).
+ *   - Expected output: exactly one VizResult. If multiple distinct user.ids appear,
+ *     one result is emitted per agent and a warning is logged.
  *
- * Multi-session-by-user_id (currently handled by the CLI via directory walking)
- * is not supported via flat browser upload. If needed, add folder upload support
- * via <input webkitdirectory> and pass all files from subdirectories here.
- *
- * This function is the ONLY place where pipeline logic is invoked from the app.
- * Swapping it for an HTTP call (fetch('/api/process', ...)) is the single change
- * needed to move processing to a backend — see data-source.ts in @coach/app.
+ * Input shapes:
+ *   (a) *.jsonl files          → one session node-array per file.
+ *   (b) OTEL sets bucketed by source directory (path prefix):
+ *       logs.json + trace*.json in the same directory → one session per directory bucket.
+ *       Bucketing fixes the cross-contamination bug where a single logs.json was
+ *       incorrectly paired with traces from sibling directories.
  */
 export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
-  const results: VizResult[] = [];
+  const sessionNodeArrays: TraceNode[][] = [];
 
   // ── Native .jsonl files ──────────────────────────────────────────────────────
-  const nativeFiles = files.filter((f) => f.name.endsWith('.jsonl'));
-  for (const file of nativeFiles) {
-    const nodes = processNativeFile(file);
-    const title = file.name.replace(/\.jsonl$/, '');
-    results.push({ title, data: buildVizData(nodes) });
+  for (const file of files.filter((f) => f.name.endsWith('.jsonl'))) {
+    sessionNodeArrays.push(processNativeFile(file));
   }
 
-  // ── OTEL set (logs.json + trace*.json) ───────────────────────────────────────
-  const logsFile = files.find((f) => f.name === 'logs.json');
-  const traceFiles = files
-    .filter(
-      (f) => f.name === 'trace.json' || (f.name.startsWith('trace-') && f.name.endsWith('.json')),
-    )
-    .sort((a, b) => a.name.localeCompare(b.name));
+  // ── OTEL sets bucketed by source directory ───────────────────────────────────
+  const otelFiles = files.filter((f) => f.name === 'logs.json' || isTraceFile(f.name));
 
-  if (logsFile != null && traceFiles.length > 0) {
-    const allTraceNodes = processOtelSet(logsFile.content, traceFiles);
-
-    if (traceFiles.length === 1) {
-      // Single trace → one result
-      const nodes = allTraceNodes[0];
-      if (nodes != null) {
-        const stem = traceFiles[0]?.name.replace(/\.json$/, '') ?? 'trace';
-        results.push({ title: stem, data: buildVizData(nodes) });
-      }
+  const buckets = new Map<string, { logs: UploadedFile | null; traces: UploadedFile[] }>();
+  for (const file of otelFiles) {
+    const dir = dirOf(file);
+    const bucket = buckets.get(dir) ?? { logs: null, traces: [] };
+    if (file.name === 'logs.json') {
+      bucket.logs = file;
     } else {
-      // Multiple traces → per-trace results + session aggregate + agent view
-      for (const [i, nodes] of allTraceNodes.entries()) {
-        const traceId =
-          traceFiles[i]?.name.replace(/^trace-/, '').replace(/\.json$/, '') ?? `trace-${String(i)}`;
-        results.push({ title: traceId, data: buildVizData(nodes) });
-      }
-      const sessionNodes = aggregateSession(allTraceNodes);
-      results.push({ title: 'session', data: buildVizData(sessionNodes) });
-      const agentNodes = aggregateAgent(sessionNodes);
-      results.push({ title: 'agent', data: buildVizData(agentNodes) });
+      bucket.traces.push(file);
     }
+    buckets.set(dir, bucket);
+  }
+
+  for (const [, { logs, traces }] of buckets) {
+    if (logs == null || traces.length === 0) continue;
+    const sorted = [...traces].sort((a, b) => a.name.localeCompare(b.name));
+    const perTraceNodes = processOtelSet(logs.content, sorted);
+    const sessionNodes = aggregateSession(perTraceNodes);
+    sessionNodeArrays.push(sessionNodes);
+  }
+
+  if (sessionNodeArrays.length === 0) return [];
+
+  // ── Group sessions by agent and emit one VizResult per agent ─────────────────
+  const agentGroups = groupSessionsByAgent(sessionNodeArrays);
+
+  if (agentGroups.size > 1) {
+    const realIds = [...agentGroups.keys()].filter((id) => id !== SYNTHETIC_AGENT_ID);
+    if (realIds.length > 1) {
+      console.warn(
+        `[coach] Multiple distinct user.ids found in upload (${realIds.join(', ')}). ` +
+          'Emitting one result per agent. Multi-agent UI is not implemented.',
+      );
+    }
+  }
+
+  const results: VizResult[] = [];
+  for (const [agentId, sessionArrays] of agentGroups) {
+    const allSessionNodes = aggregateSession(sessionArrays);
+    const agentNodes = aggregateAgent(allSessionNodes);
+    const title = agentId === SYNTHETIC_AGENT_ID ? 'agent' : agentId;
+    results.push({ title, data: buildVizData(agentNodes) });
   }
 
   return results;
