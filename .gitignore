@@ -1,6 +1,11 @@
 node_modules
 dist
 coverage
+
+# viz sub-project (workspace package)
+viz/node_modules
+viz/dist
+src/graph/viz-dist/
 *.log
 .DS_Store
 

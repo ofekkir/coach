@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TraceNode } from '../etl/types.ts';
-import { buildCausalGraphView, buildCompositionGraphView } from './view-model.ts';
+import { buildCausalGraphView } from './view-model.ts';
 
 const interaction: TraceNode = {
   id: 'root',
@@ -176,27 +176,5 @@ describe('buildCausalGraphView', () => {
   it('rootToThreadIds contains all thread ids in order', () => {
     const view = buildCausalGraphView([interaction, llm1, bgLlm]);
     expect(view?.rootToThreadIds).toEqual(view?.threads.map((t) => t.id));
-  });
-});
-
-describe('buildCompositionGraphView', () => {
-  it('returns a node for each input TraceNode', () => {
-    const view = buildCompositionGraphView([interaction, llm1]);
-    expect(view.nodes).toHaveLength(2);
-    expect(view.nodes.map((n) => n.id)).toContain('root');
-    expect(view.nodes.map((n) => n.id)).toContain('llm1');
-  });
-
-  it('returns edges only for nodes with a parent', () => {
-    const view = buildCompositionGraphView([interaction, llm1]);
-    expect(view.edges).toHaveLength(1);
-    expect(view.edges[0]?.fromId).toBe('root');
-    expect(view.edges[0]?.toId).toBe('llm1');
-  });
-
-  it('nodes have empty children and innerEdges', () => {
-    const view = buildCompositionGraphView([interaction]);
-    expect(view.nodes[0]?.children).toHaveLength(0);
-    expect(view.nodes[0]?.innerEdges).toHaveLength(0);
   });
 });
