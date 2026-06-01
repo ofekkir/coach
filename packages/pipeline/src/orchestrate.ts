@@ -66,6 +66,34 @@ function processNativeFile(file: UploadedFile): TraceNode[] {
   return sortByTime(addSessionNode(transformTrace(trace)));
 }
 
+interface OtelBucket { logs: UploadedFile | null; traces: UploadedFile[] }
+
+function buildOtelBuckets(otelFiles: readonly UploadedFile[]): Map<string, OtelBucket> {
+  const buckets = new Map<string, OtelBucket>();
+  for (const file of otelFiles) {
+    const dir = dirOf(file);
+    const bucket = buckets.get(dir) ?? { logs: null, traces: [] };
+    if (file.name === 'logs.json') {
+      bucket.logs = file;
+    } else {
+      bucket.traces.push(file);
+    }
+    buckets.set(dir, bucket);
+  }
+  return buckets;
+}
+
+function warnIfMultipleAgents(agentGroups: Map<string, TraceNode[][]>): void {
+  if (agentGroups.size <= 1) return;
+  const realIds = [...agentGroups.keys()].filter((id) => id !== SYNTHETIC_AGENT_ID);
+  if (realIds.length > 1) {
+    console.warn(
+      `[coach] Multiple distinct user.ids found in upload (${realIds.join(', ')}). ` +
+        'Emitting one result per agent. Multi-agent UI is not implemented.',
+    );
+  }
+}
+
 function processOtelSet(logsContent: string, traceFiles: UploadedFile[]): TraceNode[][] {
   const logs = JSON.parse(logsContent) as LogEntry[];
   return traceFiles.map((tf) => {
@@ -115,41 +143,20 @@ export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
 
   // ── OTEL sets bucketed by source directory ───────────────────────────────────
   const otelFiles = files.filter((f) => f.name === 'logs.json' || isTraceFile(f.name));
-
-  const buckets = new Map<string, { logs: UploadedFile | null; traces: UploadedFile[] }>();
-  for (const file of otelFiles) {
-    const dir = dirOf(file);
-    const bucket = buckets.get(dir) ?? { logs: null, traces: [] };
-    if (file.name === 'logs.json') {
-      bucket.logs = file;
-    } else {
-      bucket.traces.push(file);
-    }
-    buckets.set(dir, bucket);
-  }
+  const buckets = buildOtelBuckets(otelFiles);
 
   for (const [, { logs, traces }] of buckets) {
     if (logs == null || traces.length === 0) continue;
     const sorted = [...traces].sort((a, b) => a.name.localeCompare(b.name));
     const perTraceNodes = processOtelSet(logs.content, sorted);
-    const sessionNodes = aggregateSession(perTraceNodes);
-    sessionNodeArrays.push(sessionNodes);
+    sessionNodeArrays.push(aggregateSession(perTraceNodes));
   }
 
   if (sessionNodeArrays.length === 0) return [];
 
   // ── Group sessions by agent and emit one VizResult per agent ─────────────────
   const agentGroups = groupSessionsByAgent(sessionNodeArrays);
-
-  if (agentGroups.size > 1) {
-    const realIds = [...agentGroups.keys()].filter((id) => id !== SYNTHETIC_AGENT_ID);
-    if (realIds.length > 1) {
-      console.warn(
-        `[coach] Multiple distinct user.ids found in upload (${realIds.join(', ')}). ` +
-          'Emitting one result per agent. Multi-agent UI is not implemented.',
-      );
-    }
-  }
+  warnIfMultipleAgents(agentGroups);
 
   const results: VizResult[] = [];
   for (const [agentId, sessionArrays] of agentGroups) {

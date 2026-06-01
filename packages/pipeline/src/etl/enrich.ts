@@ -58,25 +58,21 @@ interface SpanMeta {
   readonly requestId: string | null;
 }
 
+function allSpansFlat(trace: TempoTrace): OtlpSpan[] {
+  return trace.batches.flatMap((batch) => batch.scopeSpans.flatMap((ss) => ss.spans));
+}
+
 function collectSpanMeta(trace: TempoTrace): SpanMeta[] {
-  const metas: SpanMeta[] = [];
-  for (const batch of trace.batches) {
-    for (const ss of batch.scopeSpans) {
-      for (const span of ss.spans) {
-        const spanType = getStringAttr(span.attributes, 'span.type') ?? span.name;
-        metas.push({
-          id: 's' + b64toHex(span.spanId),
-          b64: span.spanId,
-          parentB64: span.parentSpanId ?? null,
-          startNs: BigInt(span.startTimeUnixNano),
-          endNs: BigInt(span.endTimeUnixNano),
-          spanType,
-          toolName: getStringAttr(span.attributes, 'tool_name'),
-          requestId: getStringAttr(span.attributes, 'request_id'),
-        });
-      }
-    }
-  }
+  const metas = allSpansFlat(trace).map((span) => ({
+    id: 's' + b64toHex(span.spanId),
+    b64: span.spanId,
+    parentB64: span.parentSpanId ?? null,
+    startNs: BigInt(span.startTimeUnixNano),
+    endNs: BigInt(span.endTimeUnixNano),
+    spanType: getStringAttr(span.attributes, 'span.type') ?? span.name,
+    toolName: getStringAttr(span.attributes, 'tool_name'),
+    requestId: getStringAttr(span.attributes, 'request_id'),
+  }));
   metas.sort((a, b) => (a.startNs < b.startNs ? -1 : a.startNs > b.startNs ? 1 : 0));
   return metas;
 }
@@ -85,12 +81,11 @@ function narrowestContaining(metas: readonly SpanMeta[], ns: bigint): SpanMeta |
   let best: SpanMeta | null = null;
   let bestDur = BigInt(-1);
   for (const m of metas) {
-    if (ns >= m.startNs && ns <= m.endNs) {
-      const dur = m.endNs - m.startNs;
-      if (best === null || dur < bestDur) {
-        best = m;
-        bestDur = dur;
-      }
+    if (ns < m.startNs || ns > m.endNs) continue;
+    const dur = m.endNs - m.startNs;
+    if (best === null || dur < bestDur) {
+      best = m;
+      bestDur = dur;
     }
   }
   return best;
@@ -163,43 +158,65 @@ function buildRequestBodyIndex(logs: readonly LogEntry[]): Map<string, string> {
 
 // ── Tool input lookup ─────────────────────────────────────────────────────────
 
-function buildToolInputIndex(
-  metas: readonly SpanMeta[],
-  allLogs: readonly LogEntry[],
-  logsBySpan: Map<string, LogEntry[]>,
-): Map<string, string> {
+function buildUseIdToInput(allLogs: readonly LogEntry[]): Map<string, string> {
   const useIdToInput = new Map<string, string>();
   for (const log of allLogs) {
     if (log.tool_use_id != null && log.tool_input != null) {
       useIdToInput.set(log.tool_use_id, log.tool_input);
     }
   }
+  return useIdToInput;
+}
 
+function resolveToolInput(
+  m: SpanMeta,
+  logsBySpan: Map<string, LogEntry[]>,
+  useIdToInput: Map<string, string>,
+): string | null {
+  if (m.spanType !== 'tool.blocked_on_user' || m.parentB64 === null) return null;
+  const logs = logsBySpan.get(m.id) ?? [];
+  const decision = logs.find((l) => l.tool_use_id != null);
+  if (decision?.tool_use_id == null) return null;
+  return useIdToInput.get(decision.tool_use_id) ?? null;
+}
+
+function buildToolInputIndex(
+  metas: readonly SpanMeta[],
+  allLogs: readonly LogEntry[],
+  logsBySpan: Map<string, LogEntry[]>,
+): Map<string, string> {
+  const useIdToInput = buildUseIdToInput(allLogs);
   const result = new Map<string, string>();
   for (const m of metas) {
-    if (m.spanType !== 'tool.blocked_on_user' || m.parentB64 === null) continue;
+    const input = resolveToolInput(m, logsBySpan, useIdToInput);
+    if (input == null || m.parentB64 == null) continue;
     const parentId = 's' + b64toHex(m.parentB64);
-    const logs = logsBySpan.get(m.id) ?? [];
-    const decision = logs.find((l) => l.tool_use_id != null);
-    if (decision?.tool_use_id == null) continue;
-    const input = useIdToInput.get(decision.tool_use_id);
-    if (input != null) result.set(parentId, input);
+    result.set(parentId, input);
   }
-
   return result;
+}
+
+function summarizeToolInputPreferred(parsed: Record<string, unknown>, max: number): string | null {
+  const useful = parsed.command ?? parsed.file_path ?? parsed.skill ?? parsed.query;
+  if (typeof useful === 'string' || typeof useful === 'number' || typeof useful === 'boolean') {
+    return String(useful).slice(0, max);
+  }
+  return null;
+}
+
+function firstStringValue(parsed: Record<string, unknown>, max: number): string | null {
+  for (const v of Object.values(parsed)) {
+    if (typeof v === 'string' && v.length > 0) return v.slice(0, max);
+  }
+  return null;
 }
 
 function summarizeToolInput(json: string, max = 120): string | null {
   try {
     const parsed = JSON.parse(json) as Record<string, unknown>;
-    const useful = parsed.command ?? parsed.file_path ?? parsed.skill ?? parsed.query;
-    if (typeof useful === 'string' || typeof useful === 'number' || typeof useful === 'boolean') {
-      return String(useful).slice(0, max);
-    }
-    for (const v of Object.values(parsed)) {
-      if (typeof v === 'string' && v.length > 0) return v.slice(0, max);
-    }
-    return null;
+    const preferred = summarizeToolInputPreferred(parsed, max);
+    if (preferred != null) return preferred;
+    return firstStringValue(parsed, max);
   } catch {
     return json.slice(0, max);
   }
@@ -215,21 +232,23 @@ interface HookEntry {
   readonly durationMs: number | null;
 }
 
+function buildCompletesByName(sorted: readonly LogEntry[]): Map<string, bigint[]> {
+  const completesByName = new Map<string, bigint[]>();
+  for (const log of sorted) {
+    if (log.event_name !== 'hook_execution_complete' || log.hook_name == null) continue;
+    const list = completesByName.get(log.hook_name) ?? [];
+    list.push(BigInt(log.timestamp_ns));
+    completesByName.set(log.hook_name, list);
+  }
+  return completesByName;
+}
+
 function extractHooks(logs: readonly LogEntry[]): HookEntry[] {
   const sorted = [...logs].sort(
     (a, b) => parseInt(a.event_sequence, 10) - parseInt(b.event_sequence, 10),
   );
 
-  // Map hook_name → ordered list of complete timestamps
-  const completesByName = new Map<string, bigint[]>();
-  for (const log of sorted) {
-    if (log.event_name === 'hook_execution_complete' && log.hook_name != null) {
-      const list = completesByName.get(log.hook_name) ?? [];
-      list.push(BigInt(log.timestamp_ns));
-      completesByName.set(log.hook_name, list);
-    }
-  }
-
+  const completesByName = buildCompletesByName(sorted);
   const startCountByName = new Map<string, number>();
   const hooks: HookEntry[] = [];
   let index = 0;
@@ -264,23 +283,43 @@ const INTERACTION_LEVEL_HOOKS = new Set([
   'SubagentStart',
 ]);
 
+function resolvePreToolParent(
+  metas: readonly SpanMeta[],
+  toolName: string,
+  hook: HookEntry,
+): string | null {
+  const match = metas
+    .filter((m) => m.spanType === 'tool' && m.toolName === toolName && m.startNs >= hook.startNs)
+    .sort((a, b) => (a.startNs < b.startNs ? -1 : 1))[0];
+  return match?.b64 ?? null;
+}
+
+function resolvePostToolParent(
+  metas: readonly SpanMeta[],
+  toolName: string,
+  hook: HookEntry,
+): string | null {
+  const match = metas
+    .filter((m) => m.spanType === 'tool' && m.toolName === toolName && m.endNs <= hook.startNs)
+    .sort((a, b) => (a.endNs > b.endNs ? -1 : 1))[0];
+  return match?.b64 ?? null;
+}
+
+function resolveToolHookParent(
+  metas: readonly SpanMeta[],
+  event: string,
+  toolName: string,
+  hook: HookEntry,
+): string | null {
+  if (event === 'PreToolUse') return resolvePreToolParent(metas, toolName, hook);
+  if (event === 'PostToolUse') return resolvePostToolParent(metas, toolName, hook);
+  return null;
+}
+
 function resolveHookParentB64(metas: readonly SpanMeta[], hook: HookEntry): string | null {
   const { event, toolName } = parseHookEvent(hook.hookName);
 
-  if (event === 'PreToolUse' && toolName != null) {
-    const match = metas
-      .filter((m) => m.spanType === 'tool' && m.toolName === toolName && m.startNs >= hook.startNs)
-      .sort((a, b) => (a.startNs < b.startNs ? -1 : 1))[0];
-    if (match) return match.b64;
-  }
-
-  if (event === 'PostToolUse' && toolName != null) {
-    const match = metas
-      .filter((m) => m.spanType === 'tool' && m.toolName === toolName && m.endNs <= hook.startNs)
-      .sort((a, b) => (a.endNs > b.endNs ? -1 : 1))[0];
-    if (match) return match.b64;
-  }
-
+  if (toolName != null) return resolveToolHookParent(metas, event, toolName, hook);
   if (INTERACTION_LEVEL_HOOKS.has(event)) {
     return metas.find((m) => m.spanType === 'interaction')?.b64 ?? null;
   }
@@ -292,6 +331,54 @@ function resolveHookParentB64(metas: readonly SpanMeta[], hook: HookEntry): stri
 
 // ── Span enrichment ───────────────────────────────────────────────────────────
 
+// Prefer the positional index (reliable even when the log timestamp falls
+// outside the span's window); fall back to the attributed log.
+function resolveRawRequestBody(
+  meta: SpanMeta,
+  logs: LogEntry[],
+  requestBodyIndex: Map<string, string>,
+): string | null {
+  return (
+    (meta.requestId != null ? requestBodyIndex.get(meta.requestId) : undefined) ??
+    logs.find((l) => l.event_name === 'api_request_body' && l.body != null)?.body ??
+    null
+  );
+}
+
+function buildLlmExtraAttrs(
+  meta: SpanMeta,
+  logs: LogEntry[],
+  requestBodyIndex: Map<string, string>,
+): OtlpAttribute[] {
+  const apiLog = logs.find((l) => l.event_name === 'api_request');
+  const responseLog = logs.find((l) => l.event_name === 'api_response_body' && l.body != null);
+  const rawRequestBody = resolveRawRequestBody(meta, logs, requestBodyIndex);
+
+  const extra: OtlpAttribute[] = [];
+  if (apiLog?.query_source != null) extra.push(strAttr('query_source', apiLog.query_source));
+  if (apiLog?.cost_usd != null) extra.push(strAttr('cost_usd', apiLog.cost_usd));
+  if (rawRequestBody != null) extra.push(strAttr('raw_request_body', rawRequestBody));
+  if (responseLog?.body != null) extra.push(strAttr('raw_response_body', responseLog.body));
+  return extra;
+}
+
+function enrichLlmSpan(
+  span: OtlpSpan,
+  meta: SpanMeta,
+  logs: LogEntry[],
+  requestBodyIndex: Map<string, string>,
+): OtlpSpan {
+  const extra = buildLlmExtraAttrs(meta, logs, requestBodyIndex);
+  return extra.length > 0 ? { ...span, attributes: [...span.attributes, ...extra] } : span;
+}
+
+function enrichToolSpan(span: OtlpSpan, toolInput: string | null): OtlpSpan {
+  if (toolInput == null) return span;
+  const summary = summarizeToolInput(toolInput);
+  if (summary == null) return span;
+  return { ...span, attributes: [...span.attributes, strAttr('tool_input_summary', summary)] };
+}
+
 function enrichSpan(
   span: OtlpSpan,
   meta: SpanMeta,
@@ -299,45 +386,29 @@ function enrichSpan(
   toolInput: string | null,
   requestBodyIndex: Map<string, string>,
 ): OtlpSpan {
-  const extra: OtlpAttribute[] = [];
-  const spanType = meta.spanType;
-
-  if (spanType === 'llm_request') {
-    const apiLog = logs.find((l) => l.event_name === 'api_request');
-    const responseLog = logs.find((l) => l.event_name === 'api_response_body' && l.body != null);
-
-    // Prefer the positional index (reliable even when the log timestamp falls
-    // outside the span's window); fall back to the attributed log.
-    const rawRequestBody =
-      (meta.requestId != null ? requestBodyIndex.get(meta.requestId) : undefined) ??
-      logs.find((l) => l.event_name === 'api_request_body' && l.body != null)?.body ??
-      null;
-
-    if (apiLog?.query_source != null) extra.push(strAttr('query_source', apiLog.query_source));
-    if (apiLog?.cost_usd != null) extra.push(strAttr('cost_usd', apiLog.cost_usd));
-    if (rawRequestBody != null) extra.push(strAttr('raw_request_body', rawRequestBody));
-    if (responseLog?.body != null) extra.push(strAttr('raw_response_body', responseLog.body));
-  }
-
-  if (spanType === 'tool' && toolInput != null) {
-    const summary = summarizeToolInput(toolInput);
-    if (summary != null) extra.push(strAttr('tool_input_summary', summary));
-  }
-
-  return extra.length > 0 ? { ...span, attributes: [...span.attributes, ...extra] } : span;
+  if (meta.spanType === 'llm_request') return enrichLlmSpan(span, meta, logs, requestBodyIndex);
+  if (meta.spanType === 'tool') return enrichToolSpan(span, toolInput);
+  return span;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 function getTraceId(trace: TempoTrace): string {
-  for (const batch of trace.batches) {
-    for (const ss of batch.scopeSpans) {
-      for (const span of ss.spans) {
-        return span.traceId;
-      }
-    }
-  }
-  return '';
+  return allSpansFlat(trace)[0]?.traceId ?? '';
+}
+
+function enrichSpanInBatch(
+  span: OtlpSpan,
+  metas: SpanMeta[],
+  logsBySpan: Map<string, LogEntry[]>,
+  toolInputBySpanId: Map<string, string>,
+  requestBodyIndex: Map<string, string>,
+): OtlpSpan {
+  const meta = metas.find((m) => m.b64 === span.spanId);
+  if (meta == null) return span;
+  const spanLogs = logsBySpan.get(meta.id) ?? [];
+  const toolInput = toolInputBySpanId.get(meta.id) ?? null;
+  return enrichSpan(span, meta, spanLogs, toolInput, requestBodyIndex);
 }
 
 export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): TempoTrace {
@@ -348,19 +419,19 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
   const requestBodyIndex = buildRequestBodyIndex(logs);
   const hooks = extractHooks(logs);
 
+  function enrichScopeSpan(ss: { spans: readonly OtlpSpan[] }) {
+    return {
+      ...ss,
+      spans: ss.spans.map((span) =>
+        enrichSpanInBatch(span, metas, logsBySpan, toolInputBySpanId, requestBodyIndex),
+      ),
+    };
+  }
+
   // Build enriched span batches
   const enrichedBatches: OtlpBatch[] = trace.batches.map((batch) => ({
     ...batch,
-    scopeSpans: batch.scopeSpans.map((ss) => ({
-      ...ss,
-      spans: ss.spans.map((span) => {
-        const meta = metas.find((m) => m.b64 === span.spanId);
-        if (meta == null) return span;
-        const spanLogs = logsBySpan.get(meta.id) ?? [];
-        const toolInput = toolInputBySpanId.get(meta.id) ?? null;
-        return enrichSpan(span, meta, spanLogs, toolInput, requestBodyIndex);
-      }),
-    })),
+    scopeSpans: batch.scopeSpans.map(enrichScopeSpan),
   }));
 
   // Build hook spans

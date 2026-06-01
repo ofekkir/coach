@@ -35,13 +35,10 @@ export function addSessionNode(nodes: readonly TraceNode[]): TraceNode[] {
 export function aggregateSession(nodesByTrace: readonly (readonly TraceNode[])[]): TraceNode[] {
   const seen = new Set<string>();
   const result: TraceNode[] = [];
-  for (const nodes of nodesByTrace) {
-    for (const node of nodes) {
-      if (!seen.has(node.id)) {
-        seen.add(node.id);
-        result.push(node);
-      }
-    }
+  for (const node of nodesByTrace.flat()) {
+    if (seen.has(node.id)) continue;
+    seen.add(node.id);
+    result.push(node);
   }
   return result;
 }

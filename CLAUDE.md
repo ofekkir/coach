@@ -66,6 +66,11 @@ Prefer named functions and descriptive variable names over inline comments that 
 A function named `groupLogsBySpan()` is better than a `// 2. Group logs by span_id` comment
 before an anonymous block. Comments are for non-obvious WHY, not for labelling WHAT.
 
+- **Max nesting depth: 2.** Use guard clauses (early return/continue/break) instead of nested ifs. Invert conditions and return early so the happy path stays at the lowest indent level.
+- **Extract nested loops.** When two loops nest because they're doing conceptually different things, pull the inner loop into a named function.
+- **Prefer array methods over explicit loops** (`.filter()`, `.map()`, `.flatMap()`) where it reads clearly — they eliminate nesting and name the intent.
+- **No else after return.** If a branch returns/throws, the else block is unnecessary indirection — write the else body at the outer level.
+
 ## Layout
 
 ```

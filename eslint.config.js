@@ -37,10 +37,26 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
     },
   },
+  // Code complexity and nesting guards.
+  {
+    rules: {
+      'max-depth': ['error', 2],
+      complexity: ['error', 10],
+      'max-nested-callbacks': ['error', 2],
+      'no-else-return': 'error',
+    },
+  },
   // Config files are plain JS and live outside the TS program; skip type-aware rules.
   {
     files: ['**/*.js'],
     extends: [tseslint.configs.disableTypeChecked],
+  },
+  // Test files use nested describe/it/expect which is idiomatic Vitest — not a real smell.
+  {
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
+    rules: {
+      'max-nested-callbacks': 'off',
+    },
   },
   // Keep the Prettier compatibility layer last so it wins any formatting conflicts.
   prettier,

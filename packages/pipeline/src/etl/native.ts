@@ -53,18 +53,24 @@ function intAttr(key: string, value: number): OtlpAttribute {
 }
 
 // Mirrors the logic in enrich.ts summarizeToolInput but takes a parsed object
-function summarizeInput(input: unknown, max = 120): string | null {
-  if (input == null || typeof input !== 'object' || Array.isArray(input)) return null;
-  const obj = input as Record<string, unknown>;
+function summarizeInputPreferred(obj: Record<string, unknown>, max: number): string | null {
   const preferred = obj.command ?? obj.file_path ?? obj.skill ?? obj.query;
+  if (preferred == null) return null;
   if (
-    preferred != null &&
-    (typeof preferred === 'string' ||
-      typeof preferred === 'number' ||
-      typeof preferred === 'boolean')
+    typeof preferred === 'string' ||
+    typeof preferred === 'number' ||
+    typeof preferred === 'boolean'
   ) {
     return String(preferred).slice(0, max);
   }
+  return null;
+}
+
+function summarizeInput(input: unknown, max = 120): string | null {
+  if (input == null || typeof input !== 'object' || Array.isArray(input)) return null;
+  const obj = input as Record<string, unknown>;
+  const preferred = summarizeInputPreferred(obj, max);
+  if (preferred != null) return preferred;
   for (const v of Object.values(obj)) {
     if (typeof v === 'string' && v.length > 0) return v.slice(0, max);
   }
@@ -105,9 +111,9 @@ interface NativeEntry {
   readonly requestId?: string;
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Parsing helpers ───────────────────────────────────────────────────────────
 
-export function nativeSessionToTrace(jsonl: string): TempoTrace {
+function parseEntries(jsonl: string): { sessionId: string; entries: NativeEntry[] } {
   let sessionId = '';
   const entries: NativeEntry[] = [];
 
@@ -124,50 +130,29 @@ export function nativeSessionToTrace(jsonl: string): TempoTrace {
     if (typeof obj.uuid === 'string') entries.push(obj);
   }
 
-  if (!sessionId || entries.length === 0) return { batches: [] };
+  return { sessionId, entries };
+}
 
-  const tId = traceB64(sessionId);
-
-  const byUuid = new Map<string, NativeEntry>();
-  for (const e of entries) {
-    if (e.uuid) byUuid.set(e.uuid, e);
+function indexToolResultBlocks(e: NativeEntry, index: Map<string, NativeEntry>): void {
+  const content = e.message?.content;
+  if (content == null || typeof content === 'string') return;
+  for (const block of content) {
+    if (block.type === 'tool_result' && typeof block.tool_use_id === 'string') {
+      index.set(block.tool_use_id, e);
+    }
   }
+}
 
-  // Human prompt: first user entry with plain string content that isn't a meta entry
-  const humanUser = entries.find(
-    (e) => e.type === 'user' && !e.isMeta && typeof e.message?.content === 'string',
-  );
-  if (!humanUser?.uuid || !humanUser.timestamp) return { batches: [] };
+function buildToolResultUserIndex(entries: NativeEntry[]): Map<string, NativeEntry> {
+  const toolResultUser = new Map<string, NativeEntry>();
+  for (const e of entries) {
+    if (e.type !== 'user' || !e.timestamp) continue;
+    indexToolResultBlocks(e, toolResultUser);
+  }
+  return toolResultUser;
+}
 
-  const humanContent = humanUser.message?.content;
-  const userPrompt = typeof humanContent === 'string' ? humanContent : '';
-
-  // Interaction span end = turn_duration timestamp, fallback = last assistant timestamp
-  const turnDuration = entries.find((e) => e.type === 'system' && e.subtype === 'turn_duration');
-  const lastAssistant = entries.findLast((e) => e.type === 'assistant' && e.timestamp);
-  const interactionStartNs = isoToNano(humanUser.timestamp);
-  const rawEnd = turnDuration?.timestamp
-    ? isoToNano(turnDuration.timestamp)
-    : lastAssistant?.timestamp
-      ? isoToNano(lastAssistant.timestamp)
-      : interactionStartNs;
-  const interactionEndNs = clampEnd(interactionStartNs, rawEnd);
-
-  const interactionSpanId = spanB64('interaction', humanUser.uuid);
-  const interactionSpan: OtlpSpan = {
-    traceId: tId,
-    spanId: interactionSpanId,
-    name: 'claude_code.interaction',
-    startTimeUnixNano: interactionStartNs,
-    endTimeUnixNano: interactionEndNs,
-    attributes: [
-      strAttr('span.type', 'interaction'),
-      strAttr('user_prompt', userPrompt),
-      strAttr('session.id', sessionId),
-    ],
-  };
-
-  // Group assistant entries by requestId (preserves conversation order)
+function buildRequestGroups(entries: NativeEntry[]): Map<string, NativeEntry[]> {
   const requestGroups = new Map<string, NativeEntry[]>();
   for (const e of entries) {
     if (e.type !== 'assistant' || typeof e.requestId !== 'string' || !e.timestamp) continue;
@@ -175,120 +160,271 @@ export function nativeSessionToTrace(jsonl: string): TempoTrace {
     group.push(e);
     requestGroups.set(e.requestId, group);
   }
+  return requestGroups;
+}
 
-  // Map tool_use_id → user entry that returned the result
-  const toolResultUser = new Map<string, NativeEntry>();
-  for (const e of entries) {
-    if (e.type !== 'user' || !e.timestamp) continue;
+function entryBlocks(e: NativeEntry): readonly ContentBlock[] {
+  const c = e.message?.content;
+  if (c == null || typeof c === 'string') return [];
+  return c;
+}
+
+function collectContentBlocks(group: NativeEntry[]): ContentBlock[] {
+  return group.flatMap(entryBlocks);
+}
+
+function findEntryWithBlock(group: NativeEntry[], blockId: string): NativeEntry | undefined {
+  return group.find((e) => {
     const content = e.message?.content;
-    if (content == null || typeof content === 'string') continue;
-    for (const block of content) {
-      if (block.type === 'tool_result' && typeof block.tool_use_id === 'string') {
-        toolResultUser.set(block.tool_use_id, e);
-      }
-    }
+    if (content == null || typeof content === 'string') return false;
+    return content.some((b) => b.type === 'tool_use' && b.id === blockId);
+  });
+}
+
+interface LlmSpanMeta {
+  model: string;
+  stopReason: string;
+  inputTokens: number;
+  outputTokens: number;
+  spanStart: string;
+  spanEnd: string;
+}
+
+function extractLlmGroupBounds(
+  group: NativeEntry[],
+): {
+  first: NativeEntry & { timestamp: string };
+  last: NativeEntry & { timestamp: string };
+} | null {
+  const first = group[0];
+  const last = group[group.length - 1];
+  if (!first?.timestamp || !last?.timestamp) return null;
+  return {
+    first: first as NativeEntry & { timestamp: string },
+    last: last as NativeEntry & { timestamp: string },
+  };
+}
+
+function extractFirstMessageFields(msg: NativeMessage | undefined): {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+} {
+  return {
+    model: msg?.model ?? '',
+    inputTokens: msg?.usage?.input_tokens ?? 0,
+    outputTokens: msg?.usage?.output_tokens ?? 0,
+  };
+}
+
+function extractTokenUsage(
+  first: NativeEntry,
+  last: NativeEntry,
+): { model: string; stopReason: string; inputTokens: number; outputTokens: number } {
+  const fromFirst = extractFirstMessageFields(first.message);
+  return {
+    ...fromFirst,
+    stopReason: last.message?.stop_reason ?? '',
+  };
+}
+
+function extractLlmSpanMeta(group: NativeEntry[]): LlmSpanMeta | null {
+  const bounds = extractLlmGroupBounds(group);
+  if (bounds == null) return null;
+  const { first, last } = bounds;
+  const spanStart = isoToNano(first.timestamp);
+  const usage = extractTokenUsage(first, last);
+  return {
+    ...usage,
+    spanStart,
+    spanEnd: clampEnd(spanStart, isoToNano(last.timestamp)),
+  };
+}
+
+function buildLlmSpan(
+  tId: string,
+  requestId: string,
+  group: NativeEntry[],
+  allBlocks: ContentBlock[],
+  interactionSpanId: string,
+  trigUser: NativeEntry | null,
+): OtlpSpan | null {
+  const meta = extractLlmSpanMeta(group);
+  if (meta == null) return null;
+
+  const rawRequestBody = JSON.stringify({
+    messages: [{ role: 'user', content: trigUser?.message?.content ?? null }],
+  });
+  const rawResponseBody = JSON.stringify({ content: allBlocks, stop_reason: meta.stopReason });
+
+  return {
+    traceId: tId,
+    spanId: spanB64('llm_request', requestId),
+    parentSpanId: interactionSpanId,
+    name: 'claude_code.llm_request',
+    startTimeUnixNano: meta.spanStart,
+    endTimeUnixNano: meta.spanEnd,
+    attributes: [
+      strAttr('span.type', 'llm_request'),
+      strAttr('model', meta.model),
+      intAttr('input_tokens', meta.inputTokens),
+      intAttr('output_tokens', meta.outputTokens),
+      strAttr('stop_reason', meta.stopReason),
+      strAttr('request_id', requestId),
+      strAttr('raw_request_body', rawRequestBody),
+      strAttr('raw_response_body', rawResponseBody),
+    ],
+  };
+}
+
+function buildToolSpan(
+  tId: string,
+  block: ContentBlock,
+  group: NativeEntry[],
+  toolResultUser: Map<string, NativeEntry>,
+  interactionSpanId: string,
+): OtlpSpan | null {
+  if (block.type !== 'tool_use' || typeof block.id !== 'string') return null;
+
+  const entryWithTool = findEntryWithBlock(group, block.id);
+  if (!entryWithTool?.timestamp) return null;
+
+  const toolStart = isoToNano(entryWithTool.timestamp);
+  const resultEntry = toolResultUser.get(block.id);
+  const toolEnd = clampEnd(
+    toolStart,
+    resultEntry?.timestamp ? isoToNano(resultEntry.timestamp) : toolStart,
+  );
+
+  const summary = summarizeInput(block.input);
+  const toolAttrs: OtlpAttribute[] = [
+    strAttr('span.type', 'tool'),
+    strAttr('tool_name', block.name ?? 'unknown'),
+  ];
+  if (summary != null) toolAttrs.push(strAttr('tool_input_summary', summary));
+
+  return {
+    traceId: tId,
+    spanId: spanB64('tool', block.id),
+    parentSpanId: interactionSpanId,
+    name: 'claude_code.tool',
+    startTimeUnixNano: toolStart,
+    endTimeUnixNano: toolEnd,
+    attributes: toolAttrs,
+  };
+}
+
+// Walk parentUuid chain to find the nearest user ancestor (skipping attachments)
+function findTriggeringUser(
+  entry: NativeEntry,
+  byUuid: Map<string, NativeEntry>,
+): NativeEntry | null {
+  let parentUuid = entry.parentUuid ?? null;
+  while (parentUuid != null) {
+    const parent = byUuid.get(parentUuid);
+    if (!parent) break;
+    if (parent.type === 'user') return parent;
+    parentUuid = parent.parentUuid ?? null;
   }
+  return null;
+}
 
-  // Walk parentUuid chain to find the nearest user ancestor (skipping attachments)
-  function findTriggeringUser(entry: NativeEntry): NativeEntry | null {
-    let parentUuid = entry.parentUuid ?? null;
-    while (parentUuid != null) {
-      const parent = byUuid.get(parentUuid);
-      if (!parent) break;
-      if (parent.type === 'user') return parent;
-      parentUuid = parent.parentUuid ?? null;
-    }
-    return null;
-  }
+function buildSpansForRequest(
+  tId: string,
+  requestId: string,
+  group: NativeEntry[],
+  byUuid: Map<string, NativeEntry>,
+  toolResultUser: Map<string, NativeEntry>,
+  interactionSpanId: string,
+): OtlpSpan[] {
+  group.sort((a, b) => ((a.timestamp ?? '') < (b.timestamp ?? '') ? -1 : 1));
+  const first = group[0];
+  if (!first) return [];
 
-  const spans: OtlpSpan[] = [interactionSpan];
+  const allBlocks = collectContentBlocks(group);
+  const trigUser = findTriggeringUser(first, byUuid);
 
-  for (const [requestId, group] of requestGroups) {
-    group.sort((a, b) => ((a.timestamp ?? '') < (b.timestamp ?? '') ? -1 : 1));
-    const first = group[0];
-    const last = group[group.length - 1];
-    if (!first || !last) continue;
+  const llmSpan = buildLlmSpan(tId, requestId, group, allBlocks, interactionSpanId, trigUser);
+  if (!llmSpan) return [];
 
-    const model = first.message?.model ?? '';
-    const stopReason = last.message?.stop_reason ?? '';
-    const inputTokens = first.message?.usage?.input_tokens ?? 0;
-    const outputTokens = first.message?.usage?.output_tokens ?? 0;
+  const toolSpans = allBlocks.flatMap((block) => {
+    const span = buildToolSpan(tId, block, group, toolResultUser, interactionSpanId);
+    return span != null ? [span] : [];
+  });
 
-    // Concatenate content blocks from all entries in conversation order
-    const allBlocks: ContentBlock[] = [];
-    for (const e of group) {
-      const c = e.message?.content;
-      if (c != null && typeof c !== 'string') {
-        for (const block of c) allBlocks.push(block);
-      }
-    }
+  return [llmSpan, ...toolSpans];
+}
 
-    const trigUser = findTriggeringUser(first);
-    const rawRequestBody = JSON.stringify({
-      messages: [{ role: 'user', content: trigUser?.message?.content ?? null }],
-    });
-    const rawResponseBody = JSON.stringify({ content: allBlocks, stop_reason: stopReason });
+function resolveInteractionEndNs(entries: NativeEntry[], interactionStartNs: string): string {
+  const turnDuration = entries.find((e) => e.type === 'system' && e.subtype === 'turn_duration');
+  const lastAssistant = entries.findLast((e) => e.type === 'assistant' && e.timestamp);
+  const rawEnd = turnDuration?.timestamp
+    ? isoToNano(turnDuration.timestamp)
+    : lastAssistant?.timestamp
+      ? isoToNano(lastAssistant.timestamp)
+      : interactionStartNs;
+  return clampEnd(interactionStartNs, rawEnd);
+}
 
-    if (!first.timestamp || !last.timestamp) continue;
-    const spanStart = isoToNano(first.timestamp);
-    const spanEnd = clampEnd(spanStart, isoToNano(last.timestamp));
-
-    spans.push({
+function buildInteractionSpan(
+  tId: string,
+  humanUser: NativeEntry & { uuid: string; timestamp: string },
+  sessionId: string,
+  entries: NativeEntry[],
+): { span: OtlpSpan; spanId: string } {
+  const humanContent = humanUser.message?.content;
+  const userPrompt = typeof humanContent === 'string' ? humanContent : '';
+  const interactionStartNs = isoToNano(humanUser.timestamp);
+  const interactionEndNs = resolveInteractionEndNs(entries, interactionStartNs);
+  const spanId = spanB64('interaction', humanUser.uuid);
+  return {
+    spanId,
+    span: {
       traceId: tId,
-      spanId: spanB64('llm_request', requestId),
-      parentSpanId: interactionSpanId,
-      name: 'claude_code.llm_request',
-      startTimeUnixNano: spanStart,
-      endTimeUnixNano: spanEnd,
+      spanId,
+      name: 'claude_code.interaction',
+      startTimeUnixNano: interactionStartNs,
+      endTimeUnixNano: interactionEndNs,
       attributes: [
-        strAttr('span.type', 'llm_request'),
-        strAttr('model', model),
-        intAttr('input_tokens', inputTokens),
-        intAttr('output_tokens', outputTokens),
-        strAttr('stop_reason', stopReason),
-        strAttr('request_id', requestId),
-        strAttr('raw_request_body', rawRequestBody),
-        strAttr('raw_response_body', rawResponseBody),
+        strAttr('span.type', 'interaction'),
+        strAttr('user_prompt', userPrompt),
+        strAttr('session.id', sessionId),
       ],
-    });
+    },
+  };
+}
 
-    // One tool span per tool_use block
-    for (const block of allBlocks) {
-      if (block.type !== 'tool_use' || typeof block.id !== 'string') continue;
+// ── Public API ────────────────────────────────────────────────────────────────
 
-      const entryWithTool = group.find(
-        (e) =>
-          e.message?.content != null &&
-          typeof e.message.content !== 'string' &&
-          e.message.content.some((b) => b.type === 'tool_use' && b.id === block.id),
-      );
-      if (!entryWithTool?.timestamp) continue;
+export function nativeSessionToTrace(jsonl: string): TempoTrace {
+  const { sessionId, entries } = parseEntries(jsonl);
 
-      const toolStart = isoToNano(entryWithTool.timestamp);
-      const resultEntry = toolResultUser.get(block.id);
-      const toolEnd = clampEnd(
-        toolStart,
-        resultEntry?.timestamp ? isoToNano(resultEntry.timestamp) : toolStart,
-      );
+  if (!sessionId || entries.length === 0) return { batches: [] };
 
-      const summary = summarizeInput(block.input);
-      const toolAttrs: OtlpAttribute[] = [
-        strAttr('span.type', 'tool'),
-        strAttr('tool_name', block.name ?? 'unknown'),
-      ];
-      if (summary != null) toolAttrs.push(strAttr('tool_input_summary', summary));
+  const tId = traceB64(sessionId);
+  const byUuid = new Map<string, NativeEntry>(
+    entries.flatMap((e) => (e.uuid != null ? [[e.uuid, e] as [string, NativeEntry]] : [])),
+  );
 
-      spans.push({
-        traceId: tId,
-        spanId: spanB64('tool', block.id),
-        parentSpanId: interactionSpanId,
-        name: 'claude_code.tool',
-        startTimeUnixNano: toolStart,
-        endTimeUnixNano: toolEnd,
-        attributes: toolAttrs,
-      });
-    }
-  }
+  // Human prompt: first user entry with plain string content that isn't a meta entry
+  const humanUser = entries.find(
+    (e) => e.type === 'user' && !e.isMeta && typeof e.message?.content === 'string',
+  );
+  if (!humanUser?.uuid || !humanUser.timestamp) return { batches: [] };
 
-  return { batches: [{ scopeSpans: [{ spans }] }] };
+  const { span: interactionSpan, spanId: interactionSpanId } = buildInteractionSpan(
+    tId,
+    humanUser as NativeEntry & { uuid: string; timestamp: string },
+    sessionId,
+    entries,
+  );
+
+  const requestGroups = buildRequestGroups(entries);
+  const toolResultUser = buildToolResultUserIndex(entries);
+
+  const requestSpans = [...requestGroups.entries()].flatMap(([requestId, group]) =>
+    buildSpansForRequest(tId, requestId, group, byUuid, toolResultUser, interactionSpanId),
+  );
+
+  return { batches: [{ scopeSpans: [{ spans: [interactionSpan, ...requestSpans] }] }] };
 }
