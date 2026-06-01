@@ -19,6 +19,7 @@ import {
   buildElements,
   colorOf,
   initialExpanded,
+  toAgent,
   type TraceRFNodeData,
 } from './layout.ts';
 import { TraceNodeView } from './TraceNode.tsx';
@@ -220,7 +221,7 @@ function FlowInner({
     setNodes(elements.nodes);
     setEdges(elements.edges);
     const t = setTimeout(() => {
-      void fitView({ padding: 0.12, duration: 300 });
+      void fitView({ padding: 0.12 });
     }, 40);
     return () => {
       clearTimeout(t);
@@ -300,8 +301,8 @@ export function App() {
       }
       return null;
     }
-    if (DATA.kind !== 'agent') return null;
-    for (const { view: sv } of DATA.data.sessions) {
+    const agent = toAgent(DATA);
+    for (const { view: sv } of agent.sessions) {
       for (const { view: iv } of sv.interactions) {
         for (const thread of iv.threads) {
           for (const m of thread.members) {

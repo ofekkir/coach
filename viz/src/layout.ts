@@ -306,7 +306,7 @@ function placeAgent(agent: AgentCausalGraphView, ctx: Ctx): void {
 
 // ── normalise to agent ────────────────────────────────────────────────────────
 
-function toAgent(data: VizData): AgentCausalGraphView {
+export function toAgent(data: VizData): AgentCausalGraphView {
   if (data.kind === 'agent') return data.data;
 
   const FAKE: GraphViewNode = {
