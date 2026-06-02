@@ -5,16 +5,16 @@ import {
   aggregateSession,
   groupSessionsByAgent,
 } from './etl/aggregate.ts';
-import { enrichTrace } from './etl/enrich/index.ts';
-import { nativeSessionToTrace } from './etl/native/index.ts';
-import { transformTrace } from './etl/transform/index.ts';
+import { enrichTrace } from './etl/enrich/enrich.ts';
+import { nativeSessionToTrace } from './etl/native/native.ts';
+import { transformTrace } from './etl/transform/transform.ts';
 import type { LogEntry, TempoTrace, TraceNode } from './etl/types.ts';
+import { buildCausalGraphView } from './graph/view-model/graph-view.ts';
 import {
   buildAgentCausalGraphView,
-  buildCausalGraphView,
   buildSessionCausalGraphView,
-} from './graph/view-model/index.ts';
-import type { VizData } from './graph/view-model/index.ts';
+} from './graph/view-model/session-view.ts';
+import type { VizData } from './graph/view-model/types.ts';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

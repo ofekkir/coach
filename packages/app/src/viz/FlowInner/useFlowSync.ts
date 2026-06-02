@@ -7,7 +7,7 @@ import {
   type OnNodesChange,
 } from '@xyflow/react';
 import type { Edge } from '@xyflow/react';
-import type { TraceRFNode } from '../layout/index.ts';
+import type { TraceRFNode } from '../layout/types.ts';
 
 interface Elements {
   nodes: TraceRFNode[];

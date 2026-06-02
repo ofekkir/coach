@@ -1,5 +1,5 @@
 import type { GraphViewNode } from '@coach/pipeline';
-import { colorOf } from '../layout/index.ts';
+import { colorOf } from '../layout/colors.ts';
 
 function renderDetailRow(line: string, i: number): React.ReactNode {
   const colon = line.indexOf(':');

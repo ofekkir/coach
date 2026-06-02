@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { pino } from 'pino';
-import { log, createLogger } from './index.ts';
+import { log, createLogger } from './logger.ts';
 
 describe('logger exports', () => {
   it('exports log and createLogger with expected methods', () => {

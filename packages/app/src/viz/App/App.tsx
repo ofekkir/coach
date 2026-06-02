@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { GraphViewNode, VizData } from '@coach/pipeline';
-import { allExpandableIds, agentRoot, initialExpanded, toAgent } from '../layout/index.ts';
+import { allExpandableIds, agentRoot, initialExpanded, toAgent } from '../layout/queries.ts';
 import { FlowInner } from '../FlowInner/FlowInner.tsx';
 import { DetailsPanel } from '../DetailsPanel/DetailsPanel.tsx';
 import { Toolbar } from '../Toolbar/Toolbar.tsx';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { TraceNode } from '../etl/types.ts';
-import { buildCausalGraphView } from './view-model/index.ts';
+import type { TraceNode } from '../../etl/types.ts';
+import { buildCausalGraphView } from './graph-view.ts';
 
 const interaction: TraceNode = {
   id: 'root',

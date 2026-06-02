@@ -21,7 +21,8 @@
     "e2e": "node --experimental-strip-types scripts/e2e.ts",
     "viz": "node --experimental-strip-types scripts/viz.ts",
     "knip": "knip",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm knip",
+    "check:structure": "node --experimental-strip-types scripts/check-structure.ts",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm knip && pnpm check:structure",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -46,6 +47,7 @@
     "@types/node": "^22.10.0",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-no-barrel-files": "^1.3.1",
     "eslint-plugin-project-structure": "^3.14.3",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
