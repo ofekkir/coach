@@ -5,6 +5,7 @@ import prettier from 'eslint-config-prettier';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactPlugin from 'eslint-plugin-react';
 import { createFolderStructure, projectStructurePlugin } from 'eslint-plugin-project-structure';
+import noBarrelFiles from 'eslint-plugin-no-barrel-files';
 
 // TODO: projectStructureParser integration was kept minimal due to parser-layering
 // complexity with typescript-eslint's projectService. The rule enforces PascalCase
@@ -117,19 +118,11 @@ export default tseslint.config(
       'max-lines-per-function': 'off',
     },
   },
-  // index.ts files are barrels only — no logic, only re-export statements.
+  // Ban barrel files everywhere except each package's public src/index.ts.
   {
-    files: ['**/index.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'Program > :not(ExportNamedDeclaration):not(ExportAllDeclaration)',
-          message:
-            'index.ts must only contain re-export statements. Put logic in a named file (e.g. foo/foo.ts).',
-        },
-      ],
-    },
+    ignores: ['**/src/index.ts'],
+    plugins: { 'no-barrel-files': noBarrelFiles },
+    rules: { 'no-barrel-files/no-barrel-files': 'error' },
   },
   // Forbid stray console.* — route through @coach/logger. Sanctioned escape hatch when
   // console is genuinely wanted: a per-line `// eslint-disable-next-line no-console`.

@@ -1,13 +1,7 @@
 import type { OtlpAttribute, OtlpSpan } from '../types.ts';
 import { clampEnd, isoToNano, intAttr, spanB64, strAttr, summarizeInput } from './helpers.ts';
 import type { ContentBlock, LlmSpanMeta, NativeEntry } from './types.ts';
-import {
-  buildRequestGroups,
-  buildToolResultUserIndex,
-  collectContentBlocks,
-  findEntryWithBlock,
-  findTriggeringUser,
-} from './parse.ts';
+import { collectContentBlocks, findEntryWithBlock, findTriggeringUser } from './parse.ts';
 
 function extractLlmGroupBounds(group: NativeEntry[]): {
   first: NativeEntry & { timestamp: string };
@@ -153,5 +147,3 @@ export function buildSpansForRequest(
 
   return [llmSpan, ...toolSpans];
 }
-
-export { buildRequestGroups, buildToolResultUserIndex };

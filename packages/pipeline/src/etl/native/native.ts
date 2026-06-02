@@ -1,8 +1,8 @@
 import type { TempoTrace } from '../types.ts';
 import { traceB64 } from './helpers.ts';
 import { buildInteractionSpan } from './interaction.ts';
-import { parseEntries } from './parse.ts';
-import { buildRequestGroups, buildSpansForRequest, buildToolResultUserIndex } from './spans.ts';
+import { buildRequestGroups, buildToolResultUserIndex, parseEntries } from './parse.ts';
+import { buildSpansForRequest } from './spans.ts';
 import type { NativeEntry } from './types.ts';
 
 export function nativeSessionToTrace(jsonl: string): TempoTrace {

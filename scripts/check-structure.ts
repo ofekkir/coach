@@ -17,10 +17,6 @@ function checkTestPlacement(dir: string, entry: string, siblings: Set<string>): 
   }
 }
 
-function shouldVisit(name: string): boolean {
-  return !SKIP_DIRS.has(name) && !name.startsWith('.');
-}
-
 function checkDir(dir: string): void {
   const entries = readdirSync(dir);
   const siblings = new Set(entries);
@@ -31,20 +27,7 @@ function checkDir(dir: string): void {
       checkTestPlacement(dir, entry, siblings);
       continue;
     }
-    if (!shouldVisit(entry)) continue;
-    checkModuleDir(entry, fullPath);
-    checkDir(fullPath);
-  }
-}
-
-function checkModuleDir(name: string, fullPath: string): void {
-  const children = readdirSync(fullPath);
-  const hasNamedFile = children.some((c) => c === `${name}.ts` || c === `${name}.tsx`);
-  if (children.includes('index.ts') && !hasNamedFile) {
-    const rel = relative(ROOT, fullPath);
-    violations.push(
-      `${rel}/index.ts: rename to ${rel}/${name}.ts (index.ts should be a barrel, not the logic file).`,
-    );
+    if (!SKIP_DIRS.has(entry) && !entry.startsWith('.')) checkDir(fullPath);
   }
 }
 
