@@ -5,16 +5,16 @@ import {
   aggregateSession,
   groupSessionsByAgent,
 } from './etl/aggregate.ts';
-import { enrichTrace } from './etl/enrich.ts';
-import { nativeSessionToTrace } from './etl/native.ts';
-import { transformTrace } from './etl/transform.ts';
+import { enrichTrace } from './etl/enrich/index.ts';
+import { nativeSessionToTrace } from './etl/native/index.ts';
+import { transformTrace } from './etl/transform/index.ts';
 import type { LogEntry, TempoTrace, TraceNode } from './etl/types.ts';
 import {
   buildAgentCausalGraphView,
   buildCausalGraphView,
   buildSessionCausalGraphView,
-} from './graph/view-model.ts';
-import type { VizData } from './graph/view-model.ts';
+} from './graph/view-model/index.ts';
+import type { VizData } from './graph/view-model/index.ts';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -66,7 +66,10 @@ function processNativeFile(file: UploadedFile): TraceNode[] {
   return sortByTime(addSessionNode(transformTrace(trace)));
 }
 
-interface OtelBucket { logs: UploadedFile | null; traces: UploadedFile[] }
+interface OtelBucket {
+  logs: UploadedFile | null;
+  traces: UploadedFile[];
+}
 
 function buildOtelBuckets(otelFiles: readonly UploadedFile[]): Map<string, OtelBucket> {
   const buckets = new Map<string, OtelBucket>();
@@ -81,17 +84,6 @@ function buildOtelBuckets(otelFiles: readonly UploadedFile[]): Map<string, OtelB
     buckets.set(dir, bucket);
   }
   return buckets;
-}
-
-function warnIfMultipleAgents(agentGroups: Map<string, TraceNode[][]>): void {
-  if (agentGroups.size <= 1) return;
-  const realIds = [...agentGroups.keys()].filter((id) => id !== SYNTHETIC_AGENT_ID);
-  if (realIds.length > 1) {
-    console.warn(
-      `[coach] Multiple distinct user.ids found in upload (${realIds.join(', ')}). ` +
-        'Emitting one result per agent. Multi-agent UI is not implemented.',
-    );
-  }
 }
 
 function processOtelSet(logsContent: string, traceFiles: UploadedFile[]): TraceNode[][] {
@@ -156,7 +148,6 @@ export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
 
   // ── Group sessions by agent and emit one VizResult per agent ─────────────────
   const agentGroups = groupSessionsByAgent(sessionNodeArrays);
-  warnIfMultipleAgents(agentGroups);
 
   const results: VizResult[] = [];
   for (const [agentId, sessionArrays] of agentGroups) {

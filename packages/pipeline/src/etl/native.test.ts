@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { addSessionNode } from './aggregate.ts';
 import { TempoTraceSchema } from './tempo.schema.ts';
-import { transformTrace } from './transform.ts';
-import { nativeSessionToTrace } from './native.ts';
+import { transformTrace } from './transform/index.ts';
+import { nativeSessionToTrace } from './native/index.ts';
 
 const FIXTURE_JSONL = readFileSync(
   join(import.meta.dirname, '../../fixtures/native-claude/fetch-website/session.jsonl'),

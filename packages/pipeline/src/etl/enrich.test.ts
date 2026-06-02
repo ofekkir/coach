@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 import logsFixture from '../../fixtures/otel/update-claude-config/logs.json';
 import traceFixture from '../../fixtures/otel/update-claude-config/trace.json';
-import { enrichTrace } from './enrich.ts';
+import { enrichTrace } from './enrich/index.ts';
 import { TempoTraceSchema } from './tempo.schema.ts';
 import type { LogEntry, TempoTrace } from './types.ts';
 

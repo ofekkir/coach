@@ -5,10 +5,10 @@ export {
   aggregateSession,
   groupSessionsByAgent,
 } from './etl/aggregate.ts';
-export { enrichTrace } from './etl/enrich.ts';
-export { nativeSessionToTrace } from './etl/native.ts';
+export { enrichTrace } from './etl/enrich/index.ts';
+export { nativeSessionToTrace } from './etl/native/index.ts';
 export { TempoTraceSchema } from './etl/tempo.schema.ts';
-export { transformTrace } from './etl/transform.ts';
+export { transformTrace } from './etl/transform/index.ts';
 export type {
   LogEntry,
   NodeType,
@@ -24,7 +24,7 @@ export {
   buildAgentCausalGraphView,
   buildCausalGraphView,
   buildSessionCausalGraphView,
-} from './graph/view-model.ts';
+} from './graph/view-model/index.ts';
 export type {
   AgentCausalGraphView,
   CausalGraphView,
@@ -33,7 +33,7 @@ export type {
   GraphViewThread,
   SessionCausalGraphView,
   VizData,
-} from './graph/view-model.ts';
+} from './graph/view-model/index.ts';
 
 // Orchestration
 export { buildVizResults } from './orchestrate.ts';

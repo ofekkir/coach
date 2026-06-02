@@ -20,3 +20,6 @@ out.timeline
 
 # MCP server config — contains secrets (service account tokens)
 .mcp.json
+
+# eslint-plugin-project-structure cache
+projectStructure.cache.json
