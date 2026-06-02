@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { TraceRFNode, TraceRFNodeData } from './layout.ts';
+import type { TraceRFNode, TraceRFNodeData } from '../layout/index.ts';
+import { NodeBody } from './NodeBody.tsx';
 
-// Keys must match labelLines[0] values from view-model.ts buildLabelLines().
 const TYPE_BADGES: Record<string, string> = {
   agent: 'AGENT',
   session: 'SESSION',
@@ -13,8 +13,6 @@ const TYPE_BADGES: Record<string, string> = {
   hook: 'HOOK',
 };
 
-// Finds the duration line anywhere in the body and separates it out.
-// When only body line is the duration, name is empty.
 function splitLines(lines: readonly string[]): {
   name: string;
   details: string[];
@@ -32,13 +30,6 @@ function splitLines(lines: readonly string[]): {
     timing,
   };
 }
-
-// Single line style — truncates with "…" if too wide rather than wrapping.
-const LINE: React.CSSProperties = {
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
 
 function cardStyle(
   color: string,
@@ -61,61 +52,6 @@ function cardStyle(
   };
 }
 
-function NodeBody({
-  name,
-  details,
-  timing,
-  color,
-}: {
-  name: string;
-  details: string[];
-  timing: string | null;
-  color: string;
-}) {
-  return (
-    <div style={{ padding: '6px 10px 8px' }}>
-      {name !== '' && (
-        <div
-          style={{
-            ...LINE,
-            color: '#1e293b',
-            fontSize: 11,
-            lineHeight: 1.4,
-            marginBottom: details.length > 0 ? 2 : 0,
-          }}
-        >
-          {name}
-        </div>
-      )}
-      {details.map((line, i) => (
-        <div
-          key={i}
-          style={{ ...LINE, color: '#64748b', fontSize: 10, lineHeight: 1.45, marginTop: 1 }}
-        >
-          {line}
-        </div>
-      ))}
-      {timing !== null && (
-        <div
-          style={{
-            display: 'inline-block',
-            marginTop: 5,
-            background: `${color}14`,
-            border: `1px solid ${color}40`,
-            borderRadius: 4,
-            padding: '1px 6px',
-            color,
-            fontSize: 10,
-            letterSpacing: '0.02em',
-          }}
-        >
-          {timing}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
   const { gvNode, color, fill, hasRFChildren, isExpanded }: TraceRFNodeData = data;
   const type = gvNode.labelLines[0] ?? '';
@@ -131,7 +67,6 @@ export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
       />
 
       <div style={cardStyle(color, fill, selected, hasRFChildren)}>
-        {/* header */}
         <div
           style={{
             background: `${color}18`,

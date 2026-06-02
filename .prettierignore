@@ -5,3 +5,4 @@ pnpm-lock.yaml
 out.md
 out.timeline
 .claude/worktrees
+projectStructure.cache.json
