@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { TraceRFNode, TraceRFNodeData } from '../layout/index.ts';
+import type { TraceRFNode, TraceRFNodeData } from '../layout/types.ts';
 import { NodeBody } from './NodeBody.tsx';
 
 const TYPE_BADGES: Record<string, string> = {

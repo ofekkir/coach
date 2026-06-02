@@ -10,8 +10,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { VizData } from '@coach/pipeline';
-import { buildElements } from '../layout/index.ts';
-import type { TraceRFNode, TraceRFNodeData } from '../layout/index.ts';
+import { buildElements } from '../layout/queries.ts';
+import type { TraceRFNode, TraceRFNodeData } from '../layout/types.ts';
 import { TraceNodeView } from '../TraceNode/TraceNode.tsx';
 import { useFlowSync } from './useFlowSync.ts';
 

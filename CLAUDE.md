@@ -25,7 +25,7 @@ layout, module boundaries, or data flow change. Consult it before architectural 
 
 ```bash
 pnpm install          # install dependencies
-pnpm check            # typecheck + lint + format:check + test + knip (what CI runs)
+pnpm check            # typecheck + lint + format:check + test + knip + structure (what CI runs)
 pnpm typecheck        # tsc --noEmit
 pnpm lint             # eslint, warnings = errors (--max-warnings=0)
 pnpm lint:fix         # eslint --fix
@@ -34,6 +34,7 @@ pnpm format:check     # prettier --check .
 pnpm test             # vitest run
 pnpm test:watch       # vitest (watch)
 pnpm knip             # check for unused files, exports, and dependencies
+pnpm check:structure  # enforce module file naming and test placement conventions
 pnpm build            # emit dist/ via tsup
 ```
 
@@ -70,6 +71,14 @@ before an anonymous block. Comments are for non-obvious WHY, not for labelling W
 - **Extract nested loops.** When two loops nest because they're doing conceptually different things, pull the inner loop into a named function.
 - **Prefer array methods over explicit loops** (`.filter()`, `.map()`, `.flatMap()`) where it reads clearly — they eliminate nesting and name the intent.
 - **No else after return.** If a branch returns/throws, the else block is unnecessary indirection — write the else body at the outer level.
+
+## Module file conventions
+
+Enforced by `pnpm check:structure` (also runs in pre-commit):
+
+- **Named logic files:** when a module lives in its own directory, the core logic file is named after the directory — `enrich/enrich.ts`, not `enrich/index.ts`. This makes the file's purpose unambiguous without opening it.
+- **Barrel files are re-export only:** `index.ts` files may only contain `export … from` statements — no logic. Enforced by ESLint (`no-restricted-syntax` on `**/index.ts`). Avoid creating internal barrels; only the package root `index.ts` should aggregate exports.
+- **Tests live inside their module directory:** `enrich/enrich.test.ts`, not `etl/enrich.test.ts`. A test file must not be a sibling of the directory it tests.
 
 ## Layout
 

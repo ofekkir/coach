@@ -117,6 +117,20 @@ export default tseslint.config(
       'max-lines-per-function': 'off',
     },
   },
+  // index.ts files are barrels only — no logic, only re-export statements.
+  {
+    files: ['**/index.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Program > :not(ExportNamedDeclaration):not(ExportAllDeclaration)',
+          message:
+            'index.ts must only contain re-export statements. Put logic in a named file (e.g. foo/foo.ts).',
+        },
+      ],
+    },
+  },
   // Forbid stray console.* — route through @coach/logger. Sanctioned escape hatch when
   // console is genuinely wanted: a per-line `// eslint-disable-next-line no-console`.
   { files: ['**/*.{ts,tsx}'], rules: { 'no-console': 'error' } },
