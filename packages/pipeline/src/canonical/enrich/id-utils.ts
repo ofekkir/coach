@@ -1,4 +1,4 @@
-import type { OtlpAttribute, OtlpSpan, TempoTrace } from '../types.ts';
+import type { OtlpAttribute, OtlpSpan, TempoTrace } from '../../types.ts';
 
 export interface SpanMeta {
   readonly id: string;

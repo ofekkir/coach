@@ -1,19 +1,31 @@
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { log } from '@coach/logger';
-import { buildVizResults } from '@coach/pipeline';
-import type { UploadedFile, VizResult } from '@coach/pipeline';
+import { runPipeline } from '@coach/pipeline';
+import type { UploadedFile } from '@coach/pipeline';
+
+// ── CLI ───────────────────────────────────────────────────────────────────────
 
 const arg = process.argv[2];
 if (!arg) {
-  log.error('Usage: pnpm e2e <path>  (e.g. pnpm e2e packages/pipeline/fixtures/fetch-website)');
+  log.error('Usage: pnpm e2e <path|fixture>  (e.g. pnpm e2e otel/fetch-website)');
   process.exit(1);
 }
 
-const inputDir = resolve(process.cwd(), arg);
-const outDir = `out/${basename(inputDir)}`;
+function resolveInput(a: string): string {
+  const direct = resolve(process.cwd(), a);
+  if (existsSync(direct)) return direct;
+  const underFixtures = resolve(process.cwd(), 'packages/pipeline/fixtures', a);
+  if (existsSync(underFixtures)) return underFixtures;
+  log.error(`Input not found (tried '${direct}' and '${underFixtures}')`);
+  process.exit(1);
+}
 
+const inputDir = resolveInput(arg);
+const outDir = `out/${basename(inputDir)}`;
 mkdirSync(outDir, { recursive: true });
+
+// ── Gather files (the same flat UploadedFile[] the browser upload produces) ─────
 
 function gatherFiles(dir: string, rootDir: string): UploadedFile[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -28,23 +40,42 @@ function gatherFiles(dir: string, rootDir: string): UploadedFile[] {
   });
 }
 
-const allFiles = gatherFiles(inputDir, inputDir);
-log.info({ files: allFiles.length }, 'gathered input files');
+// ── Run the pipeline and dump each stage member ────────────────────────────────
 
-const results: VizResult[] = buildVizResults(allFiles);
-
-if (results.length === 0) {
-  log.error('No visualisable results produced. Check the input files.');
-  process.exit(1);
+function dump(stepLabel: string, data: unknown): void {
+  const filePath = join(outDir, `${stepLabel}.json`);
+  writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
+  log.info(`  → ${filePath}`);
 }
 
-for (const result of results) {
-  const safe = result.title.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const jsonPath = `${outDir}/vizdata-${safe}.json`;
-  writeFileSync(jsonPath, JSON.stringify(result, null, 2) + '\n');
-  log.info({ kind: result.data.kind }, `wrote ${jsonPath}`);
-}
+const files = gatherFiles(inputDir, inputDir);
+log.info({ files: files.length }, 'gathered input files');
 
+const result = runPipeline(files);
+
+// Input-bearing members are projected to names/types so the dumps stay readable;
+// the graph members are dumped in full — they are the point of inspection.
+dump(
+  '01-classified',
+  result.classified.map((c) => ({ name: c.file.name, path: c.file.path, type: c.type })),
+);
+dump(
+  '02-sessions',
+  result.sessions.map((s) => ({
+    sessionId: s.sessionId,
+    kind: s.kind,
+    inputs: s.inputs.map((i) => i.file.name),
+  })),
+);
+dump('03-canonical-by-session', result.canonicalBySession);
+dump('04-agent-graph', result.agentGraph);
+dump('05-view-model', result.viewModel);
+
+const unsupported = result.classified.filter((c) => c.type === 'unsupported');
+if (unsupported.length > 0) {
+  log.warn({ files: unsupported.map((u) => u.file.name) }, 'unsupported inputs ignored');
+}
 log.info(
-  `To visualise: pnpm --filter @coach/app dev — then upload the source files from ${inputDir}`,
+  { sessions: result.sessions.length, agentGraphNodes: result.agentGraph.length },
+  `done → ${outDir}`,
 );

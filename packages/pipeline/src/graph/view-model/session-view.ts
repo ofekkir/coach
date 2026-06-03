@@ -1,4 +1,4 @@
-import type { TraceNode } from '../../etl/types.ts';
+import type { CanonicalNode } from '../../types.ts';
 import { buildLabelLines, sortByStart, truncate } from './format.ts';
 import { buildCausalGraphView } from './graph-view.ts';
 import { buildChildrenOf } from './thread.ts';
@@ -9,10 +9,10 @@ import type {
   SessionCausalGraphView,
 } from './types.ts';
 
-function nodeSubtree(nodes: readonly TraceNode[], rootId: string): TraceNode[] {
+function nodeSubtree(nodes: readonly CanonicalNode[], rootId: string): CanonicalNode[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const childrenOf = buildChildrenOf(nodes);
-  const result: TraceNode[] = [];
+  const result: CanonicalNode[] = [];
   const queue: string[] = [rootId];
   while (queue.length > 0) {
     const id = queue.shift();
@@ -27,7 +27,7 @@ function nodeSubtree(nodes: readonly TraceNode[], rootId: string): TraceNode[] {
   return result;
 }
 
-function buildEmptyInteractionView(interaction: TraceNode): CausalGraphView {
+function buildEmptyInteractionView(interaction: CanonicalNode): CausalGraphView {
   return {
     root: {
       id: interaction.id,
@@ -37,11 +37,13 @@ function buildEmptyInteractionView(interaction: TraceNode): CausalGraphView {
     },
     threads: [],
     rootToThreadIds: [],
+    segments: [],
+    shape: 'query',
   };
 }
 
 export function buildSessionCausalGraphView(
-  nodes: readonly TraceNode[],
+  nodes: readonly CanonicalNode[],
 ): SessionCausalGraphView | null {
   const session = nodes.find((n) => n.type === 'session');
   if (session == null) return null;
@@ -72,7 +74,7 @@ export function buildSessionCausalGraphView(
   return { root, interactions: interactionViews };
 }
 
-function buildEmptySessionView(session: TraceNode): SessionCausalGraphView {
+function buildEmptySessionView(session: CanonicalNode): SessionCausalGraphView {
   return {
     root: { id: session.id, labelLines: buildLabelLines(session), children: [], innerEdges: [] },
     interactions: [],
@@ -80,7 +82,7 @@ function buildEmptySessionView(session: TraceNode): SessionCausalGraphView {
 }
 
 export function buildAgentCausalGraphView(
-  nodes: readonly TraceNode[],
+  nodes: readonly CanonicalNode[],
 ): AgentCausalGraphView | null {
   const agent = nodes.find((n) => n.type === 'agent');
   if (agent == null) return null;

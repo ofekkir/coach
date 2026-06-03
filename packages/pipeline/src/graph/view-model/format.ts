@@ -1,10 +1,10 @@
-import type { TraceNode } from '../../etl/types.ts';
+import type { CanonicalNode } from '../../types.ts';
 
 function nsOf(ns: string | undefined): bigint {
   return ns != null ? BigInt(ns) : 0n;
 }
 
-export function compareStart(a: TraceNode, b: TraceNode): number {
+export function compareStart(a: CanonicalNode, b: CanonicalNode): number {
   const diff = nsOf(a.start_time_ns) - nsOf(b.start_time_ns);
   if (diff !== 0n) return diff < 0n ? -1 : 1;
   const priority = (t: string) =>
@@ -12,7 +12,7 @@ export function compareStart(a: TraceNode, b: TraceNode): number {
   return priority(a.type) - priority(b.type);
 }
 
-export function sortByStart(list: TraceNode[]): TraceNode[] {
+export function sortByStart(list: CanonicalNode[]): CanonicalNode[] {
   return [...list].sort(compareStart);
 }
 
@@ -21,7 +21,7 @@ function formatDuration(ms: number): string {
   return `${String(Math.round(ms))}ms`;
 }
 
-export function formatGap(prev: TraceNode, next: TraceNode): string | null {
+export function formatGap(prev: CanonicalNode, next: CanonicalNode): string | null {
   if (prev.end_time_ns == null || next.start_time_ns == null) return null;
   const ms = Number(BigInt(next.start_time_ns) - BigInt(prev.end_time_ns)) / 1_000_000;
   if (!Number.isFinite(ms) || ms === 0) return null;
@@ -32,7 +32,7 @@ export function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + '…';
 }
 
-function llmRequestLines(node: TraceNode): string[] {
+function llmRequestLines(node: CanonicalNode): string[] {
   const lines = ['llm_request'];
   if (node.model != null) lines.push(`model: ${node.model}`);
   if (node.source != null) lines.push(`source: ${node.source}`);
@@ -48,7 +48,7 @@ function optionalLine(
   return value != null ? [format(value)] : [];
 }
 
-function buildTypeLines(node: TraceNode): string[] {
+function buildTypeLines(node: CanonicalNode): string[] {
   switch (node.type) {
     case 'agent':
       return ['agent', ...optionalLine(node.user_id)];
@@ -75,7 +75,7 @@ function buildTypeLines(node: TraceNode): string[] {
   }
 }
 
-export function buildLabelLines(node: TraceNode): string[] {
+export function buildLabelLines(node: CanonicalNode): string[] {
   const lines = buildTypeLines(node);
 
   if (node.duration_ms != null) lines.push(`duration: ${formatDuration(node.duration_ms)}`);

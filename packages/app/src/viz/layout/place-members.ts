@@ -1,5 +1,5 @@
 import { MarkerType } from '@xyflow/react';
-import type { GraphViewNode, GraphViewThread } from '@coach/pipeline';
+import type { GraphViewNode, GraphViewThread, StepView } from '@coach/pipeline';
 import { colorOf, fillOf } from './colors.ts';
 import { estimateNodeH } from './estimate.ts';
 import type { Ctx, TraceRFNodeData } from './types.ts';
@@ -87,6 +87,12 @@ export function placeThread(
     const isExpandedMember = hasSubNodes && ctx.expanded.has(member.id);
     const edgeLabel = i === 0 ? undefined : thread.edges[i - 1]?.label;
 
+    const step: StepView = member;
+    const stepExtra =
+      step.kind === 'action'
+        ? { stepKind: step.kind, verb: step.verb, segmentIndex: step.segmentIndex }
+        : { stepKind: step.kind, moves: step.moves, segmentIndex: step.segmentIndex };
+
     push(
       member.id,
       tx,
@@ -99,6 +105,7 @@ export function placeThread(
         hasRFChildren: hasSubNodes,
         isExpanded: isExpandedMember,
         selected: member.id === ctx.selected,
+        ...stepExtra,
       },
       ctx,
     );

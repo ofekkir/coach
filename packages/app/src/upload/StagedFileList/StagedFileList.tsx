@@ -1,3 +1,5 @@
+import type { UploadedFile } from '@coach/pipeline';
+
 const ghostButtonStyle: React.CSSProperties = {
   background: 'transparent',
   border: 'none',
@@ -5,11 +7,6 @@ const ghostButtonStyle: React.CSSProperties = {
   fontSize: 11,
   cursor: 'pointer',
 };
-
-function basenameOf(path: string): string {
-  const idx = path.lastIndexOf('/');
-  return idx >= 0 ? path.slice(idx + 1) : path;
-}
 
 function dirOf(path: string): string {
   const idx = path.lastIndexOf('/');
@@ -44,7 +41,7 @@ function renderVisualizeFooter(
   );
 }
 
-function renderFileRow(key: string, onRemove: (k: string) => void): React.ReactNode {
+function renderFileRow(key: string, name: string, onRemove: (k: string) => void): React.ReactNode {
   return (
     <div
       key={key}
@@ -66,7 +63,7 @@ function renderFileRow(key: string, onRemove: (k: string) => void): React.ReactN
           whiteSpace: 'nowrap',
         }}
       >
-        {basenameOf(key)}
+        {name}
       </span>
       <button
         onClick={() => {
@@ -87,16 +84,16 @@ export function StagedFileList({
   onRemove,
   onVisualize,
 }: {
-  stagedEntries: [string, unknown][];
+  stagedEntries: [string, UploadedFile][];
   loading: boolean;
   onClearAll: () => void;
   onRemove: (key: string) => void;
   onVisualize: () => void;
 }) {
-  const dirGroups = stagedEntries.reduce<Map<string, string[]>>((acc, [key]) => {
-    const dir = dirOf(key) || '(root)';
+  const dirGroups = stagedEntries.reduce<Map<string, [string, UploadedFile][]>>((acc, [key, f]) => {
+    const dir = dirOf(f.path ?? '') || '(root)';
     const group = acc.get(dir) ?? [];
-    group.push(key);
+    group.push([key, f]);
     acc.set(dir, group);
     return acc;
   }, new Map());
@@ -128,7 +125,7 @@ export function StagedFileList({
         </button>
       </div>
       <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-        {[...dirGroups.entries()].map(([dir, keys]) => (
+        {[...dirGroups.entries()].map(([dir, entries]) => (
           <div key={dir}>
             {dir !== '(root)' && (
               <div
@@ -145,7 +142,7 @@ export function StagedFileList({
                 {dir}
               </div>
             )}
-            {keys.map((key) => renderFileRow(key, onRemove))}
+            {entries.map(([key, f]) => renderFileRow(key, f.name, onRemove))}
           </div>
         ))}
       </div>

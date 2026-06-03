@@ -1,13 +1,60 @@
-import type { TraceNode } from '../../etl/types.ts';
+import type { CanonicalNode } from '../../types.ts';
 import { buildLabelLines, compareStart, sortByStart } from './format.ts';
 import { buildChildrenOf, buildThreadEdges, buildThreadMembers } from './thread.ts';
-import type { CausalGraphView, GraphViewEdge, GraphViewNode } from './types.ts';
+import type {
+  CausalGraphView,
+  GraphViewEdge,
+  GraphViewNode,
+  InteractionShape,
+  SegmentView,
+  StepView,
+} from './types.ts';
+import { actionVerbFromNode, inferenceMovesFromRawResponse } from './verbs.ts';
 
 function resolveId(viewNode: GraphViewNode): string {
   return viewNode.children.length > 0 ? `sg_${viewNode.id}` : viewNode.id;
 }
 
-function toViewNode(node: TraceNode, childrenOf: Map<string, TraceNode[]>): GraphViewNode {
+// V1: all steps belong to a single segment (index 0).
+// Seam: replace with a boundary-detection pass over members' moves/verbs to
+// detect goal shifts (e.g. thinking-topic change, end_turn followed by new
+// reasoning), or delegate to an LLM classifier.
+function assignSegments(members: CanonicalNode[]): number[] {
+  return members.map(() => 0);
+}
+
+function deriveInteractionShape(directChildren: CanonicalNode[]): InteractionShape {
+  const llms = directChildren.filter((n) => n.type === 'llm_request');
+  const tools = directChildren.filter((n) => n.type === 'tool');
+  if (llms.length === 1 && tools.length === 0 && llms[0]?.stop_reason === 'end_turn') {
+    return 'query';
+  }
+  return 'agentic';
+}
+
+function toStepView(
+  node: CanonicalNode,
+  childrenOf: Map<string, CanonicalNode[]>,
+  segmentIndex: number,
+): StepView {
+  const base = toViewNode(node, childrenOf);
+  if (node.type === 'llm_request') {
+    return {
+      ...base,
+      kind: 'inference',
+      moves: inferenceMovesFromRawResponse(node.raw_response),
+      segmentIndex,
+    };
+  }
+  return {
+    ...base,
+    kind: 'action',
+    verb: actionVerbFromNode(node.name, node.tool_input),
+    segmentIndex,
+  };
+}
+
+function toViewNode(node: CanonicalNode, childrenOf: Map<string, CanonicalNode[]>): GraphViewNode {
   const rawChildren = childrenOf.get(node.id);
   const labelLines = buildLabelLines(node);
 
@@ -29,7 +76,12 @@ function toViewNode(node: TraceNode, childrenOf: Map<string, TraceNode[]>): Grap
   return { id: node.id, labelLines, children: childNodes, innerEdges };
 }
 
-export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphView | null {
+function buildSegmentViews(segmentIndices: number[]): SegmentView[] {
+  const unique = [...new Set(segmentIndices)].sort((a, b) => a - b);
+  return unique.map((index) => ({ index, label: `segment ${String(index + 1)}` }));
+}
+
+export function buildCausalGraphView(nodes: readonly CanonicalNode[]): CausalGraphView | null {
   const childrenOf = buildChildrenOf(nodes);
 
   const interaction = nodes.find((n) => n.type === 'interaction');
@@ -37,7 +89,7 @@ export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphVi
 
   const directChildren = childrenOf.get(interaction.id) ?? [];
 
-  const llmsByThread = new Map<string, TraceNode[]>();
+  const llmsByThread = new Map<string, CanonicalNode[]>();
   for (const n of directChildren) {
     if (n.type !== 'llm_request') continue;
     const src = n.source ?? 'unknown';
@@ -61,10 +113,15 @@ export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphVi
     innerEdges: [],
   };
 
+  const shape = deriveInteractionShape(directChildren);
+
+  const allSegmentIndices: number[] = [];
   const threads = sortedSources.map((source) => {
     const members = threadMembers.get(source) ?? [];
     const threadId = `thread_${source.replace(/\W+/g, '_')}`;
-    const memberViewNodes = members.map((m) => toViewNode(m, childrenOf));
+    const segIndices = assignSegments(members);
+    allSegmentIndices.push(...segIndices);
+    const memberViewNodes = members.map((m, i) => toStepView(m, childrenOf, segIndices[i] ?? 0));
     const edges = buildThreadEdges(members, memberViewNodes);
 
     return {
@@ -79,5 +136,7 @@ export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphVi
     root,
     threads,
     rootToThreadIds: threads.map((t) => t.id),
+    segments: buildSegmentViews(allSegmentIndices),
+    shape,
   };
 }

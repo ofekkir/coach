@@ -1,20 +1,20 @@
-import type { TraceNode } from '../../etl/types.ts';
+import type { CanonicalNode } from '../../types.ts';
 import { formatGap, sortByStart } from './format.ts';
 import type { GraphViewEdge, GraphViewNode } from './types.ts';
 
 interface ThreadReq {
   source: string;
-  req: TraceNode;
+  req: CanonicalNode;
 }
 
-function flattenThreadReqs(llmsByThread: Map<string, TraceNode[]>): ThreadReq[] {
+function flattenThreadReqs(llmsByThread: Map<string, CanonicalNode[]>): ThreadReq[] {
   return [...llmsByThread.entries()].flatMap(([source, reqs]) =>
     reqs.map((req) => ({ source, req })),
   );
 }
 
 function findOverlappingThread(
-  llmsByThread: Map<string, TraceNode[]>,
+  llmsByThread: Map<string, CanonicalNode[]>,
   nodeStart: bigint,
 ): string | null {
   let overlappingThread: string | null = null;
@@ -32,7 +32,7 @@ function findOverlappingThread(
 }
 
 function findPrecedingThread(
-  llmsByThread: Map<string, TraceNode[]>,
+  llmsByThread: Map<string, CanonicalNode[]>,
   nodeStart: bigint | null,
 ): string | null {
   let bestByEnd: string | null = null;
@@ -55,8 +55,8 @@ function findPrecedingThread(
 }
 
 function assignNodeToThread(
-  node: TraceNode,
-  llmsByThread: Map<string, TraceNode[]>,
+  node: CanonicalNode,
+  llmsByThread: Map<string, CanonicalNode[]>,
 ): string | null {
   if (node.type === 'hook' && node.name === 'UserPromptSubmit') {
     return llmsByThread.has('repl_main_thread') ? 'repl_main_thread' : null;
@@ -72,9 +72,9 @@ function assignNodeToThread(
   return findPrecedingThread(llmsByThread, nodeStart);
 }
 
-export function buildChildrenOf(nodes: readonly TraceNode[]): Map<string, TraceNode[]> {
+export function buildChildrenOf(nodes: readonly CanonicalNode[]): Map<string, CanonicalNode[]> {
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const childrenOf = new Map<string, TraceNode[]>();
+  const childrenOf = new Map<string, CanonicalNode[]>();
   for (const n of nodes) {
     if (n.parent != null && byId.has(n.parent)) {
       const list = childrenOf.get(n.parent) ?? [];
@@ -86,10 +86,10 @@ export function buildChildrenOf(nodes: readonly TraceNode[]): Map<string, TraceN
 }
 
 export function buildThreadMembers(
-  directChildren: TraceNode[],
-  llmsByThread: Map<string, TraceNode[]>,
-): Map<string, TraceNode[]> {
-  const threadMembers = new Map<string, TraceNode[]>();
+  directChildren: CanonicalNode[],
+  llmsByThread: Map<string, CanonicalNode[]>,
+): Map<string, CanonicalNode[]> {
+  const threadMembers = new Map<string, CanonicalNode[]>();
   for (const [src, reqs] of llmsByThread) {
     threadMembers.set(src, [...reqs]);
   }
@@ -111,7 +111,7 @@ function resolveId(viewNode: GraphViewNode): string {
 }
 
 export function buildThreadEdges(
-  members: TraceNode[],
+  members: CanonicalNode[],
   memberViewNodes: GraphViewNode[],
 ): GraphViewEdge[] {
   const edges: GraphViewEdge[] = [];

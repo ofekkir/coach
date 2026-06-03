@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import type { GraphViewNode } from '@coach/pipeline';
+import type { GraphViewNode, InteractionShape, Move } from '@coach/pipeline';
 
 export const NW = 210;
 export const HG = 56;
@@ -16,6 +16,13 @@ export interface TraceRFNodeData extends Record<string, unknown> {
   hasRFChildren: boolean;
   isExpanded: boolean;
   selected: boolean;
+  // Interaction-specific
+  shape?: InteractionShape;
+  // Step-specific (member nodes)
+  stepKind?: 'inference' | 'action';
+  verb?: string;
+  moves?: readonly Move[];
+  segmentIndex?: number;
 }
 
 export type TraceRFNode = Node<TraceRFNodeData, 'trace'>;

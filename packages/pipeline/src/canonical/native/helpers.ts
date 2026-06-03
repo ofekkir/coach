@@ -1,4 +1,4 @@
-import type { OtlpAttribute } from '../types.ts';
+import type { OtlpAttribute } from '../../types.ts';
 
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = '';

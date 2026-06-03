@@ -12,44 +12,40 @@ seam, and Vercel deployment.
 
 ## Pipeline
 
+`runPipeline(files)` (@coach/pipeline) runs five named stages, each exposed as a member of
+the returned `PipelineResult`:
+
 ```
-*.jsonl / logs.json + trace*.json
+UploadedFile[]   (*.jsonl · logs.json + trace*.json)
         │
-        ▼ ETL  (@coach/pipeline)
-   nativeSessionToTrace / enrichTrace → transformTrace → addSessionNode
+        ▼ 1. classify        every file tagged: otel-trace | otel-log | native | unsupported
+        ▼ 2. route           supported inputs grouped by session id (logs fall back to dir)
+        ▼ 3. canonical       per session → CanonicalNode[]
+                               otel:   join traces → enrich with logs → transform (one pass)
+                               native: jsonl → CanonicalNode[]  (OTLP round-trip behind a facade)
+        ▼ 4. aggregate       all sessions under one agent → agentGraph (CanonicalNode[])
+        ▼ 5. view-model      buildCausalGraphView family → viewModel (VizData)
         │
-        ▼ Aggregation
-   aggregateSession  ·  groupSessionsByAgent → aggregateAgent
-        │
-        ▼ View model
-   buildCausalGraphView        → CausalGraphView
-   buildSessionCausalGraphView → SessionCausalGraphView
-   buildAgentCausalGraphView   → AgentCausalGraphView
-        │
-        ▼ VizData  { kind: 'agent' | 'session' | 'interaction', data }
-        │
-        ▼ React Flow graph  (@coach/app)
+        ▼ React Flow graph   (@coach/app, via the buildVizResults adapter)
 ```
 
-View models are built bottom-up and consumed only by the graph renderer — no raw
-`TraceNode[]` reaches the visualization layer.
+`agentGraph` is itself a visualisable graph; `viewModel` is the verb/move/segment view-model —
+one of several graphs we expect to add. View models are consumed only by the renderer; no raw
+`CanonicalNode[]` reaches the visualization layer.
 
 ### Upload model
 
-Each uploaded file or OTEL set (one directory of `logs.json` + `trace*.json`) is treated as
-one **session**. All sessions roll up under a single **agent** view. Use the accumulating
-staging UI to add files and folders before submitting — mix `.jsonl` and OTEL sets freely.
+Inputs are classified, then grouped by **session id** — OTEL traces carry `session.id`, native
+`.jsonl` carries `sessionId`, and OTEL logs use their `session_id` (falling back to the traces in
+their directory). A session is assumed wholly OTEL or wholly native. All sessions roll up under a
+single **agent** (multi-agent is out of scope). Use the staging UI to mix files and folders freely.
 
-### Fixture modes
+### Fixtures
 
 `pnpm e2e` accepts a path (relative to cwd) or a fixture name under
-`packages/pipeline/fixtures/`.
-
-| Input shape                         | Mode                      | Artifacts in `out/`  |
-| ----------------------------------- | ------------------------- | -------------------- |
-| `<dir>/*.jsonl`                     | Native sessions           | `vizdata-agent.json` |
-| `<dir>/logs.json` + `trace*.json`   | Single OTEL session       | `vizdata-agent.json` |
-| `<dir>/` containing session subdirs | Multi-session (multi-dir) | `vizdata-agent.json` |
+`packages/pipeline/fixtures/`. It dumps each stage member to `out/<name>/`:
+`01-classified.json`, `02-sessions.json`, `03-canonical-by-session.json`,
+`04-agent-graph.json`, `05-view-model.json`.
 
 ## Quick start
 

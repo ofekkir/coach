@@ -1,5 +1,5 @@
-import type { OtlpSpan } from '../types.ts';
-import { clampEnd, isoToNano, spanB64, strAttr } from './helpers.ts';
+import type { OtlpSpan } from '../../types.ts';
+import { clampEnd, intAttr, isoToNano, spanB64, strAttr } from './helpers.ts';
 import type { NativeEntry } from './types.ts';
 
 function resolveInteractionEndNs(entries: NativeEntry[], interactionStartNs: string): string {
@@ -18,6 +18,7 @@ export function buildInteractionSpan(
   humanUser: NativeEntry & { uuid: string; timestamp: string },
   sessionId: string,
   entries: NativeEntry[],
+  seqIdx: number,
 ): { span: OtlpSpan; spanId: string } {
   const humanContent = humanUser.message?.content;
   const userPrompt = typeof humanContent === 'string' ? humanContent : '';
@@ -36,6 +37,7 @@ export function buildInteractionSpan(
         strAttr('span.type', 'interaction'),
         strAttr('user_prompt', userPrompt),
         strAttr('session.id', sessionId),
+        intAttr('interaction.sequence', seqIdx),
       ],
     },
   };

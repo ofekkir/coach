@@ -114,7 +114,12 @@ function stageFiles(
   setStaged((prev) => {
     const next = new Map(prev);
     for (const f of incoming) {
-      if (FILE_PATTERN.test(f.name)) next.set(f.path ?? f.name, f);
+      if (!FILE_PATTERN.test(f.name)) continue;
+      const baseKey = f.path ?? f.name;
+      let key = baseKey;
+      let n = 1;
+      while (next.has(key)) key = `${baseKey}__${String(n++)}`;
+      next.set(key, f);
     }
     return next;
   });

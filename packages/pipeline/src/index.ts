@@ -1,23 +1,18 @@
-// ETL
-export {
-  addSessionNode,
-  aggregateAgent,
-  aggregateSession,
-  groupSessionsByAgent,
-} from './etl/aggregate.ts';
-export { enrichTrace } from './etl/enrich/enrich.ts';
-export { nativeSessionToTrace } from './etl/native/native.ts';
-export { TempoTraceSchema } from './etl/tempo.schema.ts';
-export { transformTrace } from './etl/transform/transform.ts';
+// Canonical conversion (used by CLI scripts)
+export { enrichTrace } from './canonical/enrich/enrich.ts';
+export { transformTrace } from './canonical/transform/transform.ts';
+export { TempoTraceSchema } from './canonical/tempo.schema.ts';
 export type {
+  CanonicalNode,
+  InputType,
   LogEntry,
   NodeType,
   OtlpAttribute,
   OtlpBatch,
   OtlpSpan,
   TempoTrace,
-  TraceNode,
-} from './etl/types.ts';
+  UploadedFile,
+} from './types.ts';
 
 // View model
 export { buildCausalGraphView } from './graph/view-model/graph-view.ts';
@@ -26,15 +21,21 @@ export {
   buildSessionCausalGraphView,
 } from './graph/view-model/session-view.ts';
 export type {
+  ActionStepView,
   AgentCausalGraphView,
   CausalGraphView,
   GraphViewEdge,
   GraphViewNode,
   GraphViewThread,
+  InferenceStepView,
+  InteractionShape,
+  Move,
+  SegmentView,
   SessionCausalGraphView,
+  StepView,
   VizData,
 } from './graph/view-model/types.ts';
 
 // Orchestration
-export { buildVizResults } from './orchestrate.ts';
-export type { UploadedFile, VizResult } from './orchestrate.ts';
+export { buildVizResults, runPipeline } from './orchestrate.ts';
+export type { PipelineResult, VizResult } from './orchestrate.ts';

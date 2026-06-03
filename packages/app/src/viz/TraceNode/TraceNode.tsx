@@ -1,11 +1,12 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { TraceRFNode, TraceRFNodeData } from '../layout/types.ts';
 import { NodeBody } from './NodeBody.tsx';
+import { StepAnnotation } from './StepAnnotation.tsx';
 
 const TYPE_BADGES: Record<string, string> = {
   agent: 'AGENT',
   session: 'SESSION',
-  interaction: 'TURN',
+  interaction: 'INTERACTION',
   llm_request: 'LLM',
   tool: 'TOOL',
   blocked_on_user: 'WAIT',
@@ -54,6 +55,7 @@ function cardStyle(
 
 export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
   const { gvNode, color, fill, hasRFChildren, isExpanded }: TraceRFNodeData = data;
+  const { shape, stepKind, verb, moves, segmentIndex }: TraceRFNodeData = data;
   const type = gvNode.labelLines[0] ?? '';
   const badge = TYPE_BADGES[type] ?? type.toUpperCase();
   const { name, details, timing } = splitLines(gvNode.labelLines);
@@ -91,6 +93,19 @@ export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
           >
             {badge}
           </span>
+          {shape != null && (
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                color: shape === 'query' ? '#44AA99' : '#882255',
+                letterSpacing: '0.05em',
+                flexShrink: 0,
+              }}
+            >
+              {shape}
+            </span>
+          )}
           {hasRFChildren && (
             <span style={{ marginLeft: 'auto', color, fontSize: 12, lineHeight: 1, flexShrink: 0 }}>
               {isExpanded ? '▾' : '▸'}
@@ -99,6 +114,13 @@ export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
         </div>
 
         <NodeBody name={name} details={details} timing={timing} color={color} />
+        <StepAnnotation
+          stepKind={stepKind}
+          verb={verb}
+          moves={moves}
+          segmentIndex={segmentIndex}
+          color={color}
+        />
       </div>
 
       <Handle

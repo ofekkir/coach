@@ -1,4 +1,4 @@
-import type { LogEntry, OtlpAttribute, OtlpBatch, OtlpSpan, TempoTrace } from '../types.ts';
+import type { LogEntry, OtlpAttribute, OtlpBatch, OtlpSpan, TempoTrace } from '../../types.ts';
 import { allSpansFlat, collectSpanMeta, strAttr } from './id-utils.ts';
 import type { SpanMeta } from './id-utils.ts';
 import {

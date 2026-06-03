@@ -84,11 +84,15 @@ Enforced by `pnpm check:structure` (also runs in pre-commit):
 
 ```
 packages/
-  pipeline/           # @coach/pipeline — pure ETL + view model (no node:* imports)
+  pipeline/           # @coach/pipeline — pure staged pipeline (no node:* imports)
     src/
-      etl/            # enrich + transform pipeline (+ co-located *.test.ts)
-      graph/          # view-model (CausalGraphView, VizData)
-      orchestrate.ts  # buildVizResults — file-system-free orchestration
+      types.ts        # shared types (CanonicalNode, OTLP, stage records)
+      classify/       # stage 1 — tag each file by input type
+      route/          # stage 2 — group supported inputs by session id
+      canonical/      # stage 3 — inputs → CanonicalNode[] (enrich/native/transform internals)
+      aggregate/      # stage 4 — sessions → single-agent forest
+      graph/          # stage 5 — view-model (CausalGraphView, VizData)
+      orchestrate.ts  # runPipeline + buildVizResults — file-system-free orchestration
       index.ts        # public exports
     fixtures/         # test fixtures (native .jsonl + OTEL sets)
   app/                # @coach/app — React SPA (upload UI + graph renderer)

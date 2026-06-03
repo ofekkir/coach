@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { TraceNode } from '../../etl/types.ts';
+import type { CanonicalNode } from '../../types.ts';
 import { buildCausalGraphView } from './graph-view.ts';
 
-const interaction: TraceNode = {
+const interaction: CanonicalNode = {
   id: 'root',
   type: 'interaction',
   prompt: 'hello',
 };
 
-const llm1: TraceNode = {
+const llm1: CanonicalNode = {
   id: 'llm1',
   type: 'llm_request',
   parent: 'root',
@@ -17,7 +17,7 @@ const llm1: TraceNode = {
   end_time_ns: '200000000',
 };
 
-const llm2: TraceNode = {
+const llm2: CanonicalNode = {
   id: 'llm2',
   type: 'llm_request',
   parent: 'root',
@@ -26,7 +26,7 @@ const llm2: TraceNode = {
   end_time_ns: '400000000',
 };
 
-const bgLlm: TraceNode = {
+const bgLlm: CanonicalNode = {
   id: 'bgLlm',
   type: 'llm_request',
   parent: 'root',
@@ -35,7 +35,7 @@ const bgLlm: TraceNode = {
   end_time_ns: '500000000',
 };
 
-const toolAfterLlm1: TraceNode = {
+const toolAfterLlm1: CanonicalNode = {
   id: 'toolA',
   type: 'tool',
   parent: 'root',
@@ -90,7 +90,7 @@ describe('buildCausalGraphView', () => {
   });
 
   it('a tool node with children becomes a GraphViewNode with non-empty children', () => {
-    const toolWithChild: TraceNode = {
+    const toolWithChild: CanonicalNode = {
       id: 'twc',
       type: 'tool',
       parent: 'root',
@@ -98,7 +98,7 @@ describe('buildCausalGraphView', () => {
       start_time_ns: '210000000',
       end_time_ns: '300000000',
     };
-    const child: TraceNode = {
+    const child: CanonicalNode = {
       id: 'child1',
       type: 'tool.execution',
       parent: 'twc',
@@ -112,7 +112,7 @@ describe('buildCausalGraphView', () => {
   });
 
   it('thread-level edges referencing a container node use the sg_<id> prefix', () => {
-    const toolWithChild: TraceNode = {
+    const toolWithChild: CanonicalNode = {
       id: 'twc',
       type: 'tool',
       parent: 'root',
@@ -120,7 +120,7 @@ describe('buildCausalGraphView', () => {
       start_time_ns: '210000000',
       end_time_ns: '300000000',
     };
-    const child: TraceNode = {
+    const child: CanonicalNode = {
       id: 'child1',
       type: 'tool.execution',
       parent: 'twc',
@@ -144,7 +144,7 @@ describe('buildCausalGraphView', () => {
   });
 
   it('inner edges (inside containers) have no gap label', () => {
-    const toolWithChild: TraceNode = {
+    const toolWithChild: CanonicalNode = {
       id: 'twc',
       type: 'tool',
       parent: 'root',
@@ -152,14 +152,14 @@ describe('buildCausalGraphView', () => {
       start_time_ns: '210000000',
       end_time_ns: '300000000',
     };
-    const child1: TraceNode = {
+    const child1: CanonicalNode = {
       id: 'ch1',
       type: 'tool.blocked_on_user',
       parent: 'twc',
       start_time_ns: '215000000',
       end_time_ns: '220000000',
     };
-    const child2: TraceNode = {
+    const child2: CanonicalNode = {
       id: 'ch2',
       type: 'tool.execution',
       parent: 'twc',
@@ -176,5 +176,48 @@ describe('buildCausalGraphView', () => {
   it('rootToThreadIds contains all thread ids in order', () => {
     const view = buildCausalGraphView([interaction, llm1, bgLlm]);
     expect(view?.rootToThreadIds).toEqual(view?.threads.map((t) => t.id));
+  });
+
+  it('thread members carry kind: inference for llm_request, action for tool', () => {
+    const view = buildCausalGraphView([interaction, llm1, toolAfterLlm1, llm2]);
+    const members = view?.threads.find((t) => t.id === 'thread_repl_main_thread')?.members ?? [];
+    // sorted by start: llm1(100ms), toolAfterLlm1(210ms), llm2(310ms)
+    expect(members[0]?.kind).toBe('inference');
+    expect(members[1]?.kind).toBe('action');
+    expect(members[2]?.kind).toBe('inference');
+  });
+
+  it('v1 segmentation: all thread members get segmentIndex 0', () => {
+    const view = buildCausalGraphView([interaction, llm1, toolAfterLlm1, llm2]);
+    const members = view?.threads.find((t) => t.id === 'thread_repl_main_thread')?.members ?? [];
+    for (const m of members) expect(m.segmentIndex).toBe(0);
+  });
+
+  it('segments array contains one SegmentView for v1', () => {
+    const view = buildCausalGraphView([interaction, llm1, toolAfterLlm1, llm2]);
+    expect(view?.segments).toHaveLength(1);
+    expect(view?.segments[0]).toEqual({ index: 0, label: 'segment 1' });
+  });
+
+  it('shape is query for a single end_turn inference with no tools', () => {
+    const queryLlm: CanonicalNode = {
+      id: 'q',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      stop_reason: 'end_turn',
+    };
+    const view = buildCausalGraphView([interaction, queryLlm]);
+    expect(view?.shape).toBe('query');
+  });
+
+  it('shape is agentic when there are tool nodes', () => {
+    const view = buildCausalGraphView([interaction, llm1, toolAfterLlm1, llm2]);
+    expect(view?.shape).toBe('agentic');
+  });
+
+  it('shape is agentic when there are multiple llm_requests', () => {
+    const view = buildCausalGraphView([interaction, llm1, llm2]);
+    expect(view?.shape).toBe('agentic');
   });
 });

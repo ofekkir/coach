@@ -1,4 +1,4 @@
-import type { NodeType, OtlpAttribute, TempoTrace } from '../types.ts';
+import type { NodeType, OtlpAttribute, TempoTrace } from '../../types.ts';
 
 export interface ParsedSpan {
   readonly id: string;
@@ -20,6 +20,7 @@ export interface ParsedSpan {
   readonly costUsd: string | null;
   readonly toolInputSummary: string | null;
   readonly hookName: string | null;
+  readonly sequenceIndex: number | null;
 }
 
 function b64toHex(b64: string): string {
@@ -80,6 +81,7 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
         costUsd: getStringAttr(span.attributes, 'cost_usd'),
         toolInputSummary: getStringAttr(span.attributes, 'tool_input_summary'),
         hookName: getStringAttr(span.attributes, 'hook.name'),
+        sequenceIndex: getIntAttr(span.attributes, 'interaction.sequence'),
       };
     });
   spans.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));

@@ -2,6 +2,7 @@ import type {
   AgentCausalGraphView,
   GraphViewNode,
   GraphViewThread,
+  InteractionShape,
   SessionCausalGraphView,
 } from '@coach/pipeline';
 import { colorOf, fillOf } from './colors.ts';
@@ -22,6 +23,7 @@ function placeInteraction(
   gvNode: GraphViewNode,
   parentId: string,
   threads: readonly GraphViewThread[],
+  shape: InteractionShape,
   y: number,
   ctx: Ctx,
 ): number {
@@ -41,6 +43,7 @@ function placeInteraction(
       hasRFChildren: hasKids,
       isExpanded,
       selected: id === ctx.selected,
+      shape,
     },
     ctx,
   );
@@ -95,7 +98,7 @@ function placeSession(
   if (!isExpanded || !hasKids) return y;
 
   for (const { view: iv } of interactions) {
-    y = placeInteraction(iv.root.id, iv.root, id, iv.threads, y, ctx);
+    y = placeInteraction(iv.root.id, iv.root, id, iv.threads, iv.shape, y, ctx);
   }
 
   return y;
