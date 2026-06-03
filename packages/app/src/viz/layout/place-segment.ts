@@ -4,7 +4,7 @@ import { estimateNodeH } from './estimate.ts';
 import { buildLabelLines } from '../format/format.ts';
 import { link, push } from './place-members.ts';
 import type { Ctx, TraceRFNodeData } from './types.ts';
-import { VG, subgraphId } from './types.ts';
+import { VG } from './types.ts';
 
 /** Reusable card push for a structural execution node (agent/session/interaction/member). */
 export function pushStructural(
@@ -95,12 +95,13 @@ function placeStep(
 
 export function placeSegment(
   segment: Segment,
+  id: string,
   parentId: string,
+  edgeLabel: string | undefined,
   x: number,
   startY: number,
   ctx: Ctx,
 ): number {
-  const id = subgraphId(`seg-${parentId}-${String(segment.index)}`);
   const accent = segmentAccentOf(segment.index);
   const labelLines = ['segment', segment.label];
   push(
@@ -119,7 +120,7 @@ export function placeSegment(
     },
     ctx,
   );
-  link(parentId, id, undefined, ctx);
+  link(parentId, id, edgeLabel, ctx);
   let y = startY + estimateNodeH(labelLines) + VG;
   for (const step of segment.steps) {
     y = placeStep(step, segment.index, id, x, y, ctx);

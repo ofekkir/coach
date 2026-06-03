@@ -4,15 +4,16 @@ import type {
   ExecutionNode,
   InteractionSemantics,
   SemanticGraph,
+  ThreadSemantics,
 } from '@coach/pipeline';
 import type { Edge } from '@xyflow/react';
 import { estimateNodeH } from './estimate.ts';
-import { buildLabelLines } from '../format/format.ts';
+import { buildLabelLines, threadTitle } from '../format/format.ts';
 import { link } from './place-members.ts';
 import { placeSegment, pushStructural } from './place-segment.ts';
 import { toAgent } from './queries.ts';
 import type { Ctx, TraceRFNode } from './types.ts';
-import { HG, LG, NW, VG } from './types.ts';
+import { HG, LG, NW, VG, subgraphId } from './types.ts';
 
 type SessionExec = AgentExecution['sessions'][number];
 
@@ -24,13 +25,34 @@ function semanticsFor(
 }
 
 // Horizontal extent of a semantic session: the widest interaction, where an
-// interaction lays its segments out side by side.
+// interaction lays its threads out side by side as lanes.
 function semanticSessionWidth(session: SessionExec, semantic: SemanticGraph): number {
   return session.interactions.reduce((max, interaction) => {
-    const segCount = semanticsFor(semantic, interaction.root.id)?.segments.length ?? 1;
-    const w = segCount * NW + Math.max(0, segCount - 1) * HG;
+    const threadCount = semanticsFor(semantic, interaction.root.id)?.threads.length ?? 1;
+    const w = threadCount * NW + Math.max(0, threadCount - 1) * HG;
     return Math.max(max, w);
   }, NW);
+}
+
+// One thread lane: its segments stacked vertically, chained from the interaction
+// (the first segment's incoming edge carries the thread title).
+function placeThreadLane(
+  thread: ThreadSemantics,
+  interactionId: string,
+  x: number,
+  startY: number,
+  ctx: Ctx,
+): number {
+  let y = startY;
+  let parentId = interactionId;
+  let edgeLabel: string | undefined = threadTitle(thread.source);
+  for (const segment of thread.segments) {
+    const id = subgraphId(`seg-${thread.id}-${String(segment.index)}`);
+    y = placeSegment(segment, id, parentId, edgeLabel, x, y, ctx);
+    parentId = id;
+    edgeLabel = undefined;
+  }
+  return y;
 }
 
 function pushInteractionWithShape(
@@ -51,7 +73,7 @@ function pushInteractionWithShape(
       canonical: root.canonical,
       color: '#5599BB',
       fill: '#EDF5FB',
-      hasRFChildren: semantics.segments.length > 0,
+      hasRFChildren: semantics.threads.length > 0,
       isExpanded: ctx.expanded.has(root.id),
       selected: root.id === ctx.selected,
       shape: semantics.shape,
@@ -66,17 +88,18 @@ function placeInteractionSemantics(
   ctx: Ctx,
 ): number {
   const isExpanded = ctx.expanded.has(root.id);
-  const hasKids = semantics.segments.length > 0;
+  const threads = semantics.threads;
+  const hasKids = threads.length > 0;
   pushInteractionWithShape(semantics, root, startY, ctx);
   const y =
     startY + estimateNodeH(buildLabelLines(root.canonical)) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
-  const totalW = semantics.segments.length * NW + (semantics.segments.length - 1) * HG;
+  const totalW = threads.length * NW + (threads.length - 1) * HG;
   let sx = ctx.cx - totalW / 2;
   let maxY = y;
-  for (const segment of semantics.segments) {
-    maxY = Math.max(maxY, placeSegment(segment, root.id, sx, y, ctx));
+  for (const thread of threads) {
+    maxY = Math.max(maxY, placeThreadLane(thread, root.id, sx, y, ctx));
     sx += NW + HG;
   }
   return maxY + VG;
@@ -162,8 +185,9 @@ function addInteractionExpandables(
     ids.add(interaction.root.id);
     const sem = semanticsFor(semantic, interaction.root.id);
     if (sem == null) continue;
-    sem.segments
-      .flatMap((s) => s.steps)
+    sem.threads
+      .flatMap((thread) => thread.segments)
+      .flatMap((segment) => segment.steps)
       .filter((step) => step.execution.children.length > 0)
       .forEach((step) => ids.add(step.execution.id));
   }

@@ -124,18 +124,28 @@ export interface Segment {
  *  query: one inference, end_turn, no actions. agentic: inference↔action loop. */
 export type InteractionShape = 'query' | 'agentic';
 
-/** The semantic layer for one interaction: its shape and its segments. Keyed
- *  back to the execution skeleton by `interactionId`. */
+/** The semantic layer for one thread: its steps grouped into segments.
+ *  V1 simplification: segmentation runs per thread, so segments nest under the
+ *  thread that owns them and threading is preserved. (The mental model's ideal —
+ *  segments cross-cutting threads — is deferred until segmentation is real.) */
+export interface ThreadSemantics {
+  readonly id: string;
+  readonly source: string;
+  readonly segments: readonly Segment[];
+}
+
+/** The semantic layer for one interaction: its shape and its per-thread
+ *  segmentation. Keyed back to the execution skeleton by `interactionId`. */
 export interface InteractionSemantics {
   readonly interactionId: string;
   readonly shape: InteractionShape;
-  readonly segments: readonly Segment[];
+  readonly threads: readonly ThreadSemantics[];
 }
 
 /** The semantic graph. The upper levels (agent ▸ session ▸ interaction) are the
  *  shared execution skeleton; semantics attach at the interaction level. The app
  *  renders the skeleton from `GraphData.execution` and swaps each interaction's
- *  body for its segments here (matched by `interactionId`). */
+ *  body for its threads → segments here (matched by `interactionId`). */
 export interface SemanticGraph {
   readonly interactions: readonly InteractionSemantics[];
 }

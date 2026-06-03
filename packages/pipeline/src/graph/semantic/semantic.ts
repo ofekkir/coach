@@ -9,6 +9,7 @@ import type {
   SemanticGraph,
   Step,
   Thread,
+  ThreadSemantics,
 } from '../types.ts';
 import { actionVerbFromNode, inferenceMovesFromRawResponse } from './verbs.ts';
 
@@ -45,74 +46,16 @@ function nsStart(node: ExecutionNode): bigint {
   return node.canonical.start_time_ns != null ? BigInt(node.canonical.start_time_ns) : 0n;
 }
 
-function nsEnd(node: ExecutionNode): bigint {
-  return node.canonical.end_time_ns != null ? BigInt(node.canonical.end_time_ns) : nsStart(node);
-}
-
 function byStart(a: ExecutionNode, b: ExecutionNode): number {
   const diff = nsStart(a) - nsStart(b);
   return diff < 0n ? -1 : diff > 0n ? 1 : 0;
 }
 
-function sortedMembers(thread: Thread): ExecutionNode[] {
-  return [...thread.members].sort(byStart);
-}
-
-function threadStart(thread: Thread): bigint {
-  return thread.members.reduce(
-    (min, m) => (nsStart(m) < min ? nsStart(m) : min),
-    thread.members[0] != null ? nsStart(thread.members[0]) : 0n,
-  );
-}
-
-function byThreadStart(a: Thread, b: Thread): number {
-  const diff = threadStart(a) - threadStart(b);
-  return diff < 0n ? -1 : diff > 0n ? 1 : 0;
-}
-
-function pickMainThread(threads: readonly Thread[]): Thread | null {
-  const main = threads.find((t) => t.source === 'repl_main_thread');
-  if (main != null) return main;
-  return [...threads].sort(byThreadStart)[0] ?? null;
-}
-
-// A sub-thread (sub-agent loop) is spawned by a Task action and runs to
-// completion inside that action's execution window — so it belongs to the action
-// whose [start, end] contains the sub-thread's start. Only actions spawn threads.
-function actionOwns(member: ExecutionNode, sub: Thread): boolean {
-  if (member.canonical.type !== 'tool') return false;
-  const subStart = threadStart(sub);
-  return nsStart(member) <= subStart && subStart <= nsEnd(member);
-}
-
-// Emits a member, then splices in the steps of any sub-threads it spawned —
-// keeping each sub-thread contiguous (segment ⊇ sub-thread) instead of
-// interleaving threads by global time. Recurses for nested sub-agents.
-function emitMember(member: ExecutionNode, remaining: Set<Thread>, out: ExecutionNode[]): void {
-  out.push(member);
-  const owned = [...remaining].filter((sub) => actionOwns(member, sub)).sort(byThreadStart);
-  for (const sub of owned) {
-    remaining.delete(sub);
-    for (const subMember of sortedMembers(sub)) emitMember(subMember, remaining, out);
-  }
-}
-
-// Walks the main thread in order, grouping each sub-thread under its spawning
-// action; sub-threads with no owning action (e.g. side-calls) append in order.
-function orderInteractionMembers(interaction: InteractionExecution): ExecutionNode[] {
-  const main = pickMainThread(interaction.threads);
-  if (main == null) return [];
-
-  const remaining = new Set(interaction.threads.filter((thread) => thread !== main));
-  const out: ExecutionNode[] = [];
-  for (const member of sortedMembers(main)) emitMember(member, remaining, out);
-
-  for (const sub of [...remaining].sort(byThreadStart)) out.push(...sortedMembers(sub));
-  return out;
-}
-
-function orderedSteps(interaction: InteractionExecution): Step[] {
-  return orderInteractionMembers(interaction).map(toStep);
+// Segmentation runs per thread (V1): a thread's steps are its members in time
+// order, grouped into segments. Threading is preserved — segments do not merge
+// or cross-cut threads for now.
+function threadSteps(thread: Thread): Step[] {
+  return [...thread.members].sort(byStart).map(toStep);
 }
 
 // V1: every step belongs to a single segment (index 0).
@@ -157,12 +100,20 @@ function deriveInteractionShape(stepCanonicals: readonly CanonicalNode[]): Inter
   return 'agentic';
 }
 
+function buildThreadSemantics(thread: Thread): ThreadSemantics {
+  return { id: thread.id, source: thread.source, segments: buildSegments(threadSteps(thread)) };
+}
+
 function buildInteractionSemantics(interaction: InteractionExecution): InteractionSemantics {
-  const steps = orderedSteps(interaction);
+  const stepCanonicals = interaction.threads.flatMap((thread) =>
+    thread.members.map((member) => member.canonical),
+  );
   return {
     interactionId: interaction.root.id,
-    shape: deriveInteractionShape(steps.map((step) => step.execution.canonical)),
-    segments: buildSegments(steps),
+    shape: deriveInteractionShape(stepCanonicals),
+    threads: interaction.threads
+      .map(buildThreadSemantics)
+      .filter((thread) => thread.segments.length > 0),
   };
 }
 

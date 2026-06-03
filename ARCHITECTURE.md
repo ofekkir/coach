@@ -85,10 +85,10 @@ Input files (accumulating — user stages N files/folders before submitting)
         │
         ▼  Stage 6 — graph/semantic/semantic.ts     → semanticGraph: SemanticGraph
    buildSemanticGraph(executionGraph)  Coach's inferred layer laid over execution:
-                            per interaction, steps regroup into segments (sub-goals) of
-                            semantic nodes (verbs/moves + interaction shape). A semantic node
-                            WRAPS the execution node(s) it interprets — structural sharing,
-                            not copies.
+                            per interaction → per thread, steps group into segments
+                            (sub-goals). A step (inference|action, + verbs/moves) WRAPS one
+                            execution node — structural sharing, not copies. V1 segments
+                            per thread, preserving threading (segmentation is still a stub).
         │
         ▼  buildVizResults() adapter → VizResult[]  (one result, both graphs)
         ▼  packages/app/src/viz/App  (React Flow graph renderer, two tabs)

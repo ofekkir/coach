@@ -30,6 +30,7 @@ export type {
   SessionExecution,
   Step,
   Thread,
+  ThreadSemantics,
   VizResult,
 } from './graph/types.ts';
 
