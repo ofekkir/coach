@@ -37,6 +37,8 @@ function buildEmptyInteractionView(interaction: TraceNode): CausalGraphView {
     },
     threads: [],
     rootToThreadIds: [],
+    segments: [],
+    shape: 'query',
   };
 }
 

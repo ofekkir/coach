@@ -22,11 +22,13 @@ export interface Move {
 export interface InferenceStepView extends GraphViewNode {
   readonly kind: 'inference';
   readonly moves: readonly Move[];
+  readonly segmentIndex: number;
 }
 
 export interface ActionStepView extends GraphViewNode {
   readonly kind: 'action';
   readonly verb: string;
+  readonly segmentIndex: number;
 }
 
 export type StepView = InferenceStepView | ActionStepView;
@@ -38,10 +40,22 @@ export interface GraphViewThread {
   edges: readonly GraphViewEdge[];
 }
 
+// One named sub-goal within an interaction.
+export interface SegmentView {
+  readonly index: number;
+  readonly label: string;
+}
+
+// query: one inference, end_turn, no actions.
+// agentic: inference ↔ action loop.
+export type InteractionShape = 'query' | 'agentic';
+
 export interface CausalGraphView {
   root: GraphViewNode;
   threads: readonly GraphViewThread[];
   rootToThreadIds: readonly string[];
+  segments: readonly SegmentView[];
+  shape: InteractionShape;
 }
 
 export interface SessionCausalGraphView {
