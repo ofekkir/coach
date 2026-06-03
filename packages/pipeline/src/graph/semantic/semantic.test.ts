@@ -101,4 +101,44 @@ describe('buildSemanticGraph', () => {
 
     expect(result.interactions[0]?.shape).toBe('query');
   });
+
+  it('keeps sub-thread steps contiguous after the spawning action, not interleaved', () => {
+    const at = (node: ExecutionNode, start: number, end: number): ExecutionNode => ({
+      ...node,
+      canonical: { ...node.canonical, start_time_ns: String(start), end_time_ns: String(end) },
+    });
+    const thread = (source: string, members: ExecutionNode[]) => ({
+      id: `thread_${source}`,
+      source,
+      members,
+      edges: [],
+    });
+
+    // main: llmA, Task(window 200..500), llmC.  sub-agent runs inside the Task
+    // window; a title side-call fires early (120) but is owned by no action.
+    const main = thread('repl_main_thread', [
+      at(inference('llmA', [{ type: 'text' }], 'tool_use'), 100, 150),
+      at(action('task', 'Task', 'sub'), 200, 500),
+      at(inference('llmC', [{ type: 'text' }], 'end_turn'), 600, 650),
+    ]);
+    const sub = thread('sub_agent', [
+      at(inference('subLlm', [{ type: 'text' }], 'tool_use'), 250, 300),
+      at(action('subRead', 'Read', 'f'), 320, 380),
+    ]);
+    const title = thread('generate_session_title', [
+      at(inference('titleLlm', [{ type: 'text' }], 'end_turn'), 120, 130),
+    ]);
+
+    const data: InteractionExecution = {
+      root: executionNode('int1', { type: 'interaction' }),
+      threads: [main, sub, title],
+      rootToThreadIds: main.id ? [main.id, sub.id, title.id] : [],
+    };
+    const result = buildSemanticGraph({ kind: 'interaction', data });
+
+    const ids = defined(defined(result.interactions[0]).segments[0]).steps.map((s) => s.id);
+    // sub steps sit right after `task`; the early title side-call is grouped last,
+    // NOT interleaved between llmA and task by its 120ns timestamp.
+    expect(ids).toEqual(['llmA', 'task', 'subLlm', 'subRead', 'llmC', 'titleLlm']);
+  });
 });

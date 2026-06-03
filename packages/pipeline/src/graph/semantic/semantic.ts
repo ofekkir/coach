@@ -8,6 +8,7 @@ import type {
   Segment,
   SemanticGraph,
   Step,
+  Thread,
 } from '../types.ts';
 import { actionVerbFromNode, inferenceMovesFromRawResponse } from './verbs.ts';
 
@@ -40,19 +41,78 @@ function toStep(member: ExecutionNode): Step {
   };
 }
 
-function nsOf(node: ExecutionNode): bigint {
+function nsStart(node: ExecutionNode): bigint {
   return node.canonical.start_time_ns != null ? BigInt(node.canonical.start_time_ns) : 0n;
 }
 
-// Steps cross-cut threads (mechanical lanes) — a segment is a time-ordered run
-// of the interaction's steps, regardless of which thread emitted each one.
+function nsEnd(node: ExecutionNode): bigint {
+  return node.canonical.end_time_ns != null ? BigInt(node.canonical.end_time_ns) : nsStart(node);
+}
+
+function byStart(a: ExecutionNode, b: ExecutionNode): number {
+  const diff = nsStart(a) - nsStart(b);
+  return diff < 0n ? -1 : diff > 0n ? 1 : 0;
+}
+
+function sortedMembers(thread: Thread): ExecutionNode[] {
+  return [...thread.members].sort(byStart);
+}
+
+function threadStart(thread: Thread): bigint {
+  return thread.members.reduce(
+    (min, m) => (nsStart(m) < min ? nsStart(m) : min),
+    thread.members[0] != null ? nsStart(thread.members[0]) : 0n,
+  );
+}
+
+function byThreadStart(a: Thread, b: Thread): number {
+  const diff = threadStart(a) - threadStart(b);
+  return diff < 0n ? -1 : diff > 0n ? 1 : 0;
+}
+
+function pickMainThread(threads: readonly Thread[]): Thread | null {
+  const main = threads.find((t) => t.source === 'repl_main_thread');
+  if (main != null) return main;
+  return [...threads].sort(byThreadStart)[0] ?? null;
+}
+
+// A sub-thread (sub-agent loop) is spawned by a Task action and runs to
+// completion inside that action's execution window — so it belongs to the action
+// whose [start, end] contains the sub-thread's start. Only actions spawn threads.
+function actionOwns(member: ExecutionNode, sub: Thread): boolean {
+  if (member.canonical.type !== 'tool') return false;
+  const subStart = threadStart(sub);
+  return nsStart(member) <= subStart && subStart <= nsEnd(member);
+}
+
+// Emits a member, then splices in the steps of any sub-threads it spawned —
+// keeping each sub-thread contiguous (segment ⊇ sub-thread) instead of
+// interleaving threads by global time. Recurses for nested sub-agents.
+function emitMember(member: ExecutionNode, remaining: Set<Thread>, out: ExecutionNode[]): void {
+  out.push(member);
+  const owned = [...remaining].filter((sub) => actionOwns(member, sub)).sort(byThreadStart);
+  for (const sub of owned) {
+    remaining.delete(sub);
+    for (const subMember of sortedMembers(sub)) emitMember(subMember, remaining, out);
+  }
+}
+
+// Walks the main thread in order, grouping each sub-thread under its spawning
+// action; sub-threads with no owning action (e.g. side-calls) append in order.
+function orderInteractionMembers(interaction: InteractionExecution): ExecutionNode[] {
+  const main = pickMainThread(interaction.threads);
+  if (main == null) return [];
+
+  const remaining = new Set(interaction.threads.filter((thread) => thread !== main));
+  const out: ExecutionNode[] = [];
+  for (const member of sortedMembers(main)) emitMember(member, remaining, out);
+
+  for (const sub of [...remaining].sort(byThreadStart)) out.push(...sortedMembers(sub));
+  return out;
+}
+
 function orderedSteps(interaction: InteractionExecution): Step[] {
-  const members = interaction.threads.flatMap((thread) => thread.members);
-  const sorted = [...members].sort((a, b) => {
-    const diff = nsOf(a) - nsOf(b);
-    return diff < 0n ? -1 : diff > 0n ? 1 : 0;
-  });
-  return sorted.map(toStep);
+  return orderInteractionMembers(interaction).map(toStep);
 }
 
 // V1: every step belongs to a single segment (index 0).
