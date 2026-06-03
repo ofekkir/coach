@@ -26,12 +26,16 @@ export {
   buildSessionCausalGraphView,
 } from './graph/view-model/session-view.ts';
 export type {
+  ActionStepView,
   AgentCausalGraphView,
   CausalGraphView,
   GraphViewEdge,
   GraphViewNode,
   GraphViewThread,
+  InferenceStepView,
+  Move,
   SessionCausalGraphView,
+  StepView,
   VizData,
 } from './graph/view-model/types.ts';
 

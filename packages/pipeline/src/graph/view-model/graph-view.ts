@@ -1,18 +1,19 @@
-import type { NodeType, TraceNode } from '../../etl/types.ts';
+import type { TraceNode } from '../../etl/types.ts';
 import { buildLabelLines, compareStart, sortByStart } from './format.ts';
 import { buildChildrenOf, buildThreadEdges, buildThreadMembers } from './thread.ts';
 import type { CausalGraphView, GraphViewEdge, GraphViewNode, StepView } from './types.ts';
+import { actionVerbFromNode, inferenceMovesFromRawResponse } from './verbs.ts';
 
 function resolveId(viewNode: GraphViewNode): string {
   return viewNode.children.length > 0 ? `sg_${viewNode.id}` : viewNode.id;
 }
 
-function stepKind(nodeType: NodeType): 'inference' | 'action' {
-  return nodeType === 'llm_request' ? 'inference' : 'action';
-}
-
 function toStepView(node: TraceNode, childrenOf: Map<string, TraceNode[]>): StepView {
-  return { ...toViewNode(node, childrenOf), kind: stepKind(node.type) };
+  const base = toViewNode(node, childrenOf);
+  if (node.type === 'llm_request') {
+    return { ...base, kind: 'inference', moves: inferenceMovesFromRawResponse(node.raw_response) };
+  }
+  return { ...base, kind: 'action', verb: actionVerbFromNode(node.name, node.tool_input) };
 }
 
 function toViewNode(node: TraceNode, childrenOf: Map<string, TraceNode[]>): GraphViewNode {

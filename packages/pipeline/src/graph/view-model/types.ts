@@ -11,7 +11,25 @@ export interface GraphViewNode {
   innerEdges: readonly GraphViewEdge[];
 }
 
-export type StepView = GraphViewNode & { kind: 'inference' | 'action' };
+// Verb on one content block of an inference step.
+// verb is an open vocabulary — start: 'reason' | 'act' | 'answer' | 'summarize' | 'generate'.
+// blockType is the structural discriminant from the trace (fixed enum).
+export interface Move {
+  readonly verb: string;
+  readonly blockType: 'thinking' | 'text' | 'tool_use';
+}
+
+export interface InferenceStepView extends GraphViewNode {
+  readonly kind: 'inference';
+  readonly moves: readonly Move[];
+}
+
+export interface ActionStepView extends GraphViewNode {
+  readonly kind: 'action';
+  readonly verb: string;
+}
+
+export type StepView = InferenceStepView | ActionStepView;
 
 export interface GraphViewThread {
   id: string;
