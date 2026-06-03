@@ -1,4 +1,4 @@
-import type { LogEntry } from '../types.ts';
+import type { LogEntry } from '../../types.ts';
 import { b64toHex, narrowestContaining } from './id-utils.ts';
 import type { SpanMeta } from './id-utils.ts';
 

@@ -1,4 +1,4 @@
-import type { OtlpSpan } from '../types.ts';
+import type { OtlpSpan } from '../../types.ts';
 import { clampEnd, intAttr, isoToNano, spanB64, strAttr } from './helpers.ts';
 import type { NativeEntry } from './types.ts';
 

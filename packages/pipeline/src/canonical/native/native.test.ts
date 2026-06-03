@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { addSessionNode } from '../aggregate.ts';
+import { addSessionNode } from '../../aggregate/aggregate.ts';
 import { TempoTraceSchema } from '../tempo.schema.ts';
-import type { TraceNode } from '../types.ts';
+import type { CanonicalNode } from '../../types.ts';
 import { transformTrace } from '../transform/transform.ts';
 import { nativeSessionToTrace } from './native.ts';
 
-function countLlmsByParent(llms: TraceNode[]): Map<string, number> {
+function countLlmsByParent(llms: CanonicalNode[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const n of llms) {
     const key = n.parent ?? '';

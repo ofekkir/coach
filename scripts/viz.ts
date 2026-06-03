@@ -6,7 +6,7 @@ import {
   buildSessionCausalGraphView,
   buildCausalGraphView,
 } from '@coach/pipeline';
-import type { TraceNode, VizData } from '@coach/pipeline';
+import type { CanonicalNode, VizData } from '@coach/pipeline';
 
 const nodesPath = process.argv[2];
 if (!nodesPath) {
@@ -14,7 +14,7 @@ if (!nodesPath) {
   process.exit(1);
 }
 
-const nodes = JSON.parse(readFileSync(nodesPath, 'utf8')) as TraceNode[];
+const nodes = JSON.parse(readFileSync(nodesPath, 'utf8')) as CanonicalNode[];
 const title = path.basename(nodesPath, '.json');
 
 const agentView = buildAgentCausalGraphView(nodes);

@@ -1,3 +1,36 @@
+// ── Pipeline input ──────────────────────────────────────────────────────────
+
+/** A single in-memory file presented by the caller (browser File.text() or Node fs.readFileSync). */
+export interface UploadedFile {
+  /** Filename only, e.g. "session.jsonl" or "trace-abc123.json". Classification keys on this. */
+  name: string;
+  /** Full text content of the file. */
+  content: string;
+  /** Relative path including directory, e.g. "projA/logs.json". Absent for loose top-level files. */
+  path?: string;
+}
+
+// ── Stage 1: classification ───────────────────────────────────────────────────
+
+/** What an uploaded file is. `unsupported` is carried through (never silently dropped). */
+export type InputType = 'otel-trace' | 'otel-log' | 'native' | 'unsupported';
+
+export interface ClassifiedInput {
+  readonly file: UploadedFile;
+  readonly type: InputType;
+}
+
+// ── Stage 2: session routing ──────────────────────────────────────────────────
+
+/** A session is wholly OTEL (logs + traces) or wholly native (one .jsonl). */
+type SessionKind = 'otel' | 'native';
+
+export interface SessionInputs {
+  readonly sessionId: string;
+  readonly kind: SessionKind;
+  readonly inputs: readonly ClassifiedInput[];
+}
+
 // ── OTLP types (raw input) ────────────────────────────────────────────────────
 
 type OtlpValue =
@@ -37,6 +70,7 @@ export interface LogEntry {
   readonly timestamp_ns: number;
   readonly event_sequence: string;
   readonly span_id: string;
+  readonly session_id?: string | null;
   readonly event_name: string;
   readonly hook_name?: string | null;
   readonly request_id?: string | null;
@@ -62,7 +96,7 @@ export type NodeType =
   | 'tool.execution'
   | 'hook';
 
-export interface TraceNode {
+export interface CanonicalNode {
   id: string;
   type: NodeType;
   parent?: string;

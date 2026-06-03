@@ -1,4 +1,4 @@
-import type { OtlpAttribute, OtlpSpan } from '../types.ts';
+import type { OtlpAttribute, OtlpSpan } from '../../types.ts';
 import { clampEnd, isoToNano, intAttr, spanB64, strAttr, summarizeInput } from './helpers.ts';
 import type { ContentBlock, LlmSpanMeta, NativeEntry } from './types.ts';
 import { collectContentBlocks, findEntryWithBlock, findTriggeringUser } from './parse.ts';

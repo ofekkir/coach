@@ -1,4 +1,4 @@
-import type { NodeType, OtlpAttribute, TempoTrace } from '../types.ts';
+import type { NodeType, OtlpAttribute, TempoTrace } from '../../types.ts';
 
 export interface ParsedSpan {
   readonly id: string;

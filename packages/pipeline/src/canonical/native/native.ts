@@ -1,4 +1,4 @@
-import type { TempoTrace } from '../types.ts';
+import type { TempoTrace } from '../../types.ts';
 import { traceB64 } from './helpers.ts';
 import { buildInteractionSpan } from './interaction.ts';
 import { buildRequestGroups, buildToolResultUserIndex, parseEntries } from './parse.ts';

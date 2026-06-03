@@ -1,4 +1,4 @@
-import type { TraceNode } from './types.ts';
+import type { CanonicalNode } from '../types.ts';
 
 function sessionNodeId(sessionId: string): string {
   return `session-${sessionId}`;
@@ -9,14 +9,14 @@ function agentNodeId(userId: string): string {
 }
 
 // Synthesizes a session node and re-parents root interaction nodes under it.
-export function addSessionNode(nodes: readonly TraceNode[]): TraceNode[] {
+export function addSessionNode(nodes: readonly CanonicalNode[]): CanonicalNode[] {
   const interaction = nodes.find((n) => n.type === 'interaction' && n.parent == null);
   if (interaction?.session_id == null) return [...nodes];
 
   const sessionId = interaction.session_id;
   const sessionId_nodeId = sessionNodeId(sessionId);
 
-  const sessionNode: TraceNode = {
+  const sessionNode: CanonicalNode = {
     id: sessionId_nodeId,
     type: 'session',
     session_id: sessionId,
@@ -32,9 +32,11 @@ export function addSessionNode(nodes: readonly TraceNode[]): TraceNode[] {
 
 // Merges node arrays from multiple traces into a single session-level forest.
 // All trace arrays must share the same session node id; duplicates are dropped.
-export function aggregateSession(nodesByTrace: readonly (readonly TraceNode[])[]): TraceNode[] {
+export function aggregateSession(
+  nodesByTrace: readonly (readonly CanonicalNode[])[],
+): CanonicalNode[] {
   const seen = new Set<string>();
-  const result: TraceNode[] = [];
+  const result: CanonicalNode[] = [];
   for (const node of nodesByTrace.flat()) {
     if (seen.has(node.id)) continue;
     seen.add(node.id);
@@ -45,31 +47,15 @@ export function aggregateSession(nodesByTrace: readonly (readonly TraceNode[])[]
 
 export const SYNTHETIC_AGENT_ID = 'agent-upload';
 
-// Groups session-level node arrays by agent id for multi-session aggregation.
-// Sessions with a user_id group under that id; sessions without one group under
-// the shared synthetic agent id so they are never dropped.
-export function groupSessionsByAgent(
-  sessionNodeArrays: readonly (readonly TraceNode[])[],
-): Map<string, TraceNode[][]> {
-  const groups = new Map<string, TraceNode[][]>();
-  for (const nodes of sessionNodeArrays) {
-    const session = nodes.find((n) => n.type === 'session' && n.parent == null);
-    const agentId = session?.user_id ?? SYNTHETIC_AGENT_ID;
-    const group = groups.get(agentId) ?? [];
-    group.push([...nodes]);
-    groups.set(agentId, group);
-  }
-  return groups;
-}
-
 // Synthesizes an agent node and re-parents root session nodes under it.
+// Multi-agent is out of scope — every session rolls up under one agent.
 // Uses user_id from the first root session if present; falls back to SYNTHETIC_AGENT_ID.
-export function aggregateAgent(sessionNodes: readonly TraceNode[]): TraceNode[] {
+export function aggregateAgent(sessionNodes: readonly CanonicalNode[]): CanonicalNode[] {
   const session = sessionNodes.find((n) => n.type === 'session' && n.parent == null);
   const userId = session?.user_id ?? null;
   const agentId = userId != null ? agentNodeId(userId) : SYNTHETIC_AGENT_ID;
 
-  const agentNode: TraceNode = {
+  const agentNode: CanonicalNode = {
     id: agentId,
     type: 'agent',
     ...(userId != null ? { user_id: userId } : {}),
