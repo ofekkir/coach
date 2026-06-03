@@ -18,6 +18,9 @@ out.timeline
 # Personal, machine-local Claude Code settings (committed counterpart: .claude/settings.json)
 .claude/settings.local.json
 
+# Claude Code worktrees (git worktrees created per session — not source files)
+.claude/worktrees/
+
 # MCP server config — contains secrets (service account tokens)
 .mcp.json
 
