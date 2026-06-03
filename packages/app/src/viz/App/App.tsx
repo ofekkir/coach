@@ -1,43 +1,44 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { GraphViewNode, VizData } from '@coach/pipeline';
-import { allExpandableIds, agentRoot, initialExpanded, toAgent } from '../layout/queries.ts';
+import type { GraphData } from '@coach/pipeline';
+import { allExpandableIds, agentRoot, buildElements, initialExpanded } from '../layout/queries.ts';
+import { allSemanticExpandableIds, buildSemanticElements } from '../layout/place-semantic.ts';
+import type { Elements } from '../FlowInner/FlowInner.tsx';
 import { FlowInner } from '../FlowInner/FlowInner.tsx';
 import { DetailsPanel } from '../DetailsPanel/DetailsPanel.tsx';
 import { Toolbar } from '../Toolbar/Toolbar.tsx';
+import { TabBar, type Tab } from './TabBar.tsx';
 
-function findNode(root: GraphViewNode, id: string): GraphViewNode | null {
-  if (root.id === id) return root;
-  for (const c of root.children) {
-    const r = findNode(c, id);
-    if (r != null) return r;
-  }
-  return null;
+function selectedLabelLines(elements: Elements, selectedId: string | null): string[] | null {
+  if (selectedId == null) return null;
+  const node = elements.nodes.find((n) => n.id === selectedId);
+  return node != null ? node.data.labelLines : null;
 }
 
-function resolveSelectedNode(data: VizData, selectedId: string): GraphViewNode | null {
-  const agent = toAgent(data);
-  const allMembers = agent.sessions
-    .flatMap((s) => s.view.interactions)
-    .flatMap((i) => i.view.threads)
-    .flatMap((t) => t.members);
-  for (const m of allMembers) {
-    const r = findNode(m, selectedId);
-    if (r != null) return r;
-  }
-  return null;
-}
-
-export function App({ data, title }: { data: VizData; title: string }) {
-  const allExpandable = useMemo(() => allExpandableIds(data), [data]);
-  const rootId = useMemo(() => agentRoot(data), [data]);
-
+export function App({ data, title }: { data: GraphData; title: string }) {
+  const [tab, setTab] = useState<Tab>('execution');
   const [expanded, setExpanded] = useState<Set<string>>(() => initialExpanded());
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const selectedNode = useMemo(
-    () => (selectedId != null ? resolveSelectedNode(data, selectedId) : null),
-    [selectedId, data],
+  const build = useCallback(
+    (exp: Set<string>, sel: string | null): Elements =>
+      tab === 'execution'
+        ? buildElements(data.execution, exp, sel)
+        : buildSemanticElements(data.execution, data.semantic, exp, sel),
+    [tab, data],
   );
+
+  const elements = useMemo(() => build(expanded, selectedId), [build, expanded, selectedId]);
+
+  const allExpandable = useMemo(
+    () =>
+      tab === 'execution'
+        ? allExpandableIds(data.execution)
+        : allSemanticExpandableIds(data.execution, data.semantic),
+    [tab, data],
+  );
+  const rootId = useMemo(() => agentRoot(data.execution), [data]);
+
+  const labelLines = selectedLabelLines(elements, selectedId);
 
   const onExpandAll = useCallback(() => {
     setExpanded(new Set(allExpandable));
@@ -47,19 +48,25 @@ export function App({ data, title }: { data: VizData; title: string }) {
     setExpanded(new Set([rootId]));
   }, [rootId]);
 
+  const onTabChange = useCallback((next: Tab) => {
+    setTab(next);
+    setSelectedId(null);
+  }, []);
+
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#f8fafc' }}>
       <FlowInner
-        data={data}
+        build={build}
         expanded={expanded}
         onExpandedChange={setExpanded}
         selectedId={selectedId}
         onSelectId={setSelectedId}
       />
+      <TabBar tab={tab} onTabChange={onTabChange} />
       <Toolbar title={title} onExpandAll={onExpandAll} onCollapseAll={onCollapseAll} />
-      {selectedNode != null && (
+      {labelLines != null && (
         <DetailsPanel
-          node={selectedNode}
+          labelLines={labelLines}
           onClose={() => {
             setSelectedId(null);
           }}

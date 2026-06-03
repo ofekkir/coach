@@ -69,7 +69,8 @@ dump(
 );
 dump('03-canonical-by-session', result.canonicalBySession);
 dump('04-agent-graph', result.agentGraph);
-dump('05-view-model', result.viewModel);
+dump('05-execution-graph', result.executionGraph);
+dump('06-semantic-graph', result.semanticGraph);
 
 const unsupported = result.classified.filter((c) => c.type === 'unsupported');
 if (unsupported.length > 0) {

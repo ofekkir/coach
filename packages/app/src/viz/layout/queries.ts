@@ -1,43 +1,48 @@
 import type {
-  AgentCausalGraphView,
-  GraphViewNode,
-  GraphViewThread,
-  VizData,
+  AgentExecution,
+  CanonicalNode,
+  ExecutionGraph,
+  ExecutionNode,
+  InteractionExecution,
+  SessionExecution,
 } from '@coach/pipeline';
 import { placeAgent, sessionWidth } from './place-graph.ts';
 import type { Ctx, TraceRFNode } from './types.ts';
 import { NW, HG } from './types.ts';
 import type { Edge } from '@xyflow/react';
 
-export function toAgent(data: VizData): AgentCausalGraphView {
-  if (data.kind === 'agent') return data.data;
-
-  const FAKE: GraphViewNode = {
-    id: '__root__',
-    labelLines: ['agent'],
+function synthetic(id: string, type: CanonicalNode['type']): ExecutionNode {
+  return {
+    id,
+    canonical: { id, type },
     children: [],
     innerEdges: [],
   };
+}
 
-  if (data.kind === 'session') {
-    return { root: FAKE, sessions: [{ title: 'session', view: data.data }] };
+/** Normalizes any ExecutionGraph variant into a single AgentExecution by
+ *  synthesizing the missing upper levels. The pipeline degrades to
+ *  session/interaction when those levels are absent; layout always wants an agent. */
+export function toAgent(graph: ExecutionGraph): AgentExecution {
+  if (graph.kind === 'agent') return graph.data;
+
+  if (graph.kind === 'session') {
+    return { root: synthetic('__agent__', 'agent'), sessions: [graph.data] };
   }
 
-  const fakeSession = {
-    root: { id: '__session__', labelLines: ['session'], children: [], innerEdges: [] },
-    interactions: data.data != null ? [{ title: 'interaction', view: data.data }] : [],
-  };
-  return { root: FAKE, sessions: [{ title: 'session', view: fakeSession }] };
+  const interactions: InteractionExecution[] = graph.data != null ? [graph.data] : [];
+  const session: SessionExecution = { root: synthetic('__session__', 'session'), interactions };
+  return { root: synthetic('__agent__', 'agent'), sessions: [session] };
 }
 
 export function buildElements(
-  data: VizData,
+  graph: ExecutionGraph,
   expanded: Set<string>,
   selected: string | null,
 ): { nodes: TraceRFNode[]; edges: Edge[] } {
-  const agent = toAgent(data);
+  const agent = toAgent(graph);
   const totalSessionsW = agent.sessions.reduce((sum, s, i) => {
-    return sum + sessionWidth(s.view) + (i > 0 ? HG : 0);
+    return sum + sessionWidth(s) + (i > 0 ? HG : 0);
   }, 0);
   const ctx: Ctx = {
     cx: Math.max(NW, totalSessionsW) / 2 + 50,
@@ -54,26 +59,23 @@ export function initialExpanded(): Set<string> {
   return new Set<string>();
 }
 
-function expandableInteractionIds(iv: {
-  root: GraphViewNode;
-  threads: readonly GraphViewThread[];
-}): string[] {
-  const memberIds = iv.threads
+function expandableInteractionIds(interaction: InteractionExecution): string[] {
+  const memberIds = interaction.threads
     .flatMap((thread) => thread.members)
     .filter((m) => m.children.length > 0)
     .map((m) => m.id);
-  return [iv.root.id, ...memberIds];
+  return [interaction.root.id, ...memberIds];
 }
 
-export function allExpandableIds(data: VizData): Set<string> {
-  const agent = toAgent(data);
-  const sessionIds = agent.sessions.map((s) => s.view.root.id);
+export function allExpandableIds(graph: ExecutionGraph): Set<string> {
+  const agent = toAgent(graph);
+  const sessionIds = agent.sessions.map((s) => s.root.id);
   const interactionExpandables = agent.sessions.flatMap((s) =>
-    s.view.interactions.flatMap((i) => expandableInteractionIds(i.view)),
+    s.interactions.flatMap((i) => expandableInteractionIds(i)),
   );
   return new Set([agent.root.id, ...sessionIds, ...interactionExpandables]);
 }
 
-export function agentRoot(data: VizData): string {
-  return toAgent(data).root.id;
+export function agentRoot(graph: ExecutionGraph): string {
+  return toAgent(graph).root.id;
 }

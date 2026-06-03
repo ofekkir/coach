@@ -12,6 +12,8 @@ const TYPE_BADGES: Record<string, string> = {
   blocked_on_user: 'WAIT',
   execution: 'EXEC',
   hook: 'HOOK',
+  semantic: 'NODE',
+  segment: 'SEGMENT',
 };
 
 function splitLines(lines: readonly string[]): {
@@ -54,11 +56,11 @@ function cardStyle(
 }
 
 export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
-  const { gvNode, color, fill, hasRFChildren, isExpanded }: TraceRFNodeData = data;
-  const { shape, stepKind, verb, moves, segmentIndex }: TraceRFNodeData = data;
-  const type = gvNode.labelLines[0] ?? '';
+  const { labelLines, color, fill, hasRFChildren, isExpanded }: TraceRFNodeData = data;
+  const { shape, stepKind, verb, moves, actionVerbs, segmentIndex }: TraceRFNodeData = data;
+  const type = labelLines[0] ?? '';
   const badge = TYPE_BADGES[type] ?? type.toUpperCase();
-  const { name, details, timing } = splitLines(gvNode.labelLines);
+  const { name, details, timing } = splitLines(labelLines);
 
   return (
     <>
@@ -118,6 +120,7 @@ export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
           stepKind={stepKind}
           verb={verb}
           moves={moves}
+          actionVerbs={actionVerbs}
           segmentIndex={segmentIndex}
           color={color}
         />

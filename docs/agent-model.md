@@ -145,19 +145,23 @@ A useful mechanical-ish classification of an interaction's control flow:
 
 ## What the visualization shows
 
-The visualization renders the **mechanical skeleton** and overlays the **semantic layer**:
+The visualization renders two graphs over the same execution: the **execution graph** (the
+mechanical skeleton) and the **semantic graph** (the inferred overlay, where a semantic node wraps
+the execution node it interprets).
 
-- A **causal graph** of the structure: `agent ▸ session ▸ interaction ▸ thread ▸ step`, with
-  expand/collapse. Sub-threads appear under the action that spawned them.
-- **Segmentation** as an overlay on an interaction's steps — adjacent steps grouped/colored by
-  the sub-goal they serve, so the eye reads "this run of steps was one goal."
-- **Verbs** annotated on steps: the extrinsic verb on each action; the move(s) on each
-  inference.
-- An interaction **shape** badge — a small label on each interaction marking its control-flow
-  form: **query** (one inference, answered directly, no tools) vs. **agentic** (an
-  inference↔action loop). It tells you at a glance whether the interaction was a plain answer or
-  a tool-using loop, and helps spot mismatches (a query that should have used tools, or an
-  agentic loop that was overkill).
+- The **execution graph** — a causal graph of the mechanical structure:
+  `agent ▸ session ▸ interaction ▸ thread ▸ step`, with expand/collapse. Sub-threads appear under
+  the action that spawned them. This is the deterministic skeleton, no interpretation.
+- The **semantic graph** — Coach's inferred layer laid over the execution graph. Each semantic node
+  **wraps** the execution node(s) it interprets, so the two graphs share one source of truth:
+  - **Segmentation** — an interaction's steps grouped by the sub-goal (segment) they serve, so the
+    eye reads "this run of steps was one goal."
+  - **Verbs** annotated on steps: the extrinsic verb on each action; the move(s) on each inference.
+  - An interaction **shape** badge — a small label on each interaction marking its control-flow
+    form: **query** (one inference, answered directly, no tools) vs. **agentic** (an
+    inference↔action loop). It tells you at a glance whether the interaction was a plain answer or
+    a tool-using loop, and helps spot mismatches (a query that should have used tools, or an
+    agentic loop that was overkill).
 
 The point of rendering it this way: every level is a place a finding can attach, and the user
 can _see_ the unit a finding refers to.

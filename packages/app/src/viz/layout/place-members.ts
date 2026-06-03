@@ -1,7 +1,8 @@
 import { MarkerType } from '@xyflow/react';
-import type { GraphViewNode, GraphViewThread, StepView } from '@coach/pipeline';
+import type { ExecutionNode, Thread } from '@coach/pipeline';
 import { colorOf, fillOf } from './colors.ts';
 import { estimateNodeH } from './estimate.ts';
+import { buildLabelLines, formatGap, threadTitle } from '../format/format.ts';
 import type { Ctx, TraceRFNodeData } from './types.ts';
 import { VG } from './types.ts';
 
@@ -33,12 +34,37 @@ export function link(src: string, tgt: string, label: string | undefined, ctx: C
   });
 }
 
-function lastChildY(member: GraphViewNode, startY: number): number {
-  return member.children.reduce((y, child) => y + estimateNodeH(child) + VG, startY);
+function pushExecNode(
+  node: ExecutionNode,
+  kind: TraceRFNodeData['kind'],
+  x: number,
+  y: number,
+  hasRFChildren: boolean,
+  isExpanded: boolean,
+  ctx: Ctx,
+): void {
+  const labelLines = buildLabelLines(node.canonical);
+  const type = labelLines[0] ?? '';
+  push(
+    node.id,
+    x,
+    y,
+    {
+      kind,
+      labelLines,
+      canonical: node.canonical,
+      color: colorOf(type),
+      fill: fillOf(type),
+      hasRFChildren,
+      isExpanded,
+      selected: node.id === ctx.selected,
+    },
+    ctx,
+  );
 }
 
 function placeExpandedChildren(
-  member: GraphViewNode,
+  member: ExecutionNode,
   tx: number,
   startY: number,
   ctx: Ctx,
@@ -46,31 +72,29 @@ function placeExpandedChildren(
   let y = startY;
   let lastId = member.id;
   for (const child of member.children) {
-    const childType = child.labelLines[0] ?? '';
-    push(
-      child.id,
-      tx,
-      y,
-      {
-        kind: 'member',
-        gvNode: child,
-        color: colorOf(childType),
-        fill: fillOf(childType),
-        hasRFChildren: false,
-        isExpanded: false,
-        selected: child.id === ctx.selected,
-      },
-      ctx,
-    );
+    pushExecNode(child, 'member', tx, y, false, false, ctx);
     link(lastId, child.id, undefined, ctx);
     lastId = child.id;
-    y += estimateNodeH(child) + VG;
+    y += estimateNodeH(buildLabelLines(child.canonical)) + VG;
   }
   return lastId;
 }
 
+function lastChildY(member: ExecutionNode, startY: number): number {
+  return member.children.reduce(
+    (y, child) => y + estimateNodeH(buildLabelLines(child.canonical)) + VG,
+    startY,
+  );
+}
+
+function edgeLabelFor(thread: Thread, index: number): string | undefined {
+  if (index === 0) return threadTitle(thread.source);
+  const gap = thread.edges[index - 1]?.gapMs;
+  return formatGap(gap) ?? undefined;
+}
+
 export function placeThread(
-  thread: GraphViewThread,
+  thread: Thread,
   parentId: string,
   tx: number,
   startY: number,
@@ -82,36 +106,12 @@ export function placeThread(
   for (let i = 0; i < thread.members.length; i++) {
     const member = thread.members[i];
     if (member == null) continue;
-    const type = member.labelLines[0] ?? '';
     const hasSubNodes = member.children.length > 0;
     const isExpandedMember = hasSubNodes && ctx.expanded.has(member.id);
-    const edgeLabel = i === 0 ? undefined : thread.edges[i - 1]?.label;
 
-    const step: StepView = member;
-    const stepExtra =
-      step.kind === 'action'
-        ? { stepKind: step.kind, verb: step.verb, segmentIndex: step.segmentIndex }
-        : { stepKind: step.kind, moves: step.moves, segmentIndex: step.segmentIndex };
-
-    push(
-      member.id,
-      tx,
-      y,
-      {
-        kind: 'member',
-        gvNode: member,
-        color: colorOf(type),
-        fill: fillOf(type),
-        hasRFChildren: hasSubNodes,
-        isExpanded: isExpandedMember,
-        selected: member.id === ctx.selected,
-        ...stepExtra,
-      },
-      ctx,
-    );
-
-    link(prevId, member.id, edgeLabel, ctx);
-    y += estimateNodeH(member) + VG;
+    pushExecNode(member, 'member', tx, y, hasSubNodes, isExpandedMember, ctx);
+    link(prevId, member.id, edgeLabelFor(thread, i), ctx);
+    y += estimateNodeH(buildLabelLines(member.canonical)) + VG;
 
     let lastId = member.id;
     if (isExpandedMember) {

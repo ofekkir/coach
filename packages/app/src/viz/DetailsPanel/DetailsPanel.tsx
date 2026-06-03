@@ -1,4 +1,3 @@
-import type { GraphViewNode } from '@coach/pipeline';
 import { colorOf } from '../layout/colors.ts';
 
 function renderDetailRow(line: string, i: number): React.ReactNode {
@@ -44,8 +43,14 @@ function renderDetailRow(line: string, i: number): React.ReactNode {
   );
 }
 
-export function DetailsPanel({ node, onClose }: { node: GraphViewNode; onClose: () => void }) {
-  const type = node.labelLines[0] ?? '';
+export function DetailsPanel({
+  labelLines,
+  onClose,
+}: {
+  labelLines: readonly string[];
+  onClose: () => void;
+}) {
+  const type = labelLines[0] ?? '';
   const color = colorOf(type);
 
   return (
@@ -104,7 +109,7 @@ export function DetailsPanel({ node, onClose }: { node: GraphViewNode; onClose: 
         </button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-        {node.labelLines.slice(1).map(renderDetailRow)}
+        {labelLines.slice(1).map(renderDetailRow)}
       </div>
     </div>
   );

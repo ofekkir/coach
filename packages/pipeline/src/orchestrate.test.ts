@@ -30,9 +30,9 @@ describe('buildVizResults', () => {
 
     expect(results).toHaveLength(1);
     const result = results[0];
-    expect(result?.data.kind).toBe('agent');
+    expect(result?.data.execution.kind).toBe('agent');
 
-    const agentView = result?.data.kind === 'agent' ? result.data.data : null;
+    const agentView = result?.data.execution.kind === 'agent' ? result.data.execution.data : null;
     expect(agentView?.sessions).toHaveLength(2);
   });
 
@@ -56,9 +56,10 @@ describe('buildVizResults', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.title).toBe('agent');
-    expect(results[0]?.data.kind).toBe('agent');
+    expect(results[0]?.data.execution.kind).toBe('agent');
 
-    const agentView = results[0]?.data.kind === 'agent' ? results[0].data.data : null;
+    const agentView =
+      results[0]?.data.execution.kind === 'agent' ? results[0].data.execution.data : null;
     expect(agentView?.root.id).toBe(SYNTHETIC_AGENT_ID);
   });
 
