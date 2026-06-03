@@ -1,10 +1,18 @@
-import type { TraceNode } from '../../etl/types.ts';
+import type { NodeType, TraceNode } from '../../etl/types.ts';
 import { buildLabelLines, compareStart, sortByStart } from './format.ts';
 import { buildChildrenOf, buildThreadEdges, buildThreadMembers } from './thread.ts';
-import type { CausalGraphView, GraphViewEdge, GraphViewNode } from './types.ts';
+import type { CausalGraphView, GraphViewEdge, GraphViewNode, StepView } from './types.ts';
 
 function resolveId(viewNode: GraphViewNode): string {
   return viewNode.children.length > 0 ? `sg_${viewNode.id}` : viewNode.id;
+}
+
+function stepKind(nodeType: NodeType): 'inference' | 'action' {
+  return nodeType === 'llm_request' ? 'inference' : 'action';
+}
+
+function toStepView(node: TraceNode, childrenOf: Map<string, TraceNode[]>): StepView {
+  return { ...toViewNode(node, childrenOf), kind: stepKind(node.type) };
 }
 
 function toViewNode(node: TraceNode, childrenOf: Map<string, TraceNode[]>): GraphViewNode {
@@ -64,7 +72,7 @@ export function buildCausalGraphView(nodes: readonly TraceNode[]): CausalGraphVi
   const threads = sortedSources.map((source) => {
     const members = threadMembers.get(source) ?? [];
     const threadId = `thread_${source.replace(/\W+/g, '_')}`;
-    const memberViewNodes = members.map((m) => toViewNode(m, childrenOf));
+    const memberViewNodes = members.map((m) => toStepView(m, childrenOf));
     const edges = buildThreadEdges(members, memberViewNodes);
 
     return {

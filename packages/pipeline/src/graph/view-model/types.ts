@@ -11,10 +11,12 @@ export interface GraphViewNode {
   innerEdges: readonly GraphViewEdge[];
 }
 
+export type StepView = GraphViewNode & { kind: 'inference' | 'action' };
+
 export interface GraphViewThread {
   id: string;
   title: string;
-  members: readonly GraphViewNode[];
+  members: readonly StepView[];
   edges: readonly GraphViewEdge[];
 }
 

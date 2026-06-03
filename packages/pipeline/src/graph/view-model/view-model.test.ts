@@ -177,4 +177,13 @@ describe('buildCausalGraphView', () => {
     const view = buildCausalGraphView([interaction, llm1, bgLlm]);
     expect(view?.rootToThreadIds).toEqual(view?.threads.map((t) => t.id));
   });
+
+  it('thread members carry kind: inference for llm_request, action for tool', () => {
+    const view = buildCausalGraphView([interaction, llm1, toolAfterLlm1, llm2]);
+    const members = view?.threads.find((t) => t.id === 'thread_repl_main_thread')?.members ?? [];
+    // sorted by start: llm1(100ms), toolAfterLlm1(210ms), llm2(310ms)
+    expect(members[0]?.kind).toBe('inference');
+    expect(members[1]?.kind).toBe('action');
+    expect(members[2]?.kind).toBe('inference');
+  });
 });
