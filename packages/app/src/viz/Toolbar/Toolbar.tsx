@@ -24,7 +24,7 @@ export function Toolbar({
       style={{
         position: 'fixed',
         top: 16,
-        left: 16,
+        right: 16,
         zIndex: 10,
         display: 'flex',
         flexDirection: 'column',
