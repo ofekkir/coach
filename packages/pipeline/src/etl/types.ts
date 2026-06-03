@@ -76,6 +76,7 @@ export interface TraceNode {
   name?: string;
   model?: string;
   source?: string;
+  sequence?: number;
   prompt?: string;
   raw_request?: string;
   request?: string;

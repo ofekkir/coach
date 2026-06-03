@@ -5,9 +5,45 @@ import { buildRequestGroups, buildToolResultUserIndex, parseEntries } from './pa
 import { buildSpansForRequest } from './spans.ts';
 import type { NativeEntry } from './types.ts';
 
+function isRealUserPrompt(e: NativeEntry): e is NativeEntry & { uuid: string; timestamp: string } {
+  const content = e.message?.content;
+  return (
+    e.type === 'user' &&
+    !e.isMeta &&
+    typeof content === 'string' &&
+    !content.startsWith('<') &&
+    typeof e.uuid === 'string' &&
+    typeof e.timestamp === 'string'
+  );
+}
+
+function sliceEntriesForInteraction(
+  entries: NativeEntry[],
+  startTs: string,
+  nextStartTs: string | undefined,
+): NativeEntry[] {
+  return entries.filter((e) => {
+    if (!e.timestamp) return false;
+    if (e.timestamp < startTs) return false;
+    if (nextStartTs != null && e.timestamp >= nextStartTs) return false;
+    return true;
+  });
+}
+
+function isGroupInInteraction(
+  group: NativeEntry[],
+  startTs: string,
+  nextStartTs: string | undefined,
+): boolean {
+  const firstTs = group.find((e) => e.timestamp)?.timestamp;
+  if (firstTs == null) return false;
+  if (firstTs < startTs) return false;
+  if (nextStartTs != null && firstTs >= nextStartTs) return false;
+  return true;
+}
+
 export function nativeSessionToTrace(jsonl: string): TempoTrace {
   const { sessionId, entries } = parseEntries(jsonl);
-
   if (!sessionId || entries.length === 0) return { batches: [] };
 
   const tId = traceB64(sessionId);
@@ -15,24 +51,31 @@ export function nativeSessionToTrace(jsonl: string): TempoTrace {
     entries.flatMap((e) => (e.uuid != null ? [[e.uuid, e] as [string, NativeEntry]] : [])),
   );
 
-  const humanUser = entries.find(
-    (e) => e.type === 'user' && !e.isMeta && typeof e.message?.content === 'string',
-  );
-  if (!humanUser?.uuid || !humanUser.timestamp) return { batches: [] };
-
-  const { span: interactionSpan, spanId: interactionSpanId } = buildInteractionSpan(
-    tId,
-    humanUser as NativeEntry & { uuid: string; timestamp: string },
-    sessionId,
-    entries,
-  );
+  const prompts = entries.filter(isRealUserPrompt);
+  if (prompts.length === 0) return { batches: [] };
 
   const requestGroups = buildRequestGroups(entries);
   const toolResultUser = buildToolResultUserIndex(entries);
 
-  const requestSpans = [...requestGroups.entries()].flatMap(([requestId, group]) =>
-    buildSpansForRequest(tId, requestId, group, byUuid, toolResultUser, interactionSpanId),
-  );
+  const spans = prompts.flatMap((prompt, seqIdx) => {
+    const nextTs = prompts[seqIdx + 1]?.timestamp;
+    const slice = sliceEntriesForInteraction(entries, prompt.timestamp, nextTs);
+    const { span: interactionSpan, spanId: interactionSpanId } = buildInteractionSpan(
+      tId,
+      prompt,
+      sessionId,
+      slice,
+      seqIdx,
+    );
 
-  return { batches: [{ scopeSpans: [{ spans: [interactionSpan, ...requestSpans] }] }] };
+    const ownedSpans = [...requestGroups.entries()]
+      .filter(([, group]) => isGroupInInteraction(group, prompt.timestamp, nextTs))
+      .flatMap(([requestId, group]) =>
+        buildSpansForRequest(tId, requestId, group, byUuid, toolResultUser, interactionSpanId),
+      );
+
+    return [interactionSpan, ...ownedSpans];
+  });
+
+  return { batches: [{ scopeSpans: [{ spans }] }] };
 }

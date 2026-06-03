@@ -4,6 +4,7 @@ import { isNodeType, parseSpans } from './parse.ts';
 import type { ParsedSpan } from './parse.ts';
 
 function applyInteractionFields(node: TraceNode, span: ParsedSpan): void {
+  if (span.sequenceIndex != null) node.sequence = span.sequenceIndex;
   if (span.userPrompt != null) node.prompt = span.userPrompt;
   if (span.sessionId != null) node.session_id = span.sessionId;
   if (span.userId != null) node.user_id = span.userId;
