@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CanonicalNode, NodeType } from '../../types.ts';
-import type {
-  ExecutionGraph,
-  ExecutionNode,
-  InteractionExecution,
-  SemanticNode,
-} from '../types.ts';
+import type { ExecutionGraph, ExecutionNode, InteractionExecution, Step } from '../types.ts';
 import { buildSemanticGraph } from './semantic.ts';
 
 function executionNode(
@@ -48,8 +43,8 @@ function interactionGraph(
   return { kind: 'interaction', data };
 }
 
-function verbsOf(node: SemanticNode): string[] {
-  return node.moves.map((m) => m.verb);
+function verbsOf(step: Step): string[] {
+  return step.moves.map((m) => m.verb);
 }
 
 function defined<T>(value: T | undefined): T {
@@ -58,7 +53,7 @@ function defined<T>(value: T | undefined): T {
 }
 
 describe('buildSemanticGraph', () => {
-  it('merges a reason+act inference with the following action into one node', () => {
+  it('emits one step per execution node (no merging of inference and action)', () => {
     const reasonAct = inference('inf1', [{ type: 'thinking' }, { type: 'tool_use' }], 'tool_use');
     const edit = action('act1', 'Edit', 'some/path');
     const answer = inference('inf2', [{ type: 'text' }], 'end_turn');
@@ -72,18 +67,30 @@ describe('buildSemanticGraph', () => {
     expect(semantics.shape).toBe('agentic');
     expect(semantics.segments).toHaveLength(1);
 
-    const members = defined(semantics.segments[0]).members;
-    expect(members).toHaveLength(2);
+    const steps = defined(semantics.segments[0]).steps;
+    expect(steps).toHaveLength(3);
 
-    const merged = defined(members[0]);
-    expect(verbsOf(merged)).toContain('reason');
-    expect(verbsOf(merged)).toContain('act');
-    expect(merged.actionVerbs).toContain('Edit');
-    expect(merged.execution).toEqual([reasonAct, edit]);
+    const infStep = defined(steps[0]);
+    expect(infStep.kind).toBe('inference');
+    expect(verbsOf(infStep)).toContain('reason');
+    expect(verbsOf(infStep)).toContain('act');
+    expect(infStep.execution).toBe(reasonAct);
 
-    const trailing = defined(members[1]);
-    expect(trailing.actionVerbs).toEqual([]);
-    expect(trailing.execution).toEqual([answer]);
+    const actStep = defined(steps[1]);
+    expect(actStep.kind).toBe('action');
+    expect(actStep.verb).toBe('Edit');
+    expect(actStep.moves).toEqual([]);
+    expect(actStep.execution).toBe(edit);
+  });
+
+  it('never emits an empty segment', () => {
+    const answer = inference('inf1', [{ type: 'text' }], 'end_turn');
+    const graph = interactionGraph('int1', [answer]);
+
+    const result = buildSemanticGraph(graph);
+
+    const segments = defined(result.interactions[0]).segments;
+    expect(segments.every((s) => s.steps.length >= 1)).toBe(true);
   });
 
   it('derives query shape for a single end_turn inference with no tools', () => {

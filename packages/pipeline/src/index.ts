@@ -27,8 +27,8 @@ export type {
   Move,
   Segment,
   SemanticGraph,
-  SemanticNode,
   SessionExecution,
+  Step,
   Thread,
   VizResult,
 } from './graph/types.ts';

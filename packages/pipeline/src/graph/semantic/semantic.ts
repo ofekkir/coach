@@ -7,25 +7,84 @@ import type {
   InteractionShape,
   Segment,
   SemanticGraph,
-  SemanticNode,
+  Step,
 } from '../types.ts';
 import { actionVerbFromNode, inferenceMovesFromRawResponse } from './verbs.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Semantic graph builder — Coach's inferred layer as a PURE FUNCTION of the
-// execution graph. It reuses the SAME ExecutionNode refs (structural sharing).
+// execution graph. Each execution step (inference|action) becomes one semantic
+// Step (~1:1 with an execution node, reusing the SAME ref); steps are grouped
+// into segments (sub-goals). A segment always holds at least one step.
 // ════════════════════════════════════════════════════════════════════════════
 
 function isInference(node: ExecutionNode): boolean {
   return node.canonical.type === 'llm_request';
 }
 
+function toStep(member: ExecutionNode): Step {
+  if (isInference(member)) {
+    return {
+      id: member.id,
+      kind: 'inference',
+      moves: inferenceMovesFromRawResponse(member.canonical.raw_response),
+      execution: member,
+    };
+  }
+  return {
+    id: member.id,
+    kind: 'action',
+    moves: [],
+    verb: actionVerbFromNode(member.canonical.name, member.canonical.tool_input),
+    execution: member,
+  };
+}
+
+function nsOf(node: ExecutionNode): bigint {
+  return node.canonical.start_time_ns != null ? BigInt(node.canonical.start_time_ns) : 0n;
+}
+
+// Steps cross-cut threads (mechanical lanes) — a segment is a time-ordered run
+// of the interaction's steps, regardless of which thread emitted each one.
+function orderedSteps(interaction: InteractionExecution): Step[] {
+  const members = interaction.threads.flatMap((thread) => thread.members);
+  const sorted = [...members].sort((a, b) => {
+    const diff = nsOf(a) - nsOf(b);
+    return diff < 0n ? -1 : diff > 0n ? 1 : 0;
+  });
+  return sorted.map(toStep);
+}
+
 // V1: every step belongs to a single segment (index 0).
-// Seam: replace with a boundary-detection pass over members' moves/verbs to
-// detect goal shifts (e.g. thinking-topic change, end_turn followed by new
-// reasoning), or delegate to an LLM classifier.
-function assignSegments(members: readonly SemanticNode[]): number[] {
-  return members.map(() => 0);
+// Seam: replace with a boundary-detection pass over steps' moves/verbs to detect
+// goal shifts (e.g. thinking-topic change, end_turn followed by new reasoning),
+// or delegate to an LLM classifier.
+function assignSegments(steps: readonly Step[]): number[] {
+  return steps.map(() => 0);
+}
+
+// One Segment per distinct index, steps in order. Empty groups are never emitted,
+// so the >= 1 step invariant holds. With the all-zeros stub this is one segment.
+// Seam: real sub-goal names will come from the classifier; the label is a
+// placeholder ("segment 1") keyed to the index for now.
+function buildSegments(steps: readonly Step[]): Segment[] {
+  const indices = assignSegments(steps);
+  const byIndex = new Map<number, Step[]>();
+
+  steps.forEach((step, i) => {
+    const index = indices[i] ?? 0;
+    const group = byIndex.get(index) ?? [];
+    group.push(step);
+    byIndex.set(index, group);
+  });
+
+  return [...byIndex.keys()]
+    .sort((a, b) => a - b)
+    .map((index) => ({
+      index,
+      label: `segment ${String(index + 1)}`,
+      steps: byIndex.get(index) ?? [],
+    }));
 }
 
 // query: exactly one inference, end_turn, no tools. Otherwise agentic.
@@ -38,86 +97,12 @@ function deriveInteractionShape(stepCanonicals: readonly CanonicalNode[]): Inter
   return 'agentic';
 }
 
-// Splits ordered members into contiguous groups. A group starts at each
-// inference and extends over the action steps that follow it until the next
-// inference. Actions before the first inference each form their own group.
-function groupByInference(members: readonly ExecutionNode[]): ExecutionNode[][] {
-  const groups: ExecutionNode[][] = [];
-  let open: ExecutionNode[] | null = null;
-  for (const member of members) {
-    if (open != null && !isInference(member)) open.push(member);
-    else open = appendGroup(groups, member);
-  }
-  return groups;
-}
-
-function appendGroup(groups: ExecutionNode[][], member: ExecutionNode): ExecutionNode[] | null {
-  const group = [member];
-  groups.push(group);
-  return isInference(member) ? group : null;
-}
-
-// Within a thread's ordered members, an inference subsumes the contiguous action
-// steps that follow it until the next inference. Leading actions with no
-// preceding inference become their own node with empty moves.
-function mergeInferenceWithActions(members: readonly ExecutionNode[]): SemanticNode[] {
-  return groupByInference(members).map(toSemanticNode);
-}
-
-function toSemanticNode(execution: readonly ExecutionNode[]): SemanticNode {
-  const head = execution[0];
-  const inference = head != null && isInference(head) ? head : null;
-  const actions = inference != null ? execution.slice(1) : execution;
-  const moves =
-    inference != null ? inferenceMovesFromRawResponse(inference.canonical.raw_response) : [];
-  const actionVerbs = actions.map((a) =>
-    actionVerbFromNode(a.canonical.name, a.canonical.tool_input),
-  );
-  const anchor = head ?? execution[0];
-
-  return {
-    id: `sem_${anchor?.id ?? 'unknown'}`,
-    moves,
-    actionVerbs,
-    execution,
-  };
-}
-
-// One Segment per distinct index, members in original order. With the all-zeros
-// stub this yields a single segment.
-// Seam: real sub-goal names will come from the classifier; the label is a
-// placeholder ("segment 1") keyed to the index for now.
-function buildSegments(members: readonly SemanticNode[]): Segment[] {
-  const indices = assignSegments(members);
-  const byIndex = new Map<number, SemanticNode[]>();
-
-  members.forEach((member, i) => {
-    const index = indices[i] ?? 0;
-    const group = byIndex.get(index) ?? [];
-    group.push(member);
-    byIndex.set(index, group);
-  });
-
-  return [...byIndex.keys()]
-    .sort((a, b) => a - b)
-    .map((index) => ({
-      index,
-      label: `segment ${String(index + 1)}`,
-      members: byIndex.get(index) ?? [],
-    }));
-}
-
 function buildInteractionSemantics(interaction: InteractionExecution): InteractionSemantics {
-  const allMembers = interaction.threads.flatMap((thread) => thread.members);
-  const stepCanonicals = allMembers.map((member) => member.canonical);
-  const semanticNodes = interaction.threads.flatMap((thread) =>
-    mergeInferenceWithActions(thread.members),
-  );
-
+  const steps = orderedSteps(interaction);
   return {
     interactionId: interaction.root.id,
-    shape: deriveInteractionShape(stepCanonicals),
-    segments: buildSegments(semanticNodes),
+    shape: deriveInteractionShape(steps.map((step) => step.execution.canonical)),
+    segments: buildSegments(steps),
   };
 }
 

@@ -12,7 +12,7 @@ import { link } from './place-members.ts';
 import { placeSegment, pushStructural } from './place-segment.ts';
 import { toAgent } from './queries.ts';
 import type { Ctx, TraceRFNode } from './types.ts';
-import { HG, LG, NW, VG, subgraphId } from './types.ts';
+import { HG, LG, NW, VG } from './types.ts';
 
 type SessionExec = AgentExecution['sessions'][number];
 
@@ -21,6 +21,16 @@ function semanticsFor(
   interactionId: string,
 ): InteractionSemantics | undefined {
   return semantic.interactions.find((i) => i.interactionId === interactionId);
+}
+
+// Horizontal extent of a semantic session: the widest interaction, where an
+// interaction lays its segments out side by side.
+function semanticSessionWidth(session: SessionExec, semantic: SemanticGraph): number {
+  return session.interactions.reduce((max, interaction) => {
+    const segCount = semanticsFor(semantic, interaction.root.id)?.segments.length ?? 1;
+    const w = segCount * NW + Math.max(0, segCount - 1) * HG;
+    return Math.max(max, w);
+  }, NW);
 }
 
 function pushInteractionWithShape(
@@ -116,10 +126,19 @@ function placeSemanticAgent(agent: AgentExecution, semantic: SemanticGraph, ctx:
   pushStructural(root, 'root', ctx.cx - NW / 2, 50, hasKids, ctx);
   if (!ctx.expanded.has(root.id) || !hasKids) return;
 
-  let y = 50 + estimateNodeH(buildLabelLines(root.canonical)) + LG;
-  for (const session of agent.sessions) {
-    y = placeSemanticSession(session, semantic, root.id, y, ctx);
-  }
+  const y = 50 + estimateNodeH(buildLabelLines(root.canonical)) + LG;
+  const widths = agent.sessions.map((s) => semanticSessionWidth(s, semantic));
+  const totalW = widths.reduce((sum, w) => sum + w, 0) + (agent.sessions.length - 1) * HG;
+  let sx = ctx.cx - totalW / 2;
+
+  agent.sessions.forEach((session, i) => {
+    const sw = widths[i] ?? NW;
+    const savedCx = ctx.cx;
+    ctx.cx = sx + sw / 2;
+    placeSemanticSession(session, semantic, root.id, y, ctx);
+    ctx.cx = savedCx;
+    sx += sw + HG;
+  });
 }
 
 export function buildSemanticElements(
@@ -144,9 +163,9 @@ function addInteractionExpandables(
     const sem = semanticsFor(semantic, interaction.root.id);
     if (sem == null) continue;
     sem.segments
-      .flatMap((s) => s.members)
-      .filter((m) => m.execution.length > 0)
-      .forEach((m) => ids.add(subgraphId(m.id)));
+      .flatMap((s) => s.steps)
+      .filter((step) => step.execution.children.length > 0)
+      .forEach((step) => ids.add(step.execution.id));
   }
 }
 

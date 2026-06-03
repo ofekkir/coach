@@ -15,7 +15,7 @@ export function subgraphId(plainId: string): string {
   return `${SUBGRAPH_PREFIX}${plainId}`;
 }
 
-type NodeKind = 'root' | 'session' | 'interaction' | 'member' | 'segment' | 'semantic';
+type NodeKind = 'root' | 'session' | 'interaction' | 'member' | 'segment' | 'step';
 
 export interface TraceRFNodeData extends Record<string, unknown> {
   kind: NodeKind;
@@ -30,11 +30,10 @@ export interface TraceRFNodeData extends Record<string, unknown> {
   selected: boolean;
   // Interaction-specific
   shape?: InteractionShape;
-  // Semantic-node-specific (the SemanticNode card)
-  stepKind?: 'inference' | 'action' | 'semantic';
+  // Step-specific (a step card == an execution node annotated with its semantics)
+  stepKind?: 'inference' | 'action';
   verb?: string;
   moves?: readonly Move[];
-  actionVerbs?: readonly string[];
   segmentIndex?: number;
 }
 

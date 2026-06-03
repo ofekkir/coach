@@ -12,10 +12,11 @@ import type { CanonicalNode } from '../types.ts';
 //   • EXECUTION (mechanical) — the deterministic skeleton from the trace:
 //       agent ▸ session ▸ interaction ▸ thread ▸ step. No interpretation.
 //   • SEMANTIC (inferred)    — Coach's interpreted layer laid over execution:
-//       per interaction, steps regroup into segments (sub-goals) of semantic
-//       nodes. A semantic node WRAPS the execution node(s) it subsumes — e.g. an
-//       inference that "reasons and acts" is one semantic node that, expanded,
-//       reveals the underlying inference step and the action step it spawned.
+//       per interaction, the steps are grouped into segments (sub-goals). A
+//       segment is a sequence of steps; a step is an inference or an action and
+//       is ~1:1 with an execution node (an inference = one llm_request; an action
+//       = one tool call plus its pre/post lifecycle). Expanding a step drills into
+//       that single execution node and its children.
 //
 // The semantic graph reuses the SAME ExecutionNode object instances as the
 // execution graph (structural sharing, not copies) — one source of truth.
@@ -94,25 +95,29 @@ export interface Move {
   readonly blockType: 'thinking' | 'text' | 'tool_use';
 }
 
-/** A semantic node — one interpreted unit of behavior. It WRAPS the execution
- *  node(s) it subsumes (shared refs): typically one inference step plus the
- *  action step(s) its `act` moves spawned. Expanding it reveals `execution`.
- *  `moves` are the inference's moves; `actionVerbs` are the extrinsic verbs of
- *  the wrapped action steps (e.g. "Edit", "Bash git"). */
-export interface SemanticNode {
+/** A step — one inferred unit of behavior within an interaction, ~1:1 with an
+ *  execution node. It WRAPS that single node (shared ref); expanding it drills
+ *  into the node and its lifecycle children (tool.execution, hooks).
+ *  - `kind: 'inference'` — an llm_request; `moves` are its moves (reason, plan,
+ *    answer, act, …) and `verb` is undefined.
+ *  - `kind: 'action'` — a tool call; `verb` is its extrinsic verb (e.g. "Edit",
+ *    "Bash git") and `moves` is empty. */
+export interface Step {
   readonly id: string;
+  readonly kind: 'inference' | 'action';
   readonly moves: readonly Move[];
-  readonly actionVerbs: readonly string[];
-  readonly execution: readonly ExecutionNode[];
+  readonly verb?: string;
+  readonly execution: ExecutionNode;
 }
 
-/** A segment is one sub-goal within an interaction — a contiguous grouping of
- *  semantic nodes serving one end. `label` is the (eventually inferred) sub-goal
- *  name; today a placeholder ("segment 1"). */
+/** A segment is one sub-goal within an interaction — a contiguous sequence of
+ *  steps serving one end. Invariant: a segment always has at least one step (an
+ *  empty segment is a bug). `label` is the (eventually inferred) sub-goal name;
+ *  today a placeholder ("segment 1"). */
 export interface Segment {
   readonly index: number;
   readonly label: string;
-  readonly members: readonly SemanticNode[];
+  readonly steps: readonly Step[];
 }
 
 /** A control-flow form for an interaction.

@@ -3,10 +3,9 @@ import { segmentAccentOf } from '../layout/colors.ts';
 
 interface Props {
   color: string;
-  stepKind: 'inference' | 'action' | 'semantic' | undefined;
+  stepKind: 'inference' | 'action' | undefined;
   verb: string | undefined;
   moves: readonly Move[] | undefined;
-  actionVerbs: readonly string[] | undefined;
   segmentIndex: number | undefined;
 }
 
@@ -17,12 +16,7 @@ function uniqueMoveVerbs(moves: readonly Move[] | undefined): string[] {
 
 function annotationText(props: Props): string {
   if (props.stepKind === 'action') return props.verb ?? '';
-  const moveVerbs = uniqueMoveVerbs(props.moves);
-  const actions = props.actionVerbs ?? [];
-  const parts = [moveVerbs.join(' · '), actions.length > 0 ? `→ ${actions.join(' · ')}` : '']
-    .filter((p) => p !== '')
-    .join('  ');
-  return parts;
+  return uniqueMoveVerbs(props.moves).join(' · ');
 }
 
 export function StepAnnotation(props: Props) {
