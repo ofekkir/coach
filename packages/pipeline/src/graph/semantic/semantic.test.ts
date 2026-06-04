@@ -37,6 +37,7 @@ function interactionGraph(
 ): ExecutionGraph {
   const data: InteractionExecution = {
     root: executionNode(interactionId, { type: 'interaction' }),
+    userPrompt: null,
     threads: [{ id: 'thread_main', source: 'main', members, edges: [] }],
     rootToThreadIds: ['thread_main'],
   };
@@ -97,6 +98,7 @@ describe('buildSemanticGraph', () => {
     ]);
     const data: InteractionExecution = {
       root: executionNode('int1', { type: 'interaction' }),
+      userPrompt: null,
       threads: [main, title],
       rootToThreadIds: [main.id, title.id],
     };

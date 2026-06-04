@@ -108,6 +108,13 @@ describe('buildExecutionGraph', () => {
     expect(thread.members.map((m) => m.id)).toEqual(['llm1', 'toolA', 'llm2']);
   });
 
+  it('synthesizes a user_prompt node as the head of the interaction', () => {
+    const agent = soleAgent(buildExecutionGraph(agentForest()));
+    const inter = agent.sessions[0]?.interactions[0];
+    expect(inter?.userPrompt?.canonical.type).toBe('user_prompt');
+    expect(inter?.userPrompt?.canonical.prompt).toBe('hello');
+  });
+
   it('embeds the full CanonicalNode losslessly on every node', () => {
     const agent = soleAgent(buildExecutionGraph(agentForest()));
 

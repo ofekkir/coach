@@ -27,24 +27,43 @@ function placeInteraction(
   const root = interaction.root;
   const threads: readonly Thread[] = interaction.threads;
   const isExpanded = ctx.expanded.has(root.id);
-  const hasKids = threads.some((t) => t.members.length > 0);
+  const hasKids = threads.some((t) => t.members.length > 0) || interaction.userPrompt != null;
 
   pushStructural(root, 'interaction', ctx.cx - NW / 2, y, hasKids, ctx);
   link(parentId, root.id, undefined, ctx);
   y += estimateNodeH(buildLabelLines(root.canonical)) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
+  const threadParent = placeUserPrompt(interaction.userPrompt, root.id, y, ctx);
+  if (interaction.userPrompt != null) {
+    y += estimateNodeH(buildLabelLines(interaction.userPrompt.canonical)) + VG;
+  }
+
   const totalW = threads.length * NW + (threads.length - 1) * HG;
   let tx = ctx.cx - totalW / 2;
   let maxEndY = y;
 
   for (const thread of threads) {
-    const endY = placeThread(thread, root.id, tx, y, ctx);
+    const endY = placeThread(thread, threadParent, tx, y, ctx);
     maxEndY = Math.max(maxEndY, endY);
     tx += NW + HG;
   }
 
   return maxEndY + VG;
+}
+
+// Places the synthesized user-prompt node as the interaction's first child and
+// returns the id threads should descend from (the prompt when present).
+function placeUserPrompt(
+  userPrompt: InteractionExecution['userPrompt'],
+  rootId: string,
+  y: number,
+  ctx: Ctx,
+): string {
+  if (userPrompt == null) return rootId;
+  pushStructural(userPrompt, 'member', ctx.cx - NW / 2, y, false, ctx);
+  link(rootId, userPrompt.id, undefined, ctx);
+  return userPrompt.id;
 }
 
 function placeSession(session: SessionExecution, parentId: string, y: number, ctx: Ctx): number {

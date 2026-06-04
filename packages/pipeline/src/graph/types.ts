@@ -57,9 +57,13 @@ export interface Thread {
 }
 
 /** One interaction's execution skeleton. `root` is the interaction node (its
- *  children live in `threads`, not under `root`). */
+ *  children live in `threads`, not under `root`). `userPrompt` is a synthesized
+ *  node carrying the full prompt — the interaction's input / head of the spine,
+ *  the goal source the agent's work responds to. It is NOT a step. Null when the
+ *  interaction has no prompt text. */
 export interface InteractionExecution {
   readonly root: ExecutionNode;
+  readonly userPrompt: ExecutionNode | null;
   readonly threads: readonly Thread[];
   readonly rootToThreadIds: readonly string[];
 }

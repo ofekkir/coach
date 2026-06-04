@@ -82,6 +82,8 @@ Input files (accumulating — user stages N files/folders before submitting)
         ▼  Stage 5 — graph/execution/execution.ts  → executionGraph: ExecutionGraph
    buildExecutionGraph()  the mechanical skeleton from the trace, no interpretation:
                             agent ▸ session ▸ interaction ▸ thread ▸ step
+                            each interaction has a synthesized user_prompt head node
+                            (its input / goal source) carrying the full prompt — not a step
         │
         ▼  Stage 6 — graph/semantic/semantic.ts     → semanticGraph: SemanticGraph
    buildSemanticGraph(executionGraph)  Coach's inferred layer laid over execution:

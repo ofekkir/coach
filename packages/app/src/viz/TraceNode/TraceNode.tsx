@@ -7,6 +7,7 @@ const TYPE_BADGES: Record<string, string> = {
   agent: 'AGENT',
   session: 'SESSION',
   interaction: 'INTERACTION',
+  user_prompt: 'PROMPT',
   llm_request: 'LLM',
   tool: 'TOOL',
   blocked_on_user: 'WAIT',

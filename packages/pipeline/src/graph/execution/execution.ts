@@ -113,7 +113,27 @@ export function buildInteractionExecution(
     buildThread(source, threadMembers.get(source) ?? [], childrenOf),
   );
 
-  return { root, threads, rootToThreadIds: threads.map((t) => t.id) };
+  return {
+    root,
+    userPrompt: toUserPromptNode(interaction),
+    threads,
+    rootToThreadIds: threads.map((t) => t.id),
+  };
+}
+
+// The user prompt is a synthesized first node of the interaction — its input /
+// the head of the spine, carrying the full prompt. Mechanical (the prompt is on
+// the interaction span), but not a step.
+function toUserPromptNode(interaction: CanonicalNode): ExecutionNode | null {
+  if (interaction.prompt == null || interaction.prompt.trim() === '') return null;
+  const canonical: CanonicalNode = {
+    id: `${interaction.id}__prompt`,
+    type: 'user_prompt',
+    parent: interaction.id,
+    prompt: interaction.prompt,
+    ...(interaction.start_time_ns != null ? { start_time_ns: interaction.start_time_ns } : {}),
+  };
+  return { id: canonical.id, canonical, children: [], innerEdges: [] };
 }
 
 function buildThread(
@@ -132,6 +152,7 @@ function buildThread(
 function emptyInteractionExecution(interaction: CanonicalNode): InteractionExecution {
   return {
     root: { id: interaction.id, canonical: interaction, children: [], innerEdges: [] },
+    userPrompt: toUserPromptNode(interaction),
     threads: [],
     rootToThreadIds: [],
   };

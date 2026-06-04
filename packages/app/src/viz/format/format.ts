@@ -72,6 +72,8 @@ function typeLines(node: CanonicalNode, index: number): string[] {
       return ['session', sessionTitle(node, index)];
     case 'interaction':
       return ['interaction', interactionTitle(node, index)];
+    case 'user_prompt':
+      return ['user_prompt', ...optionalLine(node.prompt, collapseWhitespace)];
     case 'llm_request':
       return llmRequestLines(node);
     case 'tool':

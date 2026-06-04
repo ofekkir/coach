@@ -58,6 +58,7 @@ function placeThreadLane(
 function pushInteractionWithShape(
   semantics: InteractionSemantics,
   root: ExecutionNode,
+  hasKids: boolean,
   startY: number,
   ctx: Ctx,
 ): void {
@@ -73,7 +74,7 @@ function pushInteractionWithShape(
       canonical: root.canonical,
       color: '#5599BB',
       fill: '#EDF5FB',
-      hasRFChildren: semantics.threads.length > 0,
+      hasRFChildren: hasKids,
       isExpanded: ctx.expanded.has(root.id),
       selected: root.id === ctx.selected,
       shape: semantics.shape,
@@ -82,24 +83,34 @@ function pushInteractionWithShape(
 }
 
 function placeInteractionSemantics(
+  interaction: SessionExec['interactions'][number],
   semantics: InteractionSemantics,
-  root: ExecutionNode,
   startY: number,
   ctx: Ctx,
 ): number {
+  const root = interaction.root;
   const isExpanded = ctx.expanded.has(root.id);
   const threads = semantics.threads;
-  const hasKids = threads.length > 0;
-  pushInteractionWithShape(semantics, root, startY, ctx);
-  const y =
+  const hasKids = threads.length > 0 || interaction.userPrompt != null;
+  pushInteractionWithShape(semantics, root, hasKids, startY, ctx);
+  let y =
     startY + estimateNodeH(buildLabelLines(root.canonical)) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
+
+  let threadParent = root.id;
+  if (interaction.userPrompt != null) {
+    const up = interaction.userPrompt;
+    pushStructural(up, 'member', ctx.cx - NW / 2, y, false, ctx);
+    link(root.id, up.id, undefined, ctx);
+    y += estimateNodeH(buildLabelLines(up.canonical)) + VG;
+    threadParent = up.id;
+  }
 
   const totalW = threads.length * NW + (threads.length - 1) * HG;
   let sx = ctx.cx - totalW / 2;
   let maxY = y;
   for (const thread of threads) {
-    maxY = Math.max(maxY, placeThreadLane(thread, root.id, sx, y, ctx));
+    maxY = Math.max(maxY, placeThreadLane(thread, threadParent, sx, y, ctx));
     sx += NW + HG;
   }
   return maxY + VG;
@@ -118,7 +129,7 @@ function placeOneInteraction(
     pushStructural(interaction.root, 'interaction', ctx.cx - NW / 2, startY, false, ctx);
     return startY + estimateNodeH(buildLabelLines(interaction.root.canonical)) + VG;
   }
-  return placeInteractionSemantics(sem, interaction.root, startY, ctx);
+  return placeInteractionSemantics(interaction, sem, startY, ctx);
 }
 
 function placeSemanticSession(
