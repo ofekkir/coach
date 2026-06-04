@@ -1,6 +1,50 @@
 import type { CanonicalNode } from '../../types.ts';
-import { formatGap, sortByStart } from './format.ts';
-import type { GraphViewEdge, GraphViewNode } from './types.ts';
+
+// ── Pure ordering / timing helpers (ported from view-model/format.ts) ──────────
+//
+// These are mechanical, presentation-free. The signed gap is a raw number of
+// milliseconds (gapMs) — the app formats it ("+12ms"). No truncation, no labels.
+
+function nsOf(ns: string | undefined): bigint {
+  return ns != null ? BigInt(ns) : 0n;
+}
+
+export function compareStart(a: CanonicalNode, b: CanonicalNode): number {
+  const diff = nsOf(a.start_time_ns) - nsOf(b.start_time_ns);
+  if (diff !== 0n) return diff < 0n ? -1 : 1;
+  const priority = (t: string) =>
+    t === 'tool.blocked_on_user' ? 0 : t === 'tool.execution' ? 1 : 2;
+  return priority(a.type) - priority(b.type);
+}
+
+export function sortByStart(list: CanonicalNode[]): CanonicalNode[] {
+  return [...list].sort(compareStart);
+}
+
+/** Signed gap between two adjacent steps in milliseconds, or null when either
+ *  timestamp is missing or the gap is zero/non-finite. Raw number — no format. */
+export function gapMsBetween(prev: CanonicalNode, next: CanonicalNode): number | null {
+  if (prev.end_time_ns == null || next.start_time_ns == null) return null;
+  const ms = Number(BigInt(next.start_time_ns) - BigInt(prev.end_time_ns)) / 1_000_000;
+  if (!Number.isFinite(ms) || ms === 0) return null;
+  return ms;
+}
+
+// ── Parent → children index ────────────────────────────────────────────────────
+
+export function buildChildrenOf(nodes: readonly CanonicalNode[]): Map<string, CanonicalNode[]> {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const childrenOf = new Map<string, CanonicalNode[]>();
+  for (const n of nodes) {
+    if (n.parent == null || !byId.has(n.parent)) continue;
+    const list = childrenOf.get(n.parent) ?? [];
+    list.push(n);
+    childrenOf.set(n.parent, list);
+  }
+  return childrenOf;
+}
+
+// ── Thread assignment (ported verbatim from view-model/thread.ts) ──────────────
 
 interface ThreadReq {
   source: string;
@@ -72,19 +116,6 @@ function assignNodeToThread(
   return findPrecedingThread(llmsByThread, nodeStart);
 }
 
-export function buildChildrenOf(nodes: readonly CanonicalNode[]): Map<string, CanonicalNode[]> {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const childrenOf = new Map<string, CanonicalNode[]>();
-  for (const n of nodes) {
-    if (n.parent != null && byId.has(n.parent)) {
-      const list = childrenOf.get(n.parent) ?? [];
-      list.push(n);
-      childrenOf.set(n.parent, list);
-    }
-  }
-  return childrenOf;
-}
-
 export function buildThreadMembers(
   directChildren: CanonicalNode[],
   llmsByThread: Map<string, CanonicalNode[]>,
@@ -104,30 +135,4 @@ export function buildThreadMembers(
     threadMembers.set(src, sortByStart(members));
   }
   return threadMembers;
-}
-
-function resolveId(viewNode: GraphViewNode): string {
-  return viewNode.children.length > 0 ? `sg_${viewNode.id}` : viewNode.id;
-}
-
-export function buildThreadEdges(
-  members: CanonicalNode[],
-  memberViewNodes: GraphViewNode[],
-): GraphViewEdge[] {
-  const edges: GraphViewEdge[] = [];
-  for (let i = 0; i < memberViewNodes.length - 1; i += 1) {
-    const prevNode = members[i];
-    const nextNode = members[i + 1];
-    if (prevNode == null || nextNode == null) continue;
-    const prevView = memberViewNodes[i];
-    const nextView = memberViewNodes[i + 1];
-    if (prevView == null || nextView == null) continue;
-    const gap = formatGap(prevNode, nextNode);
-    edges.push({
-      fromId: resolveId(prevView),
-      toId: resolveId(nextView),
-      ...(gap !== null ? { label: gap } : {}),
-    });
-  }
-  return edges;
 }

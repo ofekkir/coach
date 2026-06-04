@@ -5,35 +5,36 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  type Edge,
   type NodeMouseHandler,
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import type { VizData } from '@coach/pipeline';
-import { buildElements } from '../layout/queries.ts';
 import type { TraceRFNode, TraceRFNodeData } from '../layout/types.ts';
 import { TraceNodeView } from '../TraceNode/TraceNode.tsx';
 import { useFlowSync } from './useFlowSync.ts';
 
 const nodeTypes: NodeTypes = { trace: TraceNodeView };
 
+export interface Elements {
+  nodes: TraceRFNode[];
+  edges: Edge[];
+}
+
 export function FlowInner({
-  data,
+  build,
   expanded,
   onExpandedChange,
   selectedId,
   onSelectId,
 }: {
-  data: VizData;
+  build: (expanded: Set<string>, selected: string | null) => Elements;
   expanded: Set<string>;
   onExpandedChange: (e: Set<string>) => void;
   selectedId: string | null;
   onSelectId: (id: string | null) => void;
 }) {
-  const elements = useMemo(
-    () => buildElements(data, expanded, selectedId),
-    [data, expanded, selectedId],
-  );
+  const elements = useMemo(() => build(expanded, selectedId), [build, expanded, selectedId]);
 
   const { nodes, edges, onNodesChange, onEdgesChange } = useFlowSync(elements);
 

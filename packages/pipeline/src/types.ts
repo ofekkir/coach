@@ -90,6 +90,7 @@ export type NodeType =
   | 'agent'
   | 'session'
   | 'interaction'
+  | 'user_prompt'
   | 'llm_request'
   | 'tool'
   | 'tool.blocked_on_user'

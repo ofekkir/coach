@@ -14,28 +14,26 @@ export type {
   UploadedFile,
 } from './types.ts';
 
-// View model
-export { buildCausalGraphView } from './graph/view-model/graph-view.ts';
-export {
-  buildAgentCausalGraphView,
-  buildSessionCausalGraphView,
-} from './graph/view-model/session-view.ts';
+// Graph contract — execution (mechanical) + semantic (inferred)
 export type {
-  ActionStepView,
-  AgentCausalGraphView,
-  CausalGraphView,
-  GraphViewEdge,
-  GraphViewNode,
-  GraphViewThread,
-  InferenceStepView,
+  AgentExecution,
+  ExecutionGraph,
+  ExecutionNode,
+  GraphData,
+  GraphEdge,
+  InteractionExecution,
+  InteractionSemantics,
   InteractionShape,
   Move,
-  SegmentView,
-  SessionCausalGraphView,
-  StepView,
-  VizData,
-} from './graph/view-model/types.ts';
+  Segment,
+  SemanticGraph,
+  SessionExecution,
+  Step,
+  Thread,
+  ThreadSemantics,
+  VizResult,
+} from './graph/types.ts';
 
 // Orchestration
 export { buildVizResults, runPipeline } from './orchestrate.ts';
-export type { PipelineResult, VizResult } from './orchestrate.ts';
+export type { PipelineResult } from './orchestrate.ts';

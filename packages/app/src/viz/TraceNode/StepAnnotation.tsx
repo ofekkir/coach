@@ -9,16 +9,21 @@ interface Props {
   segmentIndex: number | undefined;
 }
 
-export function StepAnnotation({ stepKind, verb, moves, segmentIndex, color }: Props) {
+function uniqueMoveVerbs(moves: readonly Move[] | undefined): string[] {
+  if (moves == null) return [];
+  return moves.map((m) => m.verb).filter((v, i, arr) => arr.indexOf(v) === i);
+}
+
+function annotationText(props: Props): string {
+  if (props.stepKind === 'action') return props.verb ?? '';
+  return uniqueMoveVerbs(props.moves).join(' · ');
+}
+
+export function StepAnnotation(props: Props) {
+  const { stepKind, segmentIndex, color } = props;
   if (stepKind == null) return null;
   const accent = segmentIndex != null ? segmentAccentOf(segmentIndex) : color;
-  const text =
-    stepKind === 'action'
-      ? verb
-      : moves
-          ?.map((m) => m.verb)
-          .filter((v, i, arr) => arr.indexOf(v) === i)
-          .join(' · ');
+  const text = annotationText(props);
   if (!text) return null;
   return (
     <div

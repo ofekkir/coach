@@ -1,4 +1,4 @@
-import type { Move } from './types.ts';
+import type { Move } from '../types.ts';
 
 // ── Response body shape ───────────────────────────────────────────────────────
 

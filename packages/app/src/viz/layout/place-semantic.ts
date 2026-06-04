@@ -1,0 +1,218 @@
+import type {
+  AgentExecution,
+  ExecutionGraph,
+  ExecutionNode,
+  InteractionSemantics,
+  SemanticGraph,
+  ThreadSemantics,
+} from '@coach/pipeline';
+import type { Edge } from '@xyflow/react';
+import { estimateNodeH } from './estimate.ts';
+import { buildLabelLines, threadTitle } from '../format/format.ts';
+import { link } from './place-members.ts';
+import { placeSegment, pushStructural } from './place-segment.ts';
+import { expandableSubtreeIds, toAgent } from './queries.ts';
+import type { Ctx, TraceRFNode } from './types.ts';
+import { HG, LG, NW, VG, subgraphId } from './types.ts';
+
+type SessionExec = AgentExecution['sessions'][number];
+
+function semanticsFor(
+  semantic: SemanticGraph,
+  interactionId: string,
+): InteractionSemantics | undefined {
+  return semantic.interactions.find((i) => i.interactionId === interactionId);
+}
+
+// Horizontal extent of a semantic session: the widest interaction, where an
+// interaction lays its threads out side by side as lanes.
+function semanticSessionWidth(session: SessionExec, semantic: SemanticGraph): number {
+  return session.interactions.reduce((max, interaction) => {
+    const threadCount = semanticsFor(semantic, interaction.root.id)?.threads.length ?? 1;
+    const w = threadCount * NW + Math.max(0, threadCount - 1) * HG;
+    return Math.max(max, w);
+  }, NW);
+}
+
+// One thread lane: its segments stacked vertically, chained from the interaction
+// (the first segment's incoming edge carries the thread title).
+function placeThreadLane(
+  thread: ThreadSemantics,
+  interactionId: string,
+  x: number,
+  startY: number,
+  ctx: Ctx,
+): number {
+  let y = startY;
+  let parentId = interactionId;
+  let edgeLabel: string | undefined = threadTitle(thread.source);
+  for (const segment of thread.segments) {
+    const id = subgraphId(`seg-${thread.id}-${String(segment.index)}`);
+    y = placeSegment(segment, id, parentId, edgeLabel, x, y, ctx);
+    parentId = id;
+    edgeLabel = undefined;
+  }
+  return y;
+}
+
+function pushInteractionWithShape(
+  semantics: InteractionSemantics,
+  root: ExecutionNode,
+  hasKids: boolean,
+  startY: number,
+  ctx: Ctx,
+): void {
+  const labelLines = buildLabelLines(root.canonical);
+  ctx.nodes.push({
+    id: root.id,
+    type: 'trace',
+    position: { x: ctx.cx - NW / 2, y: startY },
+    selected: root.id === ctx.selected,
+    data: {
+      kind: 'interaction',
+      labelLines,
+      canonical: root.canonical,
+      color: '#5599BB',
+      fill: '#EDF5FB',
+      hasRFChildren: hasKids,
+      isExpanded: ctx.expanded.has(root.id),
+      selected: root.id === ctx.selected,
+      shape: semantics.shape,
+    },
+  });
+}
+
+function placeInteractionSemantics(
+  interaction: SessionExec['interactions'][number],
+  semantics: InteractionSemantics,
+  startY: number,
+  ctx: Ctx,
+): number {
+  const root = interaction.root;
+  const isExpanded = ctx.expanded.has(root.id);
+  const threads = semantics.threads;
+  const hasKids = threads.length > 0 || interaction.userPrompt != null;
+  pushInteractionWithShape(semantics, root, hasKids, startY, ctx);
+  let y =
+    startY + estimateNodeH(buildLabelLines(root.canonical)) + (isExpanded && hasKids ? LG : VG);
+  if (!isExpanded || !hasKids) return y;
+
+  let threadParent = root.id;
+  if (interaction.userPrompt != null) {
+    const up = interaction.userPrompt;
+    pushStructural(up, 'member', ctx.cx - NW / 2, y, false, ctx);
+    link(root.id, up.id, undefined, ctx);
+    y += estimateNodeH(buildLabelLines(up.canonical)) + VG;
+    threadParent = up.id;
+  }
+
+  const totalW = threads.length * NW + (threads.length - 1) * HG;
+  let sx = ctx.cx - totalW / 2;
+  let maxY = y;
+  for (const thread of threads) {
+    maxY = Math.max(maxY, placeThreadLane(thread, threadParent, sx, y, ctx));
+    sx += NW + HG;
+  }
+  return maxY + VG;
+}
+
+function placeOneInteraction(
+  interaction: SessionExec['interactions'][number],
+  semantic: SemanticGraph,
+  parentId: string,
+  startY: number,
+  ctx: Ctx,
+): number {
+  link(parentId, interaction.root.id, undefined, ctx);
+  const sem = semanticsFor(semantic, interaction.root.id);
+  if (sem == null) {
+    pushStructural(interaction.root, 'interaction', ctx.cx - NW / 2, startY, false, ctx);
+    return startY + estimateNodeH(buildLabelLines(interaction.root.canonical)) + VG;
+  }
+  return placeInteractionSemantics(interaction, sem, startY, ctx);
+}
+
+function placeSemanticSession(
+  session: SessionExec,
+  semantic: SemanticGraph,
+  parentId: string,
+  startY: number,
+  ctx: Ctx,
+): number {
+  const root = session.root;
+  const isExpanded = ctx.expanded.has(root.id);
+  const hasKids = session.interactions.length > 0;
+  pushStructural(root, 'session', ctx.cx - NW / 2, startY, hasKids, ctx);
+  link(parentId, root.id, undefined, ctx);
+  let y =
+    startY + estimateNodeH(buildLabelLines(root.canonical)) + (isExpanded && hasKids ? LG : VG);
+  if (!isExpanded || !hasKids) return y;
+
+  for (const interaction of session.interactions) {
+    y = placeOneInteraction(interaction, semantic, root.id, y, ctx);
+  }
+  return y;
+}
+
+function placeSemanticAgent(agent: AgentExecution, semantic: SemanticGraph, ctx: Ctx): void {
+  const root = agent.root;
+  const hasKids = agent.sessions.length > 0;
+  pushStructural(root, 'root', ctx.cx - NW / 2, 50, hasKids, ctx);
+  if (!ctx.expanded.has(root.id) || !hasKids) return;
+
+  const y = 50 + estimateNodeH(buildLabelLines(root.canonical)) + LG;
+  const widths = agent.sessions.map((s) => semanticSessionWidth(s, semantic));
+  const totalW = widths.reduce((sum, w) => sum + w, 0) + (agent.sessions.length - 1) * HG;
+  let sx = ctx.cx - totalW / 2;
+
+  agent.sessions.forEach((session, i) => {
+    const sw = widths[i] ?? NW;
+    const savedCx = ctx.cx;
+    ctx.cx = sx + sw / 2;
+    placeSemanticSession(session, semantic, root.id, y, ctx);
+    ctx.cx = savedCx;
+    sx += sw + HG;
+  });
+}
+
+export function buildSemanticElements(
+  execution: ExecutionGraph,
+  semantic: SemanticGraph,
+  expanded: Set<string>,
+  selected: string | null,
+): { nodes: TraceRFNode[]; edges: Edge[] } {
+  const agent = toAgent(execution);
+  const ctx: Ctx = { cx: NW * 4, expanded, selected, nodes: [], edges: [] };
+  placeSemanticAgent(agent, semantic, ctx);
+  return { nodes: ctx.nodes, edges: ctx.edges };
+}
+
+function addInteractionExpandables(
+  session: SessionExec,
+  semantic: SemanticGraph,
+  ids: Set<string>,
+): void {
+  for (const interaction of session.interactions) {
+    ids.add(interaction.root.id);
+    const sem = semanticsFor(semantic, interaction.root.id);
+    if (sem == null) continue;
+    sem.threads
+      .flatMap((thread) => thread.segments)
+      .flatMap((segment) => segment.steps)
+      .flatMap((step) => expandableSubtreeIds(step.execution))
+      .forEach((id) => ids.add(id));
+  }
+}
+
+export function allSemanticExpandableIds(
+  execution: ExecutionGraph,
+  semantic: SemanticGraph,
+): Set<string> {
+  const agent = toAgent(execution);
+  const ids = new Set<string>([agent.root.id]);
+  for (const session of agent.sessions) {
+    ids.add(session.root.id);
+    addInteractionExpandables(session, semantic, ids);
+  }
+  return ids;
+}

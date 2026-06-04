@@ -1,7 +1,5 @@
-import type { GraphViewNode } from '@coach/pipeline';
-
-export function estimateNodeH(gvNode: GraphViewNode): number {
-  const body = gvNode.labelLines.slice(1);
+export function estimateNodeH(labelLines: readonly string[]): number {
+  const body = labelLines.slice(1);
   const timingIdx = body.findIndex((l) => l.startsWith('duration:'));
   const hasTiming = timingIdx >= 0;
   const displayLines = hasTiming ? body.filter((_, i) => i !== timingIdx) : body;
