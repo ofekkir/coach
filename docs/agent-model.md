@@ -39,6 +39,10 @@ The model is a mechanical skeleton with a semantic layer laid over it.
             │            (one per user prompt;
             │             interaction.sequence)
             │
+            ├─ user prompt ─ the interaction's INPUT ──────── states the GOAL (which the
+            │                (full prompt; head of the         segments serve / diverge from)
+            │                 spine) — not a step
+            │
             ├─ threads ───── mechanical execution lanes ──── (cross-cut by segments)
             │   • main thread  = the spine of the interaction
             │   • sub-threads  = sub-agent loops spawned by a Task action
@@ -61,6 +65,21 @@ The model is a mechanical skeleton with a semantic layer laid over it.
   > **Parity note (native logs):** native `.jsonl` sessions must be split into one interaction
   > per user prompt to match OTEL. The historical bug was emitting a single interaction for the
   > whole session — fixing that is step one of implementation.
+
+### user prompt (mechanical input, the goal source)
+
+The interaction's **first node is the user prompt** — the full text the human sent, carried on
+the `interaction` span's `user_prompt`. It is **mechanical** (read straight from the trace) but
+distinct from everything below it: it is neither an inference nor an action — it is not a
+**step** at all. It is the interaction's _input_ and the head of the main thread's spine; the
+first inference is a _response_ to it.
+
+It earns its own node because it is the **goal source**. The interaction's GOAL is not given
+to us as a label — the prompt is the closest thing we have to a stated goal, and segments
+(the inferred sub-goals) are read _against_ it. That makes the prompt the anchor for a whole
+class of findings: an **under-specified prompt** the agent filled in by assumption (e.g. the
+user said _"fetch X"_ and the agent decided to _summarize_ it), or a trajectory that **drifted**
+from what was asked. Without a prompt node, "what the user actually asked" has nowhere to attach.
 
 ### threads (mechanical lanes)
 
@@ -150,8 +169,9 @@ mechanical skeleton) and the **semantic graph** (the inferred overlay, where a s
 the execution node it interprets).
 
 - The **execution graph** — a causal graph of the mechanical structure:
-  `agent ▸ session ▸ interaction ▸ thread ▸ step`, with expand/collapse. Sub-threads appear under
-  the action that spawned them. This is the deterministic skeleton, no interpretation.
+  `agent ▸ session ▸ interaction ▸ user prompt ▸ thread ▸ step`, with expand/collapse. The user
+  prompt is the interaction's first node (its input); threads descend from it. Sub-threads appear
+  under the action that spawned them. This is the deterministic skeleton, no interpretation.
 - The **semantic graph** — Coach's inferred layer laid over the execution graph. Each semantic node
   **wraps** the execution node(s) it interprets, so the two graphs share one source of truth:
   - **Segmentation** — an interaction's steps grouped by the sub-goal (segment) they serve, so the
