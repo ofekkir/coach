@@ -59,11 +59,17 @@ export function initialExpanded(): Set<string> {
   return new Set<string>();
 }
 
+// Every node id in the subtree that has children — at any depth — so "expand
+// all" reaches nested calls (e.g. an llm_request inside a tool's execution).
+export function expandableSubtreeIds(node: ExecutionNode): string[] {
+  if (node.children.length === 0) return [];
+  return [node.id, ...node.children.flatMap(expandableSubtreeIds)];
+}
+
 function expandableInteractionIds(interaction: InteractionExecution): string[] {
   const memberIds = interaction.threads
     .flatMap((thread) => thread.members)
-    .filter((m) => m.children.length > 0)
-    .map((m) => m.id);
+    .flatMap(expandableSubtreeIds);
   return [interaction.root.id, ...memberIds];
 }
 

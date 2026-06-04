@@ -11,7 +11,7 @@ import { estimateNodeH } from './estimate.ts';
 import { buildLabelLines, threadTitle } from '../format/format.ts';
 import { link } from './place-members.ts';
 import { placeSegment, pushStructural } from './place-segment.ts';
-import { toAgent } from './queries.ts';
+import { expandableSubtreeIds, toAgent } from './queries.ts';
 import type { Ctx, TraceRFNode } from './types.ts';
 import { HG, LG, NW, VG, subgraphId } from './types.ts';
 
@@ -188,8 +188,8 @@ function addInteractionExpandables(
     sem.threads
       .flatMap((thread) => thread.segments)
       .flatMap((segment) => segment.steps)
-      .filter((step) => step.execution.children.length > 0)
-      .forEach((step) => ids.add(step.execution.id));
+      .flatMap((step) => expandableSubtreeIds(step.execution))
+      .forEach((id) => ids.add(id));
   }
 }
 

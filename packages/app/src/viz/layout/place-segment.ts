@@ -2,7 +2,7 @@ import type { ExecutionNode, Segment, Step } from '@coach/pipeline';
 import { colorOf, fillOf, segmentAccentOf } from './colors.ts';
 import { estimateNodeH } from './estimate.ts';
 import { buildLabelLines } from '../format/format.ts';
-import { link, push } from './place-members.ts';
+import { link, placeSubtree, push } from './place-members.ts';
 import type { Ctx, TraceRFNodeData } from './types.ts';
 import { VG } from './types.ts';
 
@@ -64,18 +64,6 @@ function pushStep(step: Step, segmentIndex: number, x: number, y: number, ctx: C
   );
 }
 
-function placeStepChildren(node: ExecutionNode, x: number, startY: number, ctx: Ctx): number {
-  let y = startY;
-  let prevId = node.id;
-  for (const child of node.children) {
-    pushStructural(child, 'member', x, y, false, ctx);
-    link(prevId, child.id, undefined, ctx);
-    prevId = child.id;
-    y += estimateNodeH(buildLabelLines(child.canonical)) + VG;
-  }
-  return y;
-}
-
 function placeStep(
   step: Step,
   segmentIndex: number,
@@ -89,7 +77,7 @@ function placeStep(
   pushStep(step, segmentIndex, x, startY, ctx);
   link(parentId, node.id, undefined, ctx);
   const y = startY + estimateNodeH(buildLabelLines(node.canonical)) + VG;
-  if (isExpanded && node.children.length > 0) return placeStepChildren(node, x, y, ctx);
+  if (isExpanded && node.children.length > 0) return placeSubtree(node, x, y, ctx).y;
   return y;
 }
 

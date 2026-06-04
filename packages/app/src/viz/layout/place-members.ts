@@ -63,28 +63,30 @@ function pushExecNode(
   );
 }
 
-function placeExpandedChildren(
-  member: ExecutionNode,
+// Recursively places a node's children when expanded — each child that itself has
+// expanded children drills in further (e.g. tool ▸ tool.execution ▸ llm_request).
+// Returns the bottom y and the last-placed id so the next sibling chains from it.
+export function placeSubtree(
+  node: ExecutionNode,
   tx: number,
   startY: number,
   ctx: Ctx,
-): string {
+): { y: number; lastId: string } {
   let y = startY;
-  let lastId = member.id;
-  for (const child of member.children) {
-    pushExecNode(child, 'member', tx, y, false, false, ctx);
+  let lastId = node.id;
+  for (const child of node.children) {
+    const hasKids = child.children.length > 0;
+    const isExpanded = hasKids && ctx.expanded.has(child.id);
+    pushExecNode(child, 'member', tx, y, hasKids, isExpanded, ctx);
     link(lastId, child.id, undefined, ctx);
-    lastId = child.id;
     y += estimateNodeH(buildLabelLines(child.canonical)) + VG;
+    lastId = child.id;
+    if (!isExpanded) continue;
+    const sub = placeSubtree(child, tx, y, ctx);
+    y = sub.y;
+    lastId = sub.lastId;
   }
-  return lastId;
-}
-
-function lastChildY(member: ExecutionNode, startY: number): number {
-  return member.children.reduce(
-    (y, child) => y + estimateNodeH(buildLabelLines(child.canonical)) + VG,
-    startY,
-  );
+  return { y, lastId };
 }
 
 function edgeLabelFor(thread: Thread, index: number): string | undefined {
@@ -115,8 +117,9 @@ export function placeThread(
 
     let lastId = member.id;
     if (isExpandedMember) {
-      lastId = placeExpandedChildren(member, tx, y, ctx);
-      y = lastChildY(member, y);
+      const sub = placeSubtree(member, tx, y, ctx);
+      y = sub.y;
+      lastId = sub.lastId;
     }
 
     prevId = lastId;
