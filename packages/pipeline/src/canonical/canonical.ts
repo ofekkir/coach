@@ -21,7 +21,7 @@ function otelToCanonical(
   logs: readonly LogEntry[],
 ): CanonicalNode[] {
   const unified = enrichTrace(joinTraces(traces), logs);
-  return transformTrace(unified);
+  return transformTrace(unified, true);
 }
 
 // Native path: facade over today's jsonl → OTLP → transform. The OTLP round-trip

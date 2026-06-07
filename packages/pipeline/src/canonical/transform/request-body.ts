@@ -7,52 +7,104 @@ interface ResBody {
   stop_reason?: string;
 }
 
-function firstText(content: string | { type: string; text?: string }[]): string | null {
-  if (typeof content === 'string') return content;
-  for (const b of content) {
-    if (b.type === 'text' && b.text) return b.text;
-  }
-  return null;
-}
+// ── Raw body decoding (handles double-escaped / truncated JSON) ───────────────
 
-function unescape(s: string): string {
-  return s
-    .replace(/\\"/g, '"')
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\r')
-    .replace(/\\t/g, '\t')
-    .replace(/\\\\/g, '\\');
-}
-
-function lastUserTextFromParsed(messages: ReqBody['messages']): string | null {
-  if (!messages) return null;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg?.role !== 'user') continue;
-    const text = firstText(msg.content);
-    if (text) return text.trim();
-  }
-  return null;
-}
-
-function lastUserTextFromRaw(bodyJson: string): string | null {
-  let lastIdx = -1;
-  const re = /"role":"user"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(bodyJson)) !== null) lastIdx = m.index;
-  if (lastIdx === -1) return null;
-  const tm = /"text":"((?:[^"\\]|\\.)+)/.exec(bodyJson.slice(lastIdx));
-  if (!tm?.[1]) return null;
-  return unescape(tm[1]);
-}
-
-export function extractRequestPrompt(bodyJson: string): string | null {
+function tryLoad(text: string): unknown {
   try {
-    const parsed = JSON.parse(bodyJson) as ReqBody;
-    return lastUserTextFromParsed(parsed.messages);
+    return JSON.parse(text) as unknown;
   } catch {
-    return lastUserTextFromRaw(bodyJson);
+    return undefined;
   }
+}
+
+const CLOSING: Record<string, string> = { '[': ']', '{': '}' };
+
+function trackBracket(ch: string, stack: string[]): void {
+  if (ch === '[' || ch === '{') {
+    stack.push(ch);
+    return;
+  }
+  if (ch === ']' && stack.at(-1) === '[') {
+    stack.pop();
+    return;
+  }
+  if (ch === '}' && stack.at(-1) === '{') {
+    stack.pop();
+  }
+}
+
+function repairTruncated(text: string): string {
+  const stack: string[] = [];
+  let inStr = false;
+  let escape = false;
+  for (const ch of text) {
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inStr = !inStr;
+      continue;
+    }
+    if (inStr) continue;
+    trackBracket(ch, stack);
+  }
+  let result = text.trimEnd().replace(/,$/, '');
+  if (inStr) result += '"';
+  result += stack.reduceRight((acc, bracket) => acc + (CLOSING[bracket] ?? ''), '');
+  return result;
+}
+
+function peel(obj: unknown): unknown {
+  if (typeof obj !== 'string') return obj;
+  return tryLoad(obj) ?? tryLoad(repairTruncated(obj)) ?? obj;
+}
+
+export function decodeRawBody(raw: string): unknown {
+  const trimmed = raw.trimStart();
+  const truncAt = trimmed.indexOf('[TRUNCATED');
+  const text = truncAt !== -1 ? trimmed.slice(0, truncAt).trimEnd() : trimmed.trimEnd();
+
+  const direct = tryLoad(text);
+  if (direct !== undefined) return peel(direct);
+
+  const asString = tryLoad('"' + text + '"');
+  if (asString !== undefined) return peel(asString);
+
+  const repaired = tryLoad(repairTruncated(text));
+  if (repaired !== undefined) return peel(repaired);
+
+  const repairedAsString = tryLoad('"' + text + '"');
+  if (typeof repairedAsString === 'string') {
+    const inner = tryLoad(repairTruncated(repairedAsString));
+    if (inner !== undefined) return inner;
+  }
+
+  return null;
+}
+
+// ── Request message extraction ────────────────────────────────────────────────
+
+import type { RequestMessage, ResponseMessage } from '../../types.ts';
+
+export function extractRequestMessages(bodyJson: string, repair: boolean): RequestMessage[] | null {
+  const decoded = repair ? decodeRawBody(bodyJson) : tryLoad(bodyJson);
+  if (decoded === null || decoded === undefined || typeof decoded !== 'object') return null;
+  const messages = (decoded as ReqBody).messages;
+  if (!Array.isArray(messages)) return null;
+  return messages;
+}
+
+export function extractResponseMessages(bodyJson: string): ResponseMessage[] | null {
+  const decoded = tryLoad(bodyJson);
+  if (decoded === null || decoded === undefined || typeof decoded !== 'object') return null;
+  const content = (decoded as ResBody).content;
+  if (!Array.isArray(content)) return null;
+  return content;
 }
 
 function extractResponseTextFromBlock(block: {

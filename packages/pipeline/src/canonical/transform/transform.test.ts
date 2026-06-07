@@ -104,6 +104,7 @@ describe('transformTrace', () => {
     const child = nodes.find((n) => n.id === `s${CHILD_HEX}`);
     expect(child?.model).toBe('claude-sonnet-4-6');
     expect(child?.source).toBe('repl_main_thread');
+    expect(child?.request_messages).toEqual([{ role: 'user', content: 'Do the thing' }]);
     expect(child?.request).toBe('Do the thing');
     expect(child?.response).toBe('Done.');
     expect(child?.tokens_in).toBe(100);
@@ -113,7 +114,7 @@ describe('transformTrace', () => {
 
   it('smoke test: enrich then transform real fixture produces nodes', () => {
     const enriched = enrichTrace(traceFixture, logsFixture);
-    const nodes = transformTrace(enriched);
+    const nodes = transformTrace(enriched, true);
     expect(nodes.length).toBeGreaterThan(0);
     expect(nodes.some((n) => n.type === 'interaction')).toBe(true);
     expect(nodes.some((n) => n.type === 'llm_request')).toBe(true);
