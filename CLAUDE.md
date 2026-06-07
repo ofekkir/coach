@@ -9,6 +9,13 @@ Coach instead aims to reflect findings back to the **agent itself**, with the en
 that loop. How the loop is ultimately "closed" back to the agent is undecided — so **stage one
 targets the engineer** until we learn which problems are actually solvable.
 
+An emerging **second pillar** sits beside that optimization work (and does not replace it): because
+coach holds _complete sessions_ and _many of them_, it can infer user **intent in hindsight** and
+roll those inferences up across sessions into a per-agent **user model** — what users want, how they
+phrase it, what they leave unsaid, what needs clarification. That is a personalization signal
+population-level RLHF structurally cannot produce. See `docs/agent-model.md` for the conceptual
+model.
+
 **`ARCHITECTURE.md` is a living document** — update it in the same change whenever package
 layout, module boundaries, or data flow change. Consult it before architectural tasks.
 

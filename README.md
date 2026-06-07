@@ -7,6 +7,12 @@ Unlike tracing built for engineers to observe agents, coach aims to reflect find
 **agent itself**, with the engineer monitoring that loop. Stage one targets the engineer until we
 learn which problems are solvable.
 
+An emerging **second pillar** sits beside that optimization work: because coach holds _complete
+sessions_ and _many of them_, it can infer user **intent in hindsight** and aggregate it across
+sessions into a per-agent **user model** (what users want, how they phrase it, what they leave
+unsaid) — a personalization signal population-level RLHF cannot produce. See
+**[docs/agent-model.md](docs/agent-model.md)** for the conceptual model.
+
 See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the full picture: package layout, data flow, upload
 seam, and Vercel deployment.
 
