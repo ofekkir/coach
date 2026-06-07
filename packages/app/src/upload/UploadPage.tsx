@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UploadedFile, VizResult } from '@coach/pipeline';
 import { DropZone } from './DropZone/DropZone.tsx';
+import { PipelineOutputLoader } from './PipelineOutputLoader/PipelineOutputLoader.tsx';
 import { StagedFileList } from './StagedFileList/StagedFileList.tsx';
 import { useUploadHandlers } from './useUploadHandlers.ts';
 
@@ -119,6 +120,7 @@ export function UploadPage({ onResults }: Props) {
             {error}
           </p>
         )}
+        <PipelineOutputLoader onResults={onResults} />
       </div>
     </div>
   );

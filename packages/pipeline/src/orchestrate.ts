@@ -80,3 +80,11 @@ export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
   const title = agent?.user_id ?? 'agent';
   return [{ title, data: result.executionGraph }];
 }
+
+/**
+ * Builds a VizResult directly from a pre-computed ExecutionGraph (e.g. loaded
+ * from the e2e script's `05-execution-graph.json`), bypassing the full pipeline.
+ */
+export function buildVizResultFromExecutionGraph(graph: ExecutionGraph, title: string): VizResult {
+  return { title, data: graph };
+}
