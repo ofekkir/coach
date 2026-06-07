@@ -1,5 +1,5 @@
 import type { OtlpAttribute, OtlpSpan } from '../../types.ts';
-import { clampEnd, isoToNano, intAttr, spanB64, strAttr, summarizeInput } from './helpers.ts';
+import { clampEnd, isoToNano, intAttr, spanB64, strAttr } from './helpers.ts';
 import type { ContentBlock, LlmSpanMeta, NativeEntry } from './types.ts';
 import { collectContentBlocks, findEntryWithBlock, findTriggeringUser } from './parse.ts';
 
@@ -104,13 +104,11 @@ function buildToolSpan(
     resultEntry?.timestamp ? isoToNano(resultEntry.timestamp) : toolStart,
   );
 
-  const summary = summarizeInput(block.input);
   const toolAttrs: OtlpAttribute[] = [
     strAttr('span.type', 'tool'),
     strAttr('tool_name', block.name ?? 'unknown'),
   ];
-  if (summary != null) toolAttrs.push(strAttr('tool_input_summary', summary));
-  if (block.input != null) toolAttrs.push(strAttr('tool_input_json', JSON.stringify(block.input)));
+  if (block.input != null) toolAttrs.push(strAttr('tool_input', JSON.stringify(block.input)));
 
   return {
     traceId: tId,

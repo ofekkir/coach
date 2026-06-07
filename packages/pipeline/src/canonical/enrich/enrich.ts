@@ -1,12 +1,7 @@
 import type { LogEntry, OtlpAttribute, OtlpBatch, OtlpSpan, TempoTrace } from '../../types.ts';
 import { allSpansFlat, collectSpanMeta, strAttr } from './id-utils.ts';
 import type { SpanMeta } from './id-utils.ts';
-import {
-  attributeLogsToSpans,
-  buildRequestBodyIndex,
-  buildToolInputIndex,
-  summarizeToolInput,
-} from './logs.ts';
+import { attributeLogsToSpans, buildRequestBodyIndex, buildToolInputIndex } from './logs.ts';
 import { extractHooks, resolveHookParentB64 } from './hooks.ts';
 import type { HookEntry } from './hooks.ts';
 
@@ -73,10 +68,7 @@ function enrichLlmSpan(
 
 function enrichToolSpan(span: OtlpSpan, toolInput: string | null): OtlpSpan {
   if (toolInput == null) return span;
-  const extra: OtlpAttribute[] = [strAttr('tool_input_json', toolInput)];
-  const summary = summarizeToolInput(toolInput);
-  if (summary != null) extra.push(strAttr('tool_input_summary', summary));
-  return { ...span, attributes: [...span.attributes, ...extra] };
+  return { ...span, attributes: [...span.attributes, strAttr('tool_input', toolInput)] };
 }
 
 function enrichSpan(

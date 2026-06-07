@@ -45,27 +45,3 @@ export function strAttr(key: string, value: string): OtlpAttribute {
 export function intAttr(key: string, value: number): OtlpAttribute {
   return { key, value: { intValue: String(value) } };
 }
-
-function summarizeInputPreferred(obj: Record<string, unknown>, max: number): string | null {
-  const preferred = obj.command ?? obj.file_path ?? obj.skill ?? obj.query;
-  if (preferred == null) return null;
-  if (
-    typeof preferred === 'string' ||
-    typeof preferred === 'number' ||
-    typeof preferred === 'boolean'
-  ) {
-    return String(preferred).slice(0, max);
-  }
-  return null;
-}
-
-export function summarizeInput(input: unknown, max = 120): string | null {
-  if (input == null || typeof input !== 'object' || Array.isArray(input)) return null;
-  const obj = input as Record<string, unknown>;
-  const preferred = summarizeInputPreferred(obj, max);
-  if (preferred != null) return preferred;
-  for (const v of Object.values(obj)) {
-    if (typeof v === 'string' && v.length > 0) return v.slice(0, max);
-  }
-  return null;
-}
