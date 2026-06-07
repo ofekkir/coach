@@ -19,7 +19,6 @@ export interface ParsedSpan {
   readonly rawResponseBody: string | null;
   readonly costUsd: string | null;
   readonly toolInputSummary: string | null;
-  readonly toolInputJson: string | null;
   readonly hookName: string | null;
   readonly sequenceIndex: number | null;
 }
@@ -81,7 +80,6 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
         rawResponseBody: getStringAttr(span.attributes, 'raw_response_body'),
         costUsd: getStringAttr(span.attributes, 'cost_usd'),
         toolInputSummary: getStringAttr(span.attributes, 'tool_input_summary'),
-        toolInputJson: getStringAttr(span.attributes, 'tool_input_json'),
         hookName: getStringAttr(span.attributes, 'hook.name'),
         sequenceIndex: getIntAttr(span.attributes, 'interaction.sequence'),
       };

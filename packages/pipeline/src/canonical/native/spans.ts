@@ -110,7 +110,6 @@ function buildToolSpan(
     strAttr('tool_name', block.name ?? 'unknown'),
   ];
   if (summary != null) toolAttrs.push(strAttr('tool_input_summary', summary));
-  if (block.input != null) toolAttrs.push(strAttr('tool_input_json', JSON.stringify(block.input)));
 
   return {
     traceId: tId,
