@@ -8,7 +8,9 @@ import type { UploadedFile } from '@coach/pipeline';
 
 const arg = process.argv[2];
 if (!arg) {
-  log.error('Usage: pnpm e2e <path>  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website)');
+  log.error(
+    'Usage: pnpm e2e <path>  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website)',
+  );
   process.exit(1);
 }
 
