@@ -55,6 +55,9 @@ The pipeline **organizes** data; it does not decide how to render it. Graph node
 (each carries its full `CanonicalNode`) and carry **no formatted presentation** — no `labelLines`,
 no "+12ms" strings, no truncated titles. Presentation/label formatting was de-leaked out of the
 pipeline and into the app: the app derives all display text from the structured graph data.
+Beside `canonical`, execution nodes may carry **derived structural fields** that need thread
+ordering to compute — `requestMessagesDelta` / `responseMessagesDelta` on `llm_request` steps,
+the messages new to that step relative to the previous request in the same thread.
 
 ```
 Input files (accumulating — user stages N files/folders before submitting)
@@ -85,6 +88,9 @@ Input files (accumulating — user stages N files/folders before submitting)
                             agent ▸ session ▸ interaction ▸ thread ▸ step
                             each interaction has a synthesized user_prompt head node
                             (its input / goal source) carrying the full prompt — not a step
+                            llm_request steps carry requestMessagesDelta /
+                            responseMessagesDelta — the messages new to that step
+                            vs. the previous request in the same thread
         │
         ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)

@@ -1,4 +1,4 @@
-import type { CanonicalNode } from '../types.ts';
+import type { CanonicalNode, RequestMessage, ResponseMessage } from '../types.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Execution graph — the deterministic mechanical skeleton produced from the
@@ -20,12 +20,21 @@ export interface GraphEdge {
 
 /** A node in the execution skeleton. Lossless: `canonical` carries every field
  *  from the trace; `id` is hoisted (== canonical.id) for layout/expansion keys.
- *  Display text is the app's job — derive it from `canonical`. */
+ *  Display text is the app's job — derive it from `canonical`.
+ *
+ *  For `llm_request` nodes, `requestMessagesDelta` is the suffix of
+ *  `canonical.request_messages` beyond the previous request in the same thread
+ *  (the first request carries its full array). `responseMessagesDelta` is the
+ *  full `canonical.response_messages` — each response is always all-new (not
+ *  cumulative), so there is nothing to diff. Both fields are undefined on
+ *  non-`llm_request` nodes. */
 export interface ExecutionNode {
   readonly id: string;
   readonly canonical: CanonicalNode;
   readonly children: readonly ExecutionNode[];
   readonly innerEdges: readonly GraphEdge[];
+  readonly requestMessagesDelta?: readonly RequestMessage[];
+  readonly responseMessagesDelta?: readonly ResponseMessage[];
 }
 
 // ── Execution graph (mechanical) ──────────────────────────────────────────────

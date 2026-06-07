@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CanonicalNode } from '../../types.ts';
+import type { CanonicalNode, RequestMessage, ResponseMessage } from '../../types.ts';
 import type { AgentExecution, ExecutionGraph, ExecutionNode, Thread } from '../types.ts';
 import { buildExecutionGraph, buildInteractionExecution } from './execution.ts';
 
@@ -199,5 +199,116 @@ describe('buildExecutionGraph', () => {
   it('returns kind:interaction with null data when no interaction exists', () => {
     const graph = buildExecutionGraph([llm1]);
     expect(graph).toEqual({ kind: 'interaction', data: null });
+  });
+});
+
+// ── Message delta tests ──────────────────────────────────────────────────────
+
+const msg1: RequestMessage = { role: 'user', content: 'Hello' };
+const msg2: RequestMessage = { role: 'assistant', content: 'Hi there' };
+const msg3: RequestMessage = { role: 'user', content: 'Do the thing' };
+
+const resMsgs1: ResponseMessage[] = [{ type: 'text', text: 'Hi there' }];
+const resMsgs2: ResponseMessage[] = [{ type: 'tool_use', name: 'Read', id: 'tu1' }];
+
+function makeInteractionWithLlms(llmNodes: CanonicalNode[]): CanonicalNode[] {
+  return [{ id: 'root', type: 'interaction', prompt: 'test' }, ...llmNodes];
+}
+
+function findMember(
+  inter: ReturnType<typeof buildInteractionExecution>,
+  id: string,
+): ExecutionNode {
+  const member = inter?.threads[0]?.members.find((m) => m.id === id);
+  if (member == null) throw new Error(`member ${id} not found`);
+  return member;
+}
+
+describe('message deltas on thread members', () => {
+  it('first llm_request in thread gets its full request_messages as delta', () => {
+    const llm: CanonicalNode = {
+      id: 'llm1',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      start_time_ns: '100000000',
+      end_time_ns: '200000000',
+      request_messages: [msg1],
+      response_messages: resMsgs1,
+    };
+    const inter = buildInteractionExecution(makeInteractionWithLlms([llm]));
+    const member = findMember(inter, 'llm1');
+    expect(member.requestMessagesDelta).toEqual([msg1]);
+    expect(member.responseMessagesDelta).toEqual(resMsgs1);
+  });
+
+  it('subsequent llm_request gets suffix beyond previous request length as delta', () => {
+    const llmA: CanonicalNode = {
+      id: 'llmA',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      start_time_ns: '100000000',
+      end_time_ns: '200000000',
+      request_messages: [msg1, msg2],
+      response_messages: resMsgs1,
+    };
+    const llmB: CanonicalNode = {
+      id: 'llmB',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      start_time_ns: '300000000',
+      end_time_ns: '400000000',
+      request_messages: [msg1, msg2, msg3],
+      response_messages: resMsgs2,
+    };
+    const inter = buildInteractionExecution(makeInteractionWithLlms([llmA, llmB]));
+    const memberA = findMember(inter, 'llmA');
+    const memberB = findMember(inter, 'llmB');
+
+    expect(memberA.requestMessagesDelta).toEqual([msg1, msg2]);
+    expect(memberB.requestMessagesDelta).toEqual([msg3]);
+    expect(memberB.responseMessagesDelta).toEqual(resMsgs2);
+  });
+
+  it('single-request thread: delta equals full request_messages', () => {
+    const llm: CanonicalNode = {
+      id: 'llmOnly',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      start_time_ns: '100000000',
+      end_time_ns: '200000000',
+      request_messages: [msg1, msg2, msg3],
+      response_messages: resMsgs1,
+    };
+    const inter = buildInteractionExecution(makeInteractionWithLlms([llm]));
+    const member = findMember(inter, 'llmOnly');
+    expect(member.requestMessagesDelta).toEqual([msg1, msg2, msg3]);
+  });
+
+  it('tool nodes have no delta fields', () => {
+    const llm: CanonicalNode = {
+      id: 'llm1',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      start_time_ns: '100000000',
+      end_time_ns: '200000000',
+      request_messages: [msg1],
+    };
+    const tool: CanonicalNode = {
+      id: 'toolA',
+      type: 'tool',
+      parent: 'root',
+      name: 'Read',
+      start_time_ns: '210000000',
+      end_time_ns: '300000000',
+    };
+    const inter = buildInteractionExecution(makeInteractionWithLlms([llm, tool]));
+    const toolMember = findMember(inter, 'toolA');
+    expect(toolMember.requestMessagesDelta).toBeUndefined();
+    expect(toolMember.responseMessagesDelta).toBeUndefined();
   });
 });

@@ -124,9 +124,7 @@ export interface CanonicalNode {
   sequence?: number;
   prompt?: string;
   request_messages?: RequestMessage[];
-  request?: string;
   response_messages?: ResponseMessage[];
-  response?: string;
   stop_reason?: string;
   tokens_in?: number;
   tokens_out?: number;

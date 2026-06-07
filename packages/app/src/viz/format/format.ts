@@ -34,12 +34,27 @@ function optionalLine(
   return value != null ? [format(value)] : [];
 }
 
+function firstResponseText(
+  messages: readonly { type: string; text?: string; thinking?: string; name?: string }[],
+): string | null {
+  for (const block of messages) {
+    if (block.type === 'text' && block.text) return block.text;
+    if (block.type === 'tool_use' && block.name) return `tool_use: ${block.name}`;
+    if (block.type === 'thinking' && block.thinking && block.thinking !== '<REDACTED>') {
+      return block.thinking;
+    }
+  }
+  return null;
+}
+
 function llmRequestLines(node: CanonicalNode): string[] {
   const lines = ['llm_request'];
   if (node.model != null) lines.push(`model: ${node.model}`);
   if (node.source != null) lines.push(`source: ${node.source}`);
   if (node.prompt != null) lines.push(collapseWhitespace(node.prompt));
-  if (node.response != null) lines.push(collapseWhitespace(node.response));
+  const responseText =
+    node.response_messages != null ? firstResponseText(node.response_messages) : null;
+  if (responseText != null) lines.push(collapseWhitespace(responseText));
   return lines;
 }
 
