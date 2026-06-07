@@ -1,10 +1,25 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn } from 'node:child_process';
 import type { LabelBatchFn, LabelRequest } from '@coach/pipeline';
 
-const execFileAsync = promisify(execFile);
-
 const BATCH_SIZE = 25;
+const MAX_BUFFER = 4 * 1024 * 1024;
+const TIMEOUT_MS = 120_000;
+
+// ── Custom error carries subprocess output for diagnostics ────────────────────
+
+class ClaudeSubprocessError extends Error {
+  readonly stderr: string;
+  readonly stdout: string;
+
+  constructor(message: string, stderr: string, stdout: string) {
+    super(message);
+    this.name = 'ClaudeSubprocessError';
+    this.stderr = stderr;
+    this.stdout = stdout;
+  }
+}
+
+// ── Prompt ────────────────────────────────────────────────────────────────────
 
 function buildPrompt(batch: readonly LabelRequest[]): string {
   const nodes = batch.map((r) => {
@@ -27,27 +42,72 @@ Respond with ONLY a JSON array, no other text:
 [{"id":"<id>","what":"<description>"},...]`;
 }
 
-function extractErrorInfo(err: unknown): { message: string; stderr?: string; stdout?: string } {
-  const message = err instanceof Error ? err.message : String(err);
-  if (typeof err !== 'object' || err === null) return { message };
-  const rec = err as Record<string, unknown>;
-  const info: { message: string; stderr?: string; stdout?: string } = { message };
-  if (typeof rec.stderr === 'string' && rec.stderr.length > 0) info.stderr = rec.stderr;
-  if (typeof rec.stdout === 'string' && rec.stdout.length > 0) info.stdout = rec.stdout;
-  return info;
-}
+// ── Subprocess call ───────────────────────────────────────────────────────────
 
 async function callClaude(prompt: string): Promise<Map<string, string>> {
-  const { stdout, stderr } = await execFileAsync(
-    'claude',
-    ['-p', prompt, '--model', 'claude-haiku-4-5', '--output-format', 'json'],
-    { timeout: 120_000, maxBuffer: 4 * 1024 * 1024, encoding: 'utf8' },
-  );
-  if (stderr.length > 0) process.stderr.write(stderr);
-  const wrapper = JSON.parse(stdout) as { result: string };
-  const items = JSON.parse(wrapper.result) as { id: string; what: string }[];
-  return new Map(items.map((item) => [item.id, item.what]));
+  return new Promise((resolve, reject) => {
+    // stdio: ['ignore', ...] closes stdin so Claude does not wait for terminal input.
+    const proc = spawn(
+      'claude',
+      ['-p', prompt, '--model', 'claude-haiku-4-5', '--output-format', 'json'],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+
+    let stdout = '';
+    let stderr = '';
+
+    const timer = setTimeout(() => {
+      proc.kill();
+      reject(new ClaudeSubprocessError(`timed out after ${String(TIMEOUT_MS)}ms`, stderr, stdout));
+    }, TIMEOUT_MS);
+
+    proc.stdout.setEncoding('utf8');
+    proc.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+      if (stdout.length > MAX_BUFFER) proc.kill();
+    });
+
+    proc.stderr.setEncoding('utf8');
+    proc.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+      process.stderr.write(chunk);
+    });
+
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(new ClaudeSubprocessError(`exited with code ${String(code)}`, stderr, stdout));
+        return;
+      }
+      try {
+        const wrapper = JSON.parse(stdout) as { result?: string };
+        const resultText = wrapper.result;
+        if (resultText == null) {
+          reject(
+            new ClaudeSubprocessError(
+              `result field missing in response: ${stdout.slice(0, 300)}`,
+              stderr,
+              stdout,
+            ),
+          );
+          return;
+        }
+        const items = JSON.parse(resultText) as { id: string; what: string }[];
+        resolve(new Map(items.map((item) => [item.id, item.what])));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        reject(new ClaudeSubprocessError(`parse failed: ${msg}`, stderr, stdout));
+      }
+    });
+
+    proc.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
 }
+
+// ── Retry + fallback ──────────────────────────────────────────────────────────
 
 async function callClaudeWithRetry(
   prompt: string,
@@ -64,13 +124,16 @@ async function callClaudeWithRetry(
   } catch (err) {
     lastError = err;
   }
-  const { message, stderr, stdout } = extractErrorInfo(lastError);
+  const e = lastError instanceof ClaudeSubprocessError ? lastError : null;
   process.stderr.write(`[claude-labeler] batch failed (ids: ${batchIds.join(', ')})\n`);
-  process.stderr.write(`  error: ${message}\n`);
-  if (stderr != null) process.stderr.write(`  subprocess stderr:\n${stderr.slice(0, 1000)}\n`);
-  if (stdout != null) process.stderr.write(`  subprocess stdout:\n${stdout.slice(0, 500)}\n`);
+  process.stderr.write(
+    `  error: ${lastError instanceof Error ? lastError.message : String(lastError)}\n`,
+  );
+  if (e?.stdout) process.stderr.write(`  stdout: ${e.stdout.slice(0, 500)}\n`);
   return new Map();
 }
+
+// ── Public export ─────────────────────────────────────────────────────────────
 
 export const claudeLabelBatch: LabelBatchFn = async (requests) => {
   const results = new Map<string, string>();
