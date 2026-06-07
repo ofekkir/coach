@@ -2,8 +2,7 @@ import { SYNTHETIC_AGENT_ID, aggregateAgent, aggregateSession } from './aggregat
 import { toCanonical } from './canonical/canonical.ts';
 import { classifyInputs } from './classify/classify.ts';
 import { buildExecutionGraph } from './graph/execution/execution.ts';
-import { buildSemanticGraph } from './graph/semantic/semantic.ts';
-import type { ExecutionGraph, SemanticGraph, VizResult } from './graph/types.ts';
+import type { ExecutionGraph, VizResult } from './graph/types.ts';
 import { routeToSessions } from './route/route.ts';
 import type { CanonicalNode, ClassifiedInput, SessionInputs, UploadedFile } from './types.ts';
 
@@ -11,9 +10,8 @@ import type { CanonicalNode, ClassifiedInput, SessionInputs, UploadedFile } from
 
 /**
  * The orchestrator's output: every pipeline stage's result, exposed as a member.
- * The CLI dumps these to disk for inspection; the app reads the graph members it
- * wants to render. Stage 5 builds the mechanical `executionGraph`; stage 6 takes
- * that and builds the inferred `semanticGraph`.
+ * The CLI dumps these to disk for inspection; the app reads the graph member it
+ * wants to render. Stage 5 builds the mechanical `executionGraph`.
  */
 export interface PipelineResult {
   classified: ClassifiedInput[]; // Stage 1 — every file tagged by type
@@ -21,7 +19,6 @@ export interface PipelineResult {
   canonicalBySession: { sessionId: string; nodes: CanonicalNode[] }[]; // Stage 3
   agentGraph: CanonicalNode[]; // Stage 4 — all sessions under one agent
   executionGraph: ExecutionGraph; // Stage 5 — mechanical skeleton
-  semanticGraph: SemanticGraph; // Stage 6 — inferred layer over the execution graph
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -43,7 +40,7 @@ function sortByTime(nodes: readonly CanonicalNode[]): CanonicalNode[] {
  * stage's output. Pure and file-system-free — the CLI and the app both call it.
  *
  *   classify → route to sessions → to canonical (per session) → aggregate →
- *   execution graph → semantic graph
+ *   execution graph
  *
  * Multi-agent is out of scope: all sessions roll up under a single agent.
  */
@@ -59,15 +56,14 @@ export function runPipeline(files: readonly UploadedFile[]): PipelineResult {
   const allSessionNodes = aggregateSession(canonicalBySession.map((c) => c.nodes));
   const agentGraph = aggregateAgent(allSessionNodes);
   const executionGraph = buildExecutionGraph(agentGraph);
-  const semanticGraph = buildSemanticGraph(executionGraph);
 
-  return { classified, sessions, canonicalBySession, agentGraph, executionGraph, semanticGraph };
+  return { classified, sessions, canonicalBySession, agentGraph, executionGraph };
 }
 
 /**
- * Thin adapter for the app's data-source seam: runs the pipeline and wraps both
- * graphs in the `VizResult` shape the renderer consumes. Always emits one result
- * (single agent), or none when no session was produced.
+ * Thin adapter for the app's data-source seam: runs the pipeline and wraps the
+ * execution graph in the `VizResult` shape the renderer consumes. Always emits
+ * one result (single agent), or none when no session was produced.
  */
 export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
   const result = runPipeline(files);
@@ -82,6 +78,5 @@ export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
 
   const agent = result.agentGraph.find((n) => n.type === 'agent' && n.id !== SYNTHETIC_AGENT_ID);
   const title = agent?.user_id ?? 'agent';
-  const data = { execution: result.executionGraph, semantic: result.semanticGraph };
-  return [{ title, data }];
+  return [{ title, data: result.executionGraph }];
 }

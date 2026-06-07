@@ -6,8 +6,7 @@ import type {
 } from '@coach/pipeline';
 import { estimateNodeH } from './estimate.ts';
 import { buildLabelLines } from '../format/format.ts';
-import { link, placeThread } from './place-members.ts';
-import { pushStructural } from './place-segment.ts';
+import { link, placeThread, pushStructural } from './place-members.ts';
 import type { Ctx } from './types.ts';
 import { HG, LG, NW, VG } from './types.ts';
 
