@@ -3,14 +3,18 @@ import type { ExecutionNode } from '../types.ts';
 
 // ── Message delta helpers ───────────────────────────────────────────────────
 
-/** Suffix of `current` beyond `previousCount`. Returns full array when previous
- *  was shorter (first request, compaction, or truncation). */
+function messageKey(msg: RequestMessage): string {
+  return JSON.stringify(msg);
+}
+
+/** Messages in `current` not already present in `seenKeys`. Works for both
+ *  cumulative (OTEL) and already-delta (native) formats. */
 function requestMessagesDelta(
   current: readonly RequestMessage[] | undefined,
-  previousCount: number,
+  seenKeys: ReadonlySet<string>,
 ): readonly RequestMessage[] | undefined {
   if (current == null) return undefined;
-  return current.slice(previousCount);
+  return current.filter((msg) => !seenKeys.has(messageKey(msg)));
 }
 
 /** Annotates a base ExecutionNode with llm_request delta fields when the node
@@ -18,10 +22,10 @@ function requestMessagesDelta(
 export function withLlmDeltas(
   base: ExecutionNode,
   node: CanonicalNode,
-  prevLlmMessageCount: number,
+  seenMessageKeys: ReadonlySet<string>,
 ): ExecutionNode {
   if (node.type !== 'llm_request') return base;
-  const reqDelta = requestMessagesDelta(node.request_messages, prevLlmMessageCount);
+  const reqDelta = requestMessagesDelta(node.request_messages, seenMessageKeys);
   const resDelta = node.response_messages as readonly ResponseMessage[] | undefined;
   return {
     ...base,
