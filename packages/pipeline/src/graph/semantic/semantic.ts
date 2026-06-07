@@ -25,8 +25,8 @@ export interface LabelRequest {
   kind: 'tool' | 'llm_request';
   name?: string;
   tool_input?: string;
-  prompt?: string;
-  response?: string;
+  request_delta?: string;
+  response_delta?: string;
 }
 
 /**
@@ -44,7 +44,8 @@ function trunc(s: string): string {
   return s.length <= TRUNCATE_LEN ? s : s.slice(0, TRUNCATE_LEN) + '…';
 }
 
-function toRequest(canonical: CanonicalNode): LabelRequest | null {
+function toRequest(node: ExecutionNode): LabelRequest | null {
+  const canonical = node.canonical;
   if (canonical.type === 'tool') {
     const req: LabelRequest = { id: canonical.id, kind: 'tool' };
     if (canonical.name != null) req.name = canonical.name;
@@ -53,15 +54,17 @@ function toRequest(canonical: CanonicalNode): LabelRequest | null {
   }
   if (canonical.type === 'llm_request') {
     const req: LabelRequest = { id: canonical.id, kind: 'llm_request' };
-    if (canonical.request != null) req.prompt = trunc(canonical.request);
-    if (canonical.response != null) req.response = trunc(canonical.response);
+    if (node.requestMessagesDelta != null)
+      req.request_delta = trunc(JSON.stringify(node.requestMessagesDelta));
+    if (node.responseMessagesDelta != null)
+      req.response_delta = trunc(JSON.stringify(node.responseMessagesDelta));
     return req;
   }
   return null;
 }
 
 function collectFromNode(node: ExecutionNode, acc: LabelRequest[]): void {
-  const req = toRequest(node.canonical);
+  const req = toRequest(node);
   if (req != null) acc.push(req);
   for (const child of node.children) collectFromNode(child, acc);
 }

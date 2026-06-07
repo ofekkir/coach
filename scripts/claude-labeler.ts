@@ -26,7 +26,12 @@ function buildPrompt(batch: readonly LabelRequest[]): string {
   const nodes = batch.map((r) => {
     if (r.kind === 'tool')
       return { id: r.id, kind: r.kind, name: r.name ?? '', input: r.tool_input ?? '' };
-    return { id: r.id, kind: r.kind, prompt: r.prompt ?? '', response: r.response ?? '' };
+    return {
+      id: r.id,
+      kind: r.kind,
+      request_delta: r.request_delta ?? '',
+      response_delta: r.response_delta ?? '',
+    };
   });
 
   return `Label each agent execution node with a short "what" description (max 12 words, no filler).
