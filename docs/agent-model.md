@@ -33,10 +33,11 @@ The model is a mechanical skeleton with a semantic layer laid over it.
 
 ```
                          MECHANICAL (from spans)            SEMANTIC (inferred — Coach's value)
-  agent                  user.id                            —
-   └─ session            session.id                         —
-       └─ interaction    claude_code.interaction span       has a GOAL
-            │            (one per user prompt;
+  agent                  user.id                            the USER MODEL (rolled up across
+   │                                                          all sessions — see below)
+   └─ session            session.id                         intent themes; recurring (mis)reads
+       └─ interaction    claude_code.interaction span       carries 1..n INTENTS (a GOAL is the
+            │            (one per user prompt;                 agent's operative read of one)
             │             interaction.sequence)
             │
             ├─ user prompt ─ the interaction's INPUT ──────── states the GOAL (which the
@@ -199,3 +200,97 @@ Because every level is named, findings can be keyed precisely:
 
 This is what "reflecting findings back to the agent" stands on: a shared, precise vocabulary
 for _which_ part of its own behavior the agent is being told about.
+
+## Hindsight intent & the user model
+
+Everything above describes a _single_ interaction. Two facts change the picture once Coach holds
+**complete sessions** — and **many of them**. This section is more forward-looking than the rest of
+the document; it records where the model is heading, not a built stage.
+
+### Intent is recoverable in hindsight
+
+A live agent infers intent _forward_, with no feedback, and must guess when a prompt is
+under-specified. Coach reads the trace _backward_: a later interaction that corrects ("no, I meant
+staging"), re-asks, or confirms ("that worked") is a **label** on whether the earlier intent was
+understood. The completed session is the supervised signal the live agent never had.
+
+So Coach can do **retrospective intent inference** — derive what the user _actually_ wanted, scored
+against what the agent's segments actually served, and surface the gap. **Intent is the user side;
+the goal/segment is the agent side** — the operative goal is what the agent _did_, the intent is
+what the user _meant_, and the distance between them is the core error class:
+
+- intent with no segment serving it → **ignored ask**
+- segment serving no intent → **drift / unrequested work**
+- right intent, wrong shape → a query answered agentically (overkill), or an agentic need answered
+  as a query (under-delivery)
+
+This is also why an interaction **carries 1..n intents** rather than a single GOAL: "fix these two
+bugs and remind me of X" is a flat set of co-equal intents, not one goal with sub-goals.
+Goal-decomposition is the special case where n = 1.
+
+### Aggregation across sessions → the user model
+
+This is what fills the empty SEMANTIC cells at the **session** and **agent** levels in the
+hierarchy above. The semantic layer is not only a per-interaction overlay — it **rolls up**:
+
+| Level         | Semantic rollup                                                         |
+| ------------- | ----------------------------------------------------------------------- |
+| _interaction_ | intent(s) + fulfillment — diagnosis: was this ask understood?           |
+| _session_     | recurring intent themes; how intents were systematically mis-/well-read |
+| _agent_       | the **user model** — a distilled, per-agent (or per-user) prior         |
+
+The user model is what they want, how they phrase it, what they leave unsaid that can be safely
+inferred, and what genuinely needs a clarifying question — for example:
+
+- _intent-translation_ — says "fix X" but means "fix X **and** add a test"
+- _shape priors_ — this user's "quick question" is never a query, always agentic
+- _style_ — wants the diff, not the explanation
+- _standing constraints_ — "clean up" means lint+format, never refactor
+
+The user model is the artifact **RLHF structurally cannot produce**. RLHF bakes a
+_population-averaged_ policy into _shared weights_, frozen at training time and identical for every
+user; the only per-user channel a deployed model has is its **context**. Coach computes a per-user
+_correction_ to that population prior and feeds it into exactly that channel — it does not compete
+with fine-tuning, it supplies the one input fine-tuning leaves open. The loop closes at the
+**agent** node: the semantic layer is a function from a session forest to an agent-level user
+model, which is both an output (to the engineer/agent) and an input (to future runs).
+
+### The consequence: aggregation forces canonicalization
+
+"This user keeps doing X" is only computable if X has a stable identity. Free-text intent per
+interaction supports _diagnosis_ but cannot be _rolled up_. Aggregation therefore demands a
+canonical form (a typed schema, or embeddings + clustering), and the bounded context channel forces
+the same compression — you cannot feed "all sessions" forward, you must distill to a compact prior.
+That distillation **is** the hard problem, and it is literally "learn a user model." The
+open-vocabulary tension noted for verbs reappears here, sharper.
+
+### Two honest caveats
+
+- **Credit assignment is confounded.** A bad session may be the agent's misread _or_ a genuinely
+  vague prompt — and those imply opposite fixes (correct the agent vs. ask the user to be clearer).
+  The user model learns noise if the two are not separated.
+- **This is a second pillar, not a replacement.** Coach's first pillar stands: harness optimization
+  — accuracy, latency, cost, hallucination/operational-error detection, engineer-facing. The user
+  model is a _different output with a different consumer_ (the agent, for personalization). Both
+  rest on the same intent-inference machinery; keep them distinct in scope and success metrics.
+
+### Prior art
+
+This model synthesizes five literatures, each of which owns one piece. The intersection —
+_recover intent retrospectively from an execution trace, then aggregate it into a per-agent prior
+fed back into the loop_ — is what is novel here.
+
+- **The gap** — Norman's [Gulf of Execution & Gulf of Evaluation](https://en.wikipedia.org/wiki/Gulf_of_execution):
+  intention vs. what the system affords/shows.
+- **Meaning beyond the literal** — Grice's [Cooperative Principle & implicature](https://plato.stanford.edu/entries/implicature/):
+  inferring intent the prompt left unsaid.
+- **Understanding as a process** — Clark & Brennan, ["Grounding in Communication"](https://web.stanford.edu/~clark/1990s/Clark,%20H.H.%20_%20Brennan,%20S.E.%20_Grounding%20in%20communication_%201991.pdf):
+  common ground and its breakdown; corrections/re-asks are grounding signals.
+- **Inferring intent from actions** — plan / goal / intention recognition and the
+  [BDI](https://en.wikipedia.org/wiki/Belief%E2%80%93desire%E2%80%93intention_software_model)
+  (desire = goal, intention = committed plan) lineage.
+- **Following intent, population-level** — Ouyang et al.,
+  [InstructGPT](https://arxiv.org/abs/2203.02155): alignment = following explicit + implicit intent,
+  but baked into shared weights — the reason per-user adaptation must live in context, not weights.
+- **The user model** — personalization beyond RLHF
+  ([survey](https://arxiv.org/html/2411.00027v3); [learning to remember conversations](https://arxiv.org/pdf/2411.13405)).
