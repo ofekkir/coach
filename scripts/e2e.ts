@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { log } from '@coach/logger';
-import { enrichExecutionGraph, runPipeline } from '@coach/pipeline';
+import { runPipelineAsync } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
 import { claudeLabelBatch } from './claude-labeler.ts';
 
@@ -56,7 +56,7 @@ function dump(stepLabel: string, data: unknown): void {
 const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
-const result = runPipeline(files);
+const result = await runPipelineAsync(files, enrichFlag ? claudeLabelBatch : undefined);
 
 // Input-bearing members are projected to names/types so the dumps stay readable;
 // the graph members are dumped in full — they are the point of inspection.
@@ -75,11 +75,8 @@ dump(
 dump('03-canonical-by-session', result.canonicalBySession);
 dump('04-agent-graph', result.agentGraph);
 dump('05-execution-graph', result.executionGraph);
-
-if (enrichFlag) {
-  log.info('enriching execution graph via claude -p (this may take a moment)…');
-  const enriched = await enrichExecutionGraph(result.executionGraph, claudeLabelBatch);
-  dump('06-enriched-graph', { executionGraph: enriched });
+if (result.enrichedGraph != null) {
+  dump('06-enriched-graph', { executionGraph: result.enrichedGraph });
 }
 
 const unsupported = result.classified.filter((c) => c.type === 'unsupported');

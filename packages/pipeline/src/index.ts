@@ -33,5 +33,10 @@ export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 export type { LabelBatchFn, LabelRequest } from './graph/semantic/semantic.ts';
 
 // Orchestration
-export { buildVizResultFromExecutionGraph, buildVizResults, runPipeline } from './orchestrate.ts';
+export {
+  buildVizResultFromExecutionGraph,
+  buildVizResults,
+  runPipeline,
+  runPipelineAsync,
+} from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';
