@@ -92,6 +92,11 @@ Input files (accumulating — user stages N files/folders before submitting)
                             responseMessagesDelta — the messages new to that step
                             vs. the previous request in the same thread
         │
+        ▼  Stage 6 (opt-in) — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
+   enrichExecutionGraph()  converts tool → action and llm_request → inference nodes
+                            using an injected LabelBatchFn callback; only runs when
+                            --enrich is passed to the e2e script (no LLM calls otherwise)
+        │
         ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)
 ```
@@ -153,13 +158,14 @@ pipeline output format being reworked.
 `scripts/viz.ts`, `scripts/enrich.ts`, `scripts/etl.ts` — were removed; `e2e` covers the full
 pipeline.)
 
-| Member file                    | Stage | Contents                                           |
-| ------------------------------ | ----- | -------------------------------------------------- |
-| `01-classified.json`           | 1     | each file's name/path/type                         |
-| `02-sessions.json`             | 2     | session id, kind, and member filenames per session |
-| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session                      |
-| `04-agent-graph.json`          | 4     | the single-agent `CanonicalNode[]` forest          |
-| `05-execution-graph.json`      | 5     | `ExecutionGraph` (the mechanical skeleton)         |
+| Member file                    | Stage    | Contents                                                           |
+| ------------------------------ | -------- | ------------------------------------------------------------------ |
+| `01-classified.json`           | 1        | each file's name/path/type                                         |
+| `02-sessions.json`             | 2        | session id, kind, and member filenames per session                 |
+| `03-canonical-by-session.json` | 3        | `CanonicalNode[]` per session                                      |
+| `04-agent-graph.json`          | 4        | the single-agent `CanonicalNode[]` forest                          |
+| `05-execution-graph.json`      | 5        | `ExecutionGraph` (the mechanical skeleton)                         |
+| `06-enriched-graph.json`       | 6 opt-in | `ExecutionGraph` with action/inference nodes (requires `--enrich`) |
 
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one upload all flow through
 the same five stages. The CLI populates `UploadedFile.path` relative to the gather root so the

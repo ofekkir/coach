@@ -47,6 +47,36 @@ function firstResponseText(
   return null;
 }
 
+function formatToolInput(input: string): string {
+  try {
+    const parsed = JSON.parse(input) as Record<string, unknown>;
+    const pairs = Object.entries(parsed)
+      .map(([k, v]) => `${k}: ${String(v)}`)
+      .join(', ');
+    return truncate(pairs, 120);
+  } catch {
+    return truncate(input, 120);
+  }
+}
+
+function actionLines(node: CanonicalNode): string[] {
+  return [
+    'action',
+    ...(node.what != null ? [node.what] : optionalLine(node.name, (n) => `name: ${n}`)),
+    ...optionalLine(node.tool_input, formatToolInput),
+  ];
+}
+
+function inferenceLines(node: CanonicalNode): string[] {
+  const responseText =
+    node.response_messages != null ? firstResponseText(node.response_messages) : null;
+  return [
+    'inference',
+    ...(node.what != null ? [node.what] : optionalLine(node.model, (m) => `model: ${m}`)),
+    ...optionalLine(responseText, (o) => `output: ${truncate(collapseWhitespace(o), 500)}`),
+  ];
+}
+
 function llmRequestLines(node: CanonicalNode): string[] {
   const lines = ['llm_request'];
   if (node.model != null) lines.push(`model: ${node.model}`);
@@ -79,45 +109,28 @@ export function threadTitle(source: string): string {
   return `thread: ${source}`;
 }
 
-function formatToolInput(input: string): string {
-  try {
-    const parsed = JSON.parse(input) as Record<string, unknown>;
-    const pairs = Object.entries(parsed)
-      .map(([k, v]) => `${k}: ${String(v)}`)
-      .join(', ');
-    return truncate(pairs, 120);
-  } catch {
-    return truncate(input, 120);
-  }
-}
+type LineBuilder = (node: CanonicalNode, index: number) => string[];
+
+const TYPE_LINE_BUILDERS: Partial<Record<string, LineBuilder>> = {
+  agent: (n) => ['agent', ...optionalLine(n.user_id)],
+  session: (n, i) => ['session', sessionTitle(n, i)],
+  interaction: (n, i) => ['interaction', interactionTitle(n, i)],
+  user_prompt: (n) => ['user_prompt', ...optionalLine(n.prompt, collapseWhitespace)],
+  llm_request: (n) => llmRequestLines(n),
+  tool: (n) => [
+    'tool',
+    ...optionalLine(n.name, (x) => `name: ${x}`),
+    ...optionalLine(n.tool_input, formatToolInput),
+  ],
+  'tool.blocked_on_user': () => ['blocked_on_user'],
+  'tool.execution': () => ['execution'],
+  hook: (n) => ['hook', ...optionalLine(n.name, (x) => `name: ${x}`)],
+  action: (n) => actionLines(n),
+  inference: (n) => inferenceLines(n),
+};
 
 function typeLines(node: CanonicalNode, index: number): string[] {
-  switch (node.type) {
-    case 'agent':
-      return ['agent', ...optionalLine(node.user_id)];
-    case 'session':
-      return ['session', sessionTitle(node, index)];
-    case 'interaction':
-      return ['interaction', interactionTitle(node, index)];
-    case 'user_prompt':
-      return ['user_prompt', ...optionalLine(node.prompt, collapseWhitespace)];
-    case 'llm_request':
-      return llmRequestLines(node);
-    case 'tool':
-      return [
-        'tool',
-        ...optionalLine(node.name, (n) => `name: ${n}`),
-        ...optionalLine(node.tool_input, formatToolInput),
-      ];
-    case 'tool.blocked_on_user':
-      return ['blocked_on_user'];
-    case 'tool.execution':
-      return ['execution'];
-    case 'hook':
-      return ['hook', ...optionalLine(node.name, (n) => `name: ${n}`)];
-    default:
-      return [node.type];
-  }
+  return TYPE_LINE_BUILDERS[node.type]?.(node, index) ?? [node.type];
 }
 
 /** The full ordered label lines for a node: `[type, ...details, duration?, tokens?, cost?]`.

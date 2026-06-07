@@ -95,7 +95,9 @@ export type NodeType =
   | 'tool'
   | 'tool.blocked_on_user'
   | 'tool.execution'
-  | 'hook';
+  | 'hook'
+  | 'action' // enriched: tool → semantically-labeled action
+  | 'inference'; // enriched: llm_request → semantically-labeled inference
 
 export interface RequestMessage {
   role: string;
@@ -130,4 +132,5 @@ export interface CanonicalNode {
   tokens_out?: number;
   cost_usd?: number;
   tool_input?: string;
+  what?: string; // enriched: LLM-generated one-liner (action/inference nodes only)
 }

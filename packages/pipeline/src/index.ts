@@ -28,6 +28,10 @@ export type {
   VizResult,
 } from './graph/types.ts';
 
+// Semantic enrichment stage (opt-in; LLM adapter injected by caller)
+export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
+export type { LabelBatchFn, LabelRequest } from './graph/semantic/semantic.ts';
+
 // Orchestration
 export { buildVizResultFromExecutionGraph, buildVizResults, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';
