@@ -14,7 +14,7 @@ import type { UploadedFile, VizResult } from '@coach/pipeline';
  *   });
  *   return res.json() as Promise<VizResult[]>;
  *
- * The visualization layer depends only on VizResult / GraphData — it never imports
+ * The visualization layer depends only on VizResult / ExecutionGraph — it never imports
  * pipeline internals directly.
  */
 export async function processUploads(files: UploadedFile[]): Promise<VizResult[]> {

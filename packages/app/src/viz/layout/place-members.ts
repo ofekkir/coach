@@ -6,7 +6,7 @@ import { buildLabelLines, formatGap, threadTitle } from '../format/format.ts';
 import type { Ctx, TraceRFNodeData } from './types.ts';
 import { VG } from './types.ts';
 
-export function push(id: string, x: number, y: number, data: TraceRFNodeData, ctx: Ctx): void {
+function push(id: string, x: number, y: number, data: TraceRFNodeData, ctx: Ctx): void {
   ctx.nodes.push({
     id,
     type: 'trace',
@@ -32,6 +32,35 @@ export function link(src: string, tgt: string, label: string | undefined, ctx: C
     style: { stroke: '#cbd5e1', strokeWidth: 1.5 },
     markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1', width: 14, height: 14 },
   });
+}
+
+/** Reusable card push for a structural execution node (agent/session/interaction/member). */
+export function pushStructural(
+  node: ExecutionNode,
+  kind: TraceRFNodeData['kind'],
+  x: number,
+  y: number,
+  hasKids: boolean,
+  ctx: Ctx,
+): void {
+  const labelLines = buildLabelLines(node.canonical);
+  const type = labelLines[0] ?? '';
+  push(
+    node.id,
+    x,
+    y,
+    {
+      kind,
+      labelLines,
+      canonical: node.canonical,
+      color: colorOf(type),
+      fill: fillOf(type),
+      hasRFChildren: hasKids,
+      isExpanded: ctx.expanded.has(node.id),
+      selected: node.id === ctx.selected,
+    },
+    ctx,
+  );
 }
 
 function pushExecNode(
@@ -66,7 +95,7 @@ function pushExecNode(
 // Recursively places a node's children when expanded — each child that itself has
 // expanded children drills in further (e.g. tool ▸ tool.execution ▸ llm_request).
 // Returns the bottom y and the last-placed id so the next sibling chains from it.
-export function placeSubtree(
+function placeSubtree(
   node: ExecutionNode,
   tx: number,
   startY: number,
