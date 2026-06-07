@@ -35,5 +35,5 @@ export type {
 } from './graph/types.ts';
 
 // Orchestration
-export { buildVizResults, runPipeline } from './orchestrate.ts';
+export { buildVizResultFromExecutionGraph, buildVizResults, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';

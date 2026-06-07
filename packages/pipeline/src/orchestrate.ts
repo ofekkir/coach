@@ -85,3 +85,13 @@ export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
   const data = { execution: result.executionGraph, semantic: result.semanticGraph };
   return [{ title, data }];
 }
+
+/**
+ * Builds a VizResult directly from a pre-computed ExecutionGraph (e.g. loaded
+ * from the e2e script's `05-execution-graph.json`). Derives the semantic graph
+ * in-browser from the supplied execution graph — the full pipeline is skipped.
+ */
+export function buildVizResultFromExecutionGraph(graph: ExecutionGraph, title: string): VizResult {
+  const semantic = buildSemanticGraph(graph);
+  return { title, data: { execution: graph, semantic } };
+}

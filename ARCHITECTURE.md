@@ -18,6 +18,7 @@ The system is split into three packages plus a Node CLI layer:
 │  React SPA · Upload UI · Graph renderer                 │
 │                                                         │
 │  upload/UploadPage.tsx ──► data-source.ts ──► viz/App   │
+│  (raw logs or pre-computed JSON)                        │
 │                               │                         │
 │           ┌───────────────────┘                         │
 │           ▼                                             │
@@ -108,8 +109,10 @@ consumed only by the renderer — no raw `CanonicalNode[]` reaches the visualiza
 
 ## Upload flow and the data-source seam
 
+The app has two intake paths, both converging on `VizResult[]` before the renderer:
+
 ```
-Browser
+Browser — path 1: raw log files (full pipeline)
   UploadPage.tsx  (accumulating staging UI)
     ├── "Add files" button   → <input multiple>
     ├── "Add folder" button  → <input multiple webkitdirectory>
@@ -123,11 +126,28 @@ Browser
                               → execution graph → semantic graph
                               └── VizResult[]  (one result, both graphs)
                                     └── App.tsx renders the graph (derives all display text)
+
+Browser — path 2: pre-computed pipeline output (bypasses the pipeline)
+  UploadPage.tsx  (PipelineOutputLoader)
+    └── "Load pipeline output" → <input accept=".json"> single file
+          └── data-source.ts :: loadPipelineOutput(jsonText, fileName)
+                ├── extractExecutionGraph(raw)   ← detects bare ExecutionGraph
+                │     or object wrapping one     ← or wrapper with executionGraph key
+                └── @coach/pipeline :: buildVizResultFromExecutionGraph(graph, title)
+                      └── buildSemanticGraph(graph) — derived in-browser from the graph
+                            └── VizResult  (file name without extension as title)
+                                  └── App.tsx renders the graph unchanged
 ```
 
-**`packages/app/src/data-source.ts` is the single swap point** for moving processing to a
-backend. Replace its body with a `fetch('/api/process', ...)` call and nothing else in the
-app changes — the visualization layer depends only on `VizResult` / `GraphData`.
+**`packages/app/src/data-source.ts` is the single swap point** for moving raw-log
+processing to a backend. Replace `processUploads`'s body with a `fetch('/api/process', ...)`
+call and nothing else in the app changes — the visualization layer depends only on
+`VizResult` / `GraphData`.
+
+`loadPipelineOutput` and `extractExecutionGraph` live alongside it. The shape-detection
+logic is centralized in `extractExecutionGraph`: it accepts a bare `ExecutionGraph` (the
+e2e script's direct output) or any object with an `executionGraph` member, tolerating the
+pipeline output format being reworked.
 
 ## Fixture modes
 
