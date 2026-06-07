@@ -47,9 +47,11 @@ Respond with ONLY a JSON array, no other text:
 async function callClaude(prompt: string): Promise<Map<string, string>> {
   return new Promise((resolve, reject) => {
     // stdio: ['ignore', ...] closes stdin so Claude does not wait for terminal input.
+    // --output-format text gives the model's response directly; we parse it as JSON
+    // ourselves (simpler than hunting the result event in the stream-json array).
     const proc = spawn(
       'claude',
-      ['-p', prompt, '--model', 'claude-haiku-4-5', '--output-format', 'json'],
+      ['-p', prompt, '--model', 'claude-haiku-4-5', '--output-format', 'text'],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
 
@@ -80,19 +82,10 @@ async function callClaude(prompt: string): Promise<Map<string, string>> {
         return;
       }
       try {
-        const wrapper = JSON.parse(stdout) as { result?: string };
-        const resultText = wrapper.result;
-        if (resultText == null) {
-          reject(
-            new ClaudeSubprocessError(
-              `result field missing in response: ${stdout.slice(0, 300)}`,
-              stderr,
-              stdout,
-            ),
-          );
-          return;
-        }
-        const items = JSON.parse(resultText) as { id: string; what: string }[];
+        // Extract the first JSON array from the response (handles any preamble text).
+        const match = /\[[\s\S]*\]/.exec(stdout);
+        const jsonText = match != null ? match[0] : stdout.trim();
+        const items = JSON.parse(jsonText) as { id: string; what: string }[];
         resolve(new Map(items.map((item) => [item.id, item.what])));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
