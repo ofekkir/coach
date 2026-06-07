@@ -18,7 +18,7 @@ seam, and Vercel deployment.
 
 ## Pipeline
 
-`runPipeline(files)` (@coach/pipeline) runs six named stages, each exposed as a member of
+`runPipeline(files)` (@coach/pipeline) runs five named stages, each exposed as a member of
 the returned `PipelineResult`:
 
 ```
@@ -32,16 +32,13 @@ UploadedFile[]   (*.jsonl · logs.json + trace*.json)
         ▼ 4. aggregate       all sessions under one agent → agentGraph (CanonicalNode[])
         ▼ 5. execution graph buildExecutionGraph → executionGraph (ExecutionGraph)
                                the mechanical skeleton: agent ▸ session ▸ interaction ▸ thread ▸ step
-        ▼ 6. semantic graph  buildSemanticGraph(executionGraph) → semanticGraph (SemanticGraph)
-                               the inferred overlay: segments + verbs/moves + interaction shape
         │
         ▼ React Flow graph   (@coach/app, via the buildVizResults adapter)
 ```
 
-`agentGraph` is itself a visualisable graph. The **execution graph** is the deterministic skeleton;
-the **semantic graph** takes it as input and lays Coach's inferred sub-goal/verb overlay over it (a
-semantic node wraps the execution node it interprets). The pipeline organizes data losslessly and
-carries no presentation — the app derives all display text. The graphs are consumed only by the
+`agentGraph` is itself a visualisable graph. The **execution graph** is the deterministic skeleton.
+`VizResult.data` is the `ExecutionGraph` directly. The pipeline organizes data losslessly and
+carries no presentation — the app derives all display text. The graph is consumed only by the
 renderer; no raw `CanonicalNode[]` reaches the visualization layer.
 
 ### Upload model
@@ -56,7 +53,7 @@ single **agent** (multi-agent is out of scope). Use the staging UI to mix files 
 `pnpm e2e` accepts a path (relative to cwd) or a fixture name under
 `packages/pipeline/fixtures/`. It dumps each stage member to `out/<name>/`:
 `01-classified.json`, `02-sessions.json`, `03-canonical-by-session.json`,
-`04-agent-graph.json`, `05-execution-graph.json`, `06-semantic-graph.json`.
+`04-agent-graph.json`, `05-execution-graph.json`.
 
 ## Quick start
 

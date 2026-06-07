@@ -29,9 +29,3 @@ export function colorOf(type: string): string {
 export function fillOf(type: string): string {
   return TYPE_FILLS[type] ?? '#f8fafc';
 }
-
-const SEGMENT_ACCENT_COLORS = ['#5599BB', '#44AA99', '#CC6677', '#882255', '#117733'];
-
-export function segmentAccentOf(index: number): string {
-  return SEGMENT_ACCENT_COLORS[index % SEGMENT_ACCENT_COLORS.length] ?? '#94a3b8';
-}

@@ -25,7 +25,7 @@ The system is split into three packages plus a Node CLI layer:
 │  @coach/pipeline (packages/pipeline)                    │
 │  Pure data processing · No node:* imports               │
 │  classify → route → canonical → aggregate →             │
-│            execution graph → semantic graph             │
+│            execution graph                              │
 └─────────────────────────────────────────────────────────┘
 
 scripts/          Node CLI — reads from disk, writes JSON artifacts
@@ -37,19 +37,19 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Package layout
 
-| Package / dir       | Purpose                                                                                                                                                                                                                            |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/logger`   | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                      |
-| `packages/pipeline` | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → semantic graph, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike. |
-| `packages/app`      | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                             |
-| `scripts/`          | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                     |
+| Package / dir       | Purpose                                                                                                                                                                                                           |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/logger`   | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                     |
+| `packages/pipeline` | Pure staged pipeline: classify → route → canonical → aggregate → execution graph, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike. |
+| `packages/app`      | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                            |
+| `scripts/`          | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                    |
 
 ## Data flow
 
-`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files): PipelineResult` — six
+`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files): PipelineResult` — five
 named stages, each surfaced as a member: `classified`, `sessions`, `canonicalBySession`,
-`agentGraph`, `executionGraph`, `semanticGraph`. It is pure and file-system-free; the CLI and the
-app both call it. `buildVizResults` is a thin adapter that wraps the two graphs for the renderer.
+`agentGraph`, `executionGraph`. It is pure and file-system-free; the CLI and the app both
+call it. `buildVizResults` is a thin adapter that wraps the execution graph for the renderer.
 
 The pipeline **organizes** data; it does not decide how to render it. Graph nodes are **lossless**
 (each carries its full `CanonicalNode`) and carry **no formatted presentation** — no `labelLines`,
@@ -86,25 +86,16 @@ Input files (accumulating — user stages N files/folders before submitting)
                             each interaction has a synthesized user_prompt head node
                             (its input / goal source) carrying the full prompt — not a step
         │
-        ▼  Stage 6 — graph/semantic/semantic.ts     → semanticGraph: SemanticGraph
-   buildSemanticGraph(executionGraph)  Coach's inferred layer laid over execution:
-                            per interaction → per thread, steps group into segments
-                            (sub-goals). A step (inference|action, + verbs/moves) WRAPS one
-                            execution node — structural sharing, not copies. V1 segments
-                            per thread, preserving threading (segmentation is still a stub).
-        │
-        ▼  buildVizResults() adapter → VizResult[]  (one result, both graphs)
-        ▼  packages/app/src/viz/App  (React Flow graph renderer, two tabs)
+        ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
+        ▼  packages/app/src/viz/App  (React Flow graph renderer)
 ```
 
 `agentGraph` is itself a visualisable graph (the canonical node forest). The execution graph is the
-deterministic skeleton; the semantic graph takes that skeleton as input and attaches the inferred
-sub-goal/verb overlay at the interaction level — reusing the same `ExecutionNode` instances as one
-source of truth.
+deterministic skeleton from the trace. `VizResult.data` is the `ExecutionGraph` directly.
 
-All sessions roll up under one agent; `buildVizResults` emits exactly one `VizResult` carrying both
-graphs, and sessions are navigated by expand/collapse inside the graph. Unsupported files are
-carried through `classified` (never silently dropped) and surfaced as a count. The graphs are
+All sessions roll up under one agent; `buildVizResults` emits exactly one `VizResult` carrying the
+execution graph, and sessions are navigated by expand/collapse inside the graph. Unsupported files
+are carried through `classified` (never silently dropped) and surfaced as a count. The graph is
 consumed only by the renderer — no raw `CanonicalNode[]` reaches the visualization layer.
 
 ## Upload flow and the data-source seam
@@ -123,8 +114,8 @@ Browser — path 1: raw log files (full pipeline)
           └── data-source.ts :: processUploads(files)
                 └── @coach/pipeline :: buildVizResults(files)
                         └── runPipeline: classify → route → canonical → aggregate
-                              → execution graph → semantic graph
-                              └── VizResult[]  (one result, both graphs)
+                              → execution graph
+                              └── VizResult[]  (one result, execution graph)
                                     └── App.tsx renders the graph (derives all display text)
 
 Browser — path 2: pre-computed pipeline output (bypasses the pipeline)
@@ -134,15 +125,14 @@ Browser — path 2: pre-computed pipeline output (bypasses the pipeline)
                 ├── extractExecutionGraph(raw)   ← detects bare ExecutionGraph
                 │     or object wrapping one     ← or wrapper with executionGraph key
                 └── @coach/pipeline :: buildVizResultFromExecutionGraph(graph, title)
-                      └── buildSemanticGraph(graph) — derived in-browser from the graph
-                            └── VizResult  (file name without extension as title)
-                                  └── App.tsx renders the graph unchanged
+                      └── VizResult  (file name without extension as title)
+                            └── App.tsx renders the graph unchanged
 ```
 
 **`packages/app/src/data-source.ts` is the single swap point** for moving raw-log
 processing to a backend. Replace `processUploads`'s body with a `fetch('/api/process', ...)`
 call and nothing else in the app changes — the visualization layer depends only on
-`VizResult` / `GraphData`.
+`VizResult` / `ExecutionGraph`.
 
 `loadPipelineOutput` and `extractExecutionGraph` live alongside it. The shape-detection
 logic is centralized in `extractExecutionGraph`: it accepts a bare `ExecutionGraph` (the
@@ -164,10 +154,9 @@ pipeline.)
 | `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session                      |
 | `04-agent-graph.json`          | 4     | the single-agent `CanonicalNode[]` forest          |
 | `05-execution-graph.json`      | 5     | `ExecutionGraph` (the mechanical skeleton)         |
-| `06-semantic-graph.json`       | 6     | `SemanticGraph` (the inferred overlay)             |
 
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one upload all flow through
-the same six stages. The CLI populates `UploadedFile.path` relative to the gather root so the
+the same five stages. The CLI populates `UploadedFile.path` relative to the gather root so the
 same session-id routing (with directory fallback for logs) that powers the browser upload applies.
 
 ## Deploying to Vercel (static SPA)

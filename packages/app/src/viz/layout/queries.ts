@@ -23,7 +23,7 @@ function synthetic(id: string, type: CanonicalNode['type']): ExecutionNode {
 /** Normalizes any ExecutionGraph variant into a single AgentExecution by
  *  synthesizing the missing upper levels. The pipeline degrades to
  *  session/interaction when those levels are absent; layout always wants an agent. */
-export function toAgent(graph: ExecutionGraph): AgentExecution {
+function toAgent(graph: ExecutionGraph): AgentExecution {
   if (graph.kind === 'agent') return graph.data;
 
   if (graph.kind === 'session') {
@@ -61,7 +61,7 @@ export function initialExpanded(): Set<string> {
 
 // Every node id in the subtree that has children — at any depth — so "expand
 // all" reaches nested calls (e.g. an llm_request inside a tool's execution).
-export function expandableSubtreeIds(node: ExecutionNode): string[] {
+function expandableSubtreeIds(node: ExecutionNode): string[] {
   if (node.children.length === 0) return [];
   return [node.id, ...node.children.flatMap(expandableSubtreeIds)];
 }

@@ -14,23 +14,15 @@ export type {
   UploadedFile,
 } from './types.ts';
 
-// Graph contract — execution (mechanical) + semantic (inferred)
+// Graph contract — execution graph (mechanical skeleton)
 export type {
   AgentExecution,
   ExecutionGraph,
   ExecutionNode,
-  GraphData,
   GraphEdge,
   InteractionExecution,
-  InteractionSemantics,
-  InteractionShape,
-  Move,
-  Segment,
-  SemanticGraph,
   SessionExecution,
-  Step,
   Thread,
-  ThreadSemantics,
   VizResult,
 } from './graph/types.ts';
 
