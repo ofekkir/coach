@@ -48,7 +48,8 @@ function toRequest(canonical: CanonicalNode): LabelRequest | null {
   if (canonical.type === 'tool') {
     const req: LabelRequest = { id: canonical.id, kind: 'tool' };
     if (canonical.name != null) req.name = canonical.name;
-    if (canonical.tool_input != null) req.tool_input = trunc(canonical.tool_input);
+    const rawInput = canonical.tool_input_json ?? canonical.tool_input;
+    if (rawInput != null) req.tool_input = trunc(rawInput);
     return req;
   }
   if (canonical.type === 'llm_request') {

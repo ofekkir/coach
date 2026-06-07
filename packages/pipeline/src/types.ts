@@ -132,5 +132,6 @@ export interface CanonicalNode {
   tokens_out?: number;
   cost_usd?: number;
   tool_input?: string;
+  tool_input_json?: string; // full JSON of the tool input object (used by semantic enrichment)
   what?: string; // enriched: LLM-generated one-liner (action/inference nodes only)
 }

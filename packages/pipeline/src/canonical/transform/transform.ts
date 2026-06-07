@@ -2,10 +2,20 @@ import type { TempoTrace, CanonicalNode } from '../../types.ts';
 import {
   extractRequestMessages,
   extractResponseMessages,
+  extractResponseText,
   extractStopReason,
 } from './request-body.ts';
 import { isNodeType, parseSpans } from './parse.ts';
 import type { ParsedSpan } from './parse.ts';
+
+function firstContentText(content: unknown): string | null {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return null;
+  for (const b of content as { type?: string; text?: string }[]) {
+    if (b.type === 'text' && b.text) return b.text;
+  }
+  return null;
+}
 
 function applyInteractionFields(node: CanonicalNode, span: ParsedSpan): void {
   if (span.sequenceIndex != null) node.sequence = span.sequenceIndex;
@@ -18,11 +28,22 @@ function applyRequestBody(node: CanonicalNode, rawRequestBody: string, repair: b
   const messages = extractRequestMessages(rawRequestBody, repair);
   if (messages == null) return;
   node.request_messages = messages;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg?.role !== 'user') continue;
+    const text = firstContentText(msg.content);
+    if (text) {
+      node.request = text.trim();
+      break;
+    }
+  }
 }
 
 function applyResponseBody(node: CanonicalNode, rawResponseBody: string): void {
   const messages = extractResponseMessages(rawResponseBody);
   if (messages != null) node.response_messages = messages;
+  const text = extractResponseText(rawResponseBody);
+  if (text != null) node.response = text;
   const stopReason = extractStopReason(rawResponseBody);
   if (stopReason != null) node.stop_reason = stopReason;
 }
@@ -50,7 +71,8 @@ function applySpanTypeFields(node: CanonicalNode, span: ParsedSpan, repair: bool
       break;
     case 'tool':
       if (span.toolName != null) node.name = span.toolName;
-      if (span.toolInput != null) node.tool_input = span.toolInput;
+      if (span.toolInputSummary != null) node.tool_input = span.toolInputSummary;
+      if (span.toolInputJson != null) node.tool_input_json = span.toolInputJson;
       break;
     case 'hook':
       if (span.hookName != null) node.name = span.hookName;

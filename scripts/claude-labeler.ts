@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { log } from '@coach/logger';
 import type { LabelBatchFn, LabelRequest } from '@coach/pipeline';
 
 const BATCH_SIZE = 25;
@@ -118,11 +119,14 @@ async function callClaudeWithRetry(
     lastError = err;
   }
   const e = lastError instanceof ClaudeSubprocessError ? lastError : null;
-  process.stderr.write(`[claude-labeler] batch failed (ids: ${batchIds.join(', ')})\n`);
-  process.stderr.write(
-    `  error: ${lastError instanceof Error ? lastError.message : String(lastError)}\n`,
+  log.error(
+    {
+      ids: batchIds,
+      error: lastError instanceof Error ? lastError.message : String(lastError),
+      stdout: e?.stdout.slice(0, 500),
+    },
+    '[claude-labeler] batch failed',
   );
-  if (e?.stdout) process.stderr.write(`  stdout: ${e.stdout.slice(0, 500)}\n`);
   return new Map();
 }
 
@@ -130,6 +134,8 @@ async function callClaudeWithRetry(
 
 export const claudeLabelBatch: LabelBatchFn = async (requests) => {
   const results = new Map<string, string>();
+
+  for (const r of requests) log.debug(r, 'label request');
 
   for (let i = 0; i < requests.length; i += BATCH_SIZE) {
     const batch = requests.slice(i, i + BATCH_SIZE);

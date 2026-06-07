@@ -9,12 +9,15 @@ import { claudeLabelBatch } from './claude-labeler.ts';
 
 const cliArgs = process.argv.slice(2);
 const enrichFlag = cliArgs.includes('--enrich');
+const debugFlag = cliArgs.includes('--debug');
 const positionals = cliArgs.filter((a) => !a.startsWith('--'));
 const arg = positionals[0];
 
+if (debugFlag) log.level = 'debug';
+
 if (!arg) {
   log.error(
-    'Usage: pnpm e2e <path> [--enrich]  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website --enrich)',
+    'Usage: pnpm e2e <path> [--enrich] [--debug]  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website --enrich)',
   );
   process.exit(1);
 }
