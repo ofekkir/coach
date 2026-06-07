@@ -7,6 +7,88 @@ interface ResBody {
   stop_reason?: string;
 }
 
+// ── Raw body decoding (handles double-escaped / truncated JSON) ───────────────
+
+function tryLoad(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+const CLOSING: Record<string, string> = { '[': ']', '{': '}' };
+
+function trackBracket(ch: string, stack: string[]): void {
+  if (ch === '[' || ch === '{') {
+    stack.push(ch);
+    return;
+  }
+  if (ch === ']' && stack.at(-1) === '[') {
+    stack.pop();
+    return;
+  }
+  if (ch === '}' && stack.at(-1) === '{') {
+    stack.pop();
+  }
+}
+
+function repairTruncated(text: string): string {
+  const stack: string[] = [];
+  let inStr = false;
+  let escape = false;
+  for (const ch of text) {
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inStr = !inStr;
+      continue;
+    }
+    if (inStr) continue;
+    trackBracket(ch, stack);
+  }
+  let result = text.trimEnd().replace(/,$/, '');
+  if (inStr) result += '"';
+  result += stack.reduceRight((acc, bracket) => acc + (CLOSING[bracket] ?? ''), '');
+  return result;
+}
+
+function peel(obj: unknown): unknown {
+  if (typeof obj !== 'string') return obj;
+  return tryLoad(obj) ?? tryLoad(repairTruncated(obj)) ?? obj;
+}
+
+export function decodeRawBody(raw: string): unknown {
+  const trimmed = raw.trimStart();
+  const truncAt = trimmed.indexOf('[TRUNCATED');
+  const text = truncAt !== -1 ? trimmed.slice(0, truncAt).trimEnd() : trimmed.trimEnd();
+
+  const direct = tryLoad(text);
+  if (direct !== undefined) return peel(direct);
+
+  const asString = tryLoad('"' + text + '"');
+  if (asString !== undefined) return peel(asString);
+
+  const repaired = tryLoad(repairTruncated(text));
+  if (repaired !== undefined) return peel(repaired);
+
+  const repairedAsString = tryLoad('"' + text + '"');
+  if (typeof repairedAsString === 'string') {
+    const inner = tryLoad(repairTruncated(repairedAsString));
+    if (inner !== undefined) return inner;
+  }
+
+  return null;
+}
+
+// ── Request prompt extraction ─────────────────────────────────────────────────
+
 function firstText(content: string | { type: string; text?: string }[]): string | null {
   if (typeof content === 'string') return content;
   for (const b of content) {
@@ -47,12 +129,11 @@ function lastUserTextFromRaw(bodyJson: string): string | null {
 }
 
 export function extractRequestPrompt(bodyJson: string): string | null {
-  try {
-    const parsed = JSON.parse(bodyJson) as ReqBody;
-    return lastUserTextFromParsed(parsed.messages);
-  } catch {
-    return lastUserTextFromRaw(bodyJson);
+  const decoded = decodeRawBody(bodyJson);
+  if (decoded !== null && typeof decoded === 'object') {
+    return lastUserTextFromParsed((decoded as ReqBody).messages);
   }
+  return lastUserTextFromRaw(bodyJson);
 }
 
 function extractResponseTextFromBlock(block: {
