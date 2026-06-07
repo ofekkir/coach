@@ -8,16 +8,14 @@ import type { UploadedFile } from '@coach/pipeline';
 
 const arg = process.argv[2];
 if (!arg) {
-  log.error('Usage: pnpm e2e <path|fixture>  (e.g. pnpm e2e otel/fetch-website)');
+  log.error('Usage: pnpm e2e <path>  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website)');
   process.exit(1);
 }
 
 function resolveInput(a: string): string {
   const direct = resolve(process.cwd(), a);
   if (existsSync(direct)) return direct;
-  const underFixtures = resolve(process.cwd(), 'packages/pipeline/fixtures', a);
-  if (existsSync(underFixtures)) return underFixtures;
-  log.error(`Input not found (tried '${direct}' and '${underFixtures}')`);
+  log.error(`Input not found: '${direct}'`);
   process.exit(1);
 }
 
@@ -79,3 +77,4 @@ log.info(
   { sessions: result.sessions.length, agentGraphNodes: result.agentGraph.length },
   `done → ${outDir}`,
 );
+log.info(`To visualize: pnpm --filter @coach/app dev  (then upload the files from ${outDir})`);
