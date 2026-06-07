@@ -73,9 +73,10 @@ function enrichLlmSpan(
 
 function enrichToolSpan(span: OtlpSpan, toolInput: string | null): OtlpSpan {
   if (toolInput == null) return span;
+  const extra: OtlpAttribute[] = [strAttr('tool_input_json', toolInput)];
   const summary = summarizeToolInput(toolInput);
-  if (summary == null) return span;
-  return { ...span, attributes: [...span.attributes, strAttr('tool_input_summary', summary)] };
+  if (summary != null) extra.push(strAttr('tool_input_summary', summary));
+  return { ...span, attributes: [...span.attributes, ...extra] };
 }
 
 function enrichSpan(

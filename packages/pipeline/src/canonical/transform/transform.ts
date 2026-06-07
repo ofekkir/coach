@@ -72,6 +72,7 @@ function applySpanTypeFields(node: CanonicalNode, span: ParsedSpan, repair: bool
     case 'tool':
       if (span.toolName != null) node.name = span.toolName;
       if (span.toolInputSummary != null) node.tool_input = span.toolInputSummary;
+      if (span.toolInputJson != null) node.tool_input_json = span.toolInputJson;
       break;
     case 'hook':
       if (span.hookName != null) node.name = span.hookName;
