@@ -10,6 +10,8 @@ export type {
   OtlpAttribute,
   OtlpBatch,
   OtlpSpan,
+  RequestMessage,
+  ResponseMessage,
   TempoTrace,
   UploadedFile,
 } from './types.ts';

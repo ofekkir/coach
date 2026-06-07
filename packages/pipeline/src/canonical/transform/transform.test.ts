@@ -105,8 +105,7 @@ describe('transformTrace', () => {
     expect(child?.model).toBe('claude-sonnet-4-6');
     expect(child?.source).toBe('repl_main_thread');
     expect(child?.request_messages).toEqual([{ role: 'user', content: 'Do the thing' }]);
-    expect(child?.request).toBe('Do the thing');
-    expect(child?.response).toBe('Done.');
+    expect(child?.response_messages).toEqual([{ type: 'text', text: 'Done.' }]);
     expect(child?.tokens_in).toBe(100);
     expect(child?.tokens_out).toBe(50);
     expect(child?.cost_usd).toBeCloseTo(0.001234);

@@ -1,4 +1,34 @@
-import type { CanonicalNode } from '../../types.ts';
+import type { CanonicalNode, RequestMessage, ResponseMessage } from '../../types.ts';
+import type { ExecutionNode } from '../types.ts';
+
+// ── Message delta helpers ───────────────────────────────────────────────────
+
+/** Suffix of `current` beyond `previousCount`. Returns full array when previous
+ *  was shorter (first request, compaction, or truncation). */
+function requestMessagesDelta(
+  current: readonly RequestMessage[] | undefined,
+  previousCount: number,
+): readonly RequestMessage[] | undefined {
+  if (current == null) return undefined;
+  return current.slice(previousCount);
+}
+
+/** Annotates a base ExecutionNode with llm_request delta fields when the node
+ *  is an llm_request. Non-llm_request nodes are returned unchanged. */
+export function withLlmDeltas(
+  base: ExecutionNode,
+  node: CanonicalNode,
+  prevLlmMessageCount: number,
+): ExecutionNode {
+  if (node.type !== 'llm_request') return base;
+  const reqDelta = requestMessagesDelta(node.request_messages, prevLlmMessageCount);
+  const resDelta = node.response_messages as readonly ResponseMessage[] | undefined;
+  return {
+    ...base,
+    ...(reqDelta !== undefined ? { requestMessagesDelta: reqDelta } : {}),
+    ...(resDelta !== undefined ? { responseMessagesDelta: resDelta } : {}),
+  };
+}
 
 // ── Pure ordering / timing helpers (ported from view-model/format.ts) ──────────
 //

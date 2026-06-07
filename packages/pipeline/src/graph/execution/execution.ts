@@ -14,6 +14,7 @@ import {
   compareStart,
   gapMsBetween,
   sortByStart,
+  withLlmDeltas,
 } from './thread.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -141,10 +142,20 @@ function buildThread(
   members: readonly CanonicalNode[],
   childrenOf: Map<string, CanonicalNode[]>,
 ): Thread {
+  let prevLlmMessageCount = 0;
+  const builtMembers = members.map((m) => {
+    const base = toExecutionNode(m, childrenOf);
+    const node = withLlmDeltas(base, m, prevLlmMessageCount);
+    if (m.type === 'llm_request') {
+      prevLlmMessageCount = m.request_messages?.length ?? prevLlmMessageCount;
+    }
+    return node;
+  });
+
   return {
     id: `thread_${source.replace(/\W+/g, '_')}`,
     source,
-    members: members.map((m) => toExecutionNode(m, childrenOf)),
+    members: builtMembers,
     edges: buildThreadEdges(members),
   };
 }

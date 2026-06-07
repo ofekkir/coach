@@ -107,37 +107,6 @@ export function extractResponseMessages(bodyJson: string): ResponseMessage[] | n
   return content;
 }
 
-function extractResponseTextFromBlock(block: {
-  type: string;
-  text?: string;
-  thinking?: string;
-  name?: string;
-}): string | null {
-  if (block.type === 'text' && block.text) return block.text;
-  if (block.type === 'tool_use' && block.name) return `tool_use: ${block.name}`;
-  if (block.type === 'thinking' && block.thinking && block.thinking !== '<REDACTED>') {
-    return block.thinking;
-  }
-  return null;
-}
-
-function firstBlockText(content: ResBody['content']): string | null {
-  for (const block of content ?? []) {
-    const text = extractResponseTextFromBlock(block);
-    if (text != null) return text;
-  }
-  return null;
-}
-
-export function extractResponseText(bodyJson: string): string | null {
-  try {
-    const parsed = JSON.parse(bodyJson) as ResBody;
-    return firstBlockText(parsed.content);
-  } catch {
-    return null;
-  }
-}
-
 export function extractStopReason(bodyJson: string): string | null {
   try {
     const parsed = JSON.parse(bodyJson) as ResBody;
