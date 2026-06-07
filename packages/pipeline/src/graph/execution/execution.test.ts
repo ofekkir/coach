@@ -288,6 +288,37 @@ describe('message deltas on thread members', () => {
     expect(member.requestMessagesDelta).toEqual([msg1, msg2, msg3]);
   });
 
+  it('native format: each llm_request carries only new messages as delta', () => {
+    // Native traces log only the delta per request, not the full cumulative history.
+    const llmA: CanonicalNode = {
+      id: 'llmA',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      start_time_ns: '100000000',
+      end_time_ns: '200000000',
+      request_messages: [msg1, msg2],
+      response_messages: resMsgs1,
+    };
+    const llmB: CanonicalNode = {
+      id: 'llmB',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      start_time_ns: '300000000',
+      end_time_ns: '400000000',
+      // Native: only the new message, not the full history
+      request_messages: [msg3],
+      response_messages: resMsgs2,
+    };
+    const inter = buildInteractionExecution(makeInteractionWithLlms([llmA, llmB]));
+    const memberA = findMember(inter, 'llmA');
+    const memberB = findMember(inter, 'llmB');
+
+    expect(memberA.requestMessagesDelta).toEqual([msg1, msg2]);
+    expect(memberB.requestMessagesDelta).toEqual([msg3]);
+  });
+
   it('tool nodes have no delta fields', () => {
     const llm: CanonicalNode = {
       id: 'llm1',

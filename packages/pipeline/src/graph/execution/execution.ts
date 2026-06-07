@@ -142,12 +142,14 @@ function buildThread(
   members: readonly CanonicalNode[],
   childrenOf: Map<string, CanonicalNode[]>,
 ): Thread {
-  let prevLlmMessageCount = 0;
+  const seenMessageKeys = new Set<string>();
   const builtMembers = members.map((m) => {
     const base = toExecutionNode(m, childrenOf);
-    const node = withLlmDeltas(base, m, prevLlmMessageCount);
+    const node = withLlmDeltas(base, m, seenMessageKeys);
     if (m.type === 'llm_request') {
-      prevLlmMessageCount = m.request_messages?.length ?? prevLlmMessageCount;
+      for (const msg of m.request_messages ?? []) {
+        seenMessageKeys.add(JSON.stringify(msg));
+      }
     }
     return node;
   });
