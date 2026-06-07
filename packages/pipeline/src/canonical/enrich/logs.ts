@@ -90,29 +90,3 @@ export function buildToolInputIndex(
   }
   return result;
 }
-
-function summarizeToolInputPreferred(parsed: Record<string, unknown>, max: number): string | null {
-  const useful = parsed.command ?? parsed.file_path ?? parsed.skill ?? parsed.query;
-  if (typeof useful === 'string' || typeof useful === 'number' || typeof useful === 'boolean') {
-    return String(useful).slice(0, max);
-  }
-  return null;
-}
-
-function firstStringValue(parsed: Record<string, unknown>, max: number): string | null {
-  for (const v of Object.values(parsed)) {
-    if (typeof v === 'string' && v.length > 0) return v.slice(0, max);
-  }
-  return null;
-}
-
-export function summarizeToolInput(json: string, max = 120): string | null {
-  try {
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    const preferred = summarizeToolInputPreferred(parsed, max);
-    if (preferred != null) return preferred;
-    return firstStringValue(parsed, max);
-  } catch {
-    return json.slice(0, max);
-  }
-}

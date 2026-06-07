@@ -64,6 +64,18 @@ export function threadTitle(source: string): string {
   return `thread: ${source}`;
 }
 
+function formatToolInput(input: string): string {
+  try {
+    const parsed = JSON.parse(input) as Record<string, unknown>;
+    const pairs = Object.entries(parsed)
+      .map(([k, v]) => `${k}: ${String(v)}`)
+      .join(', ');
+    return truncate(pairs, 120);
+  } catch {
+    return truncate(input, 120);
+  }
+}
+
 function typeLines(node: CanonicalNode, index: number): string[] {
   switch (node.type) {
     case 'agent':
@@ -80,7 +92,7 @@ function typeLines(node: CanonicalNode, index: number): string[] {
       return [
         'tool',
         ...optionalLine(node.name, (n) => `name: ${n}`),
-        ...optionalLine(node.tool_input, (i) => `input: ${i}`),
+        ...optionalLine(node.tool_input, formatToolInput),
       ];
     case 'tool.blocked_on_user':
       return ['blocked_on_user'];
