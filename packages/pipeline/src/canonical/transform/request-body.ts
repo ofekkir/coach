@@ -87,53 +87,16 @@ export function decodeRawBody(raw: string): unknown {
   return null;
 }
 
-// ── Request prompt extraction ─────────────────────────────────────────────────
+// ── Request message extraction ────────────────────────────────────────────────
 
-function firstText(content: string | { type: string; text?: string }[]): string | null {
-  if (typeof content === 'string') return content;
-  for (const b of content) {
-    if (b.type === 'text' && b.text) return b.text;
-  }
-  return null;
-}
+import type { RequestMessage } from '../../types.ts';
 
-function unescape(s: string): string {
-  return s
-    .replace(/\\"/g, '"')
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\r')
-    .replace(/\\t/g, '\t')
-    .replace(/\\\\/g, '\\');
-}
-
-function lastUserTextFromParsed(messages: ReqBody['messages']): string | null {
-  if (!messages) return null;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg?.role !== 'user') continue;
-    const text = firstText(msg.content);
-    if (text) return text.trim();
-  }
-  return null;
-}
-
-function lastUserTextFromRaw(bodyJson: string): string | null {
-  let lastIdx = -1;
-  const re = /"role":"user"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(bodyJson)) !== null) lastIdx = m.index;
-  if (lastIdx === -1) return null;
-  const tm = /"text":"((?:[^"\\]|\\.)+)/.exec(bodyJson.slice(lastIdx));
-  if (!tm?.[1]) return null;
-  return unescape(tm[1]);
-}
-
-export function extractRequestPrompt(bodyJson: string): string | null {
-  const decoded = decodeRawBody(bodyJson);
-  if (decoded !== null && typeof decoded === 'object') {
-    return lastUserTextFromParsed((decoded as ReqBody).messages);
-  }
-  return lastUserTextFromRaw(bodyJson);
+export function extractRequestMessages(bodyJson: string, repair: boolean): RequestMessage[] | null {
+  const decoded = repair ? decodeRawBody(bodyJson) : tryLoad(bodyJson);
+  if (decoded === null || decoded === undefined || typeof decoded !== 'object') return null;
+  const messages = (decoded as ReqBody).messages;
+  if (!Array.isArray(messages)) return null;
+  return messages;
 }
 
 function extractResponseTextFromBlock(block: {

@@ -97,6 +97,11 @@ export type NodeType =
   | 'tool.execution'
   | 'hook';
 
+export interface RequestMessage {
+  role: string;
+  content: unknown;
+}
+
 export interface CanonicalNode {
   id: string;
   type: NodeType;
@@ -113,9 +118,8 @@ export interface CanonicalNode {
   source?: string;
   sequence?: number;
   prompt?: string;
-  raw_request?: string;
+  request_messages?: RequestMessage[];
   request?: string;
-  raw_response?: string;
   response?: string;
   stop_reason?: string;
   tokens_in?: number;

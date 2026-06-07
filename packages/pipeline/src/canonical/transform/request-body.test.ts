@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeRawBody } from './request-body.ts';
+import { decodeRawBody, extractRequestMessages } from './request-body.ts';
 
 const REQ = { messages: [{ role: 'user', content: 'hello' }] };
 
@@ -28,7 +28,30 @@ describe('decodeRawBody', () => {
   });
 
   it('returns null for completely unparseable input', () => {
-    // Not valid JSON in any form — not a bare string body either
     expect(decodeRawBody('\x00\x01\x02')).toBeNull();
+  });
+});
+
+describe('extractRequestMessages', () => {
+  it('returns messages array from plain JSON (repair=false)', () => {
+    const msgs = extractRequestMessages(JSON.stringify(REQ), false);
+    expect(msgs).toEqual([{ role: 'user', content: 'hello' }]);
+  });
+
+  it('returns messages from double-escaped JSON when repair=true', () => {
+    const doubleEncoded = JSON.stringify(JSON.stringify(REQ));
+    expect(extractRequestMessages(doubleEncoded, true)).toEqual([
+      { role: 'user', content: 'hello' },
+    ]);
+  });
+
+  it('returns null for double-escaped JSON when repair=false', () => {
+    const doubleEncoded = JSON.stringify(JSON.stringify(REQ));
+    expect(extractRequestMessages(doubleEncoded, false)).toBeNull();
+  });
+
+  it('returns null for invalid input', () => {
+    expect(extractRequestMessages('not json', false)).toBeNull();
+    expect(extractRequestMessages('not json', true)).toBeNull();
   });
 });
