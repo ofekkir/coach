@@ -102,6 +102,11 @@ export interface RequestMessage {
   content: unknown;
 }
 
+export interface ResponseMessage {
+  type: string;
+  [key: string]: unknown;
+}
+
 export interface CanonicalNode {
   id: string;
   type: NodeType;
@@ -120,6 +125,7 @@ export interface CanonicalNode {
   prompt?: string;
   request_messages?: RequestMessage[];
   request?: string;
+  response_messages?: ResponseMessage[];
   response?: string;
   stop_reason?: string;
   tokens_in?: number;

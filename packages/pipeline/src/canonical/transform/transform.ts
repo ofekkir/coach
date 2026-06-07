@@ -1,5 +1,10 @@
 import type { TempoTrace, CanonicalNode } from '../../types.ts';
-import { extractRequestMessages, extractResponseText, extractStopReason } from './request-body.ts';
+import {
+  extractRequestMessages,
+  extractResponseMessages,
+  extractResponseText,
+  extractStopReason,
+} from './request-body.ts';
 import { isNodeType, parseSpans } from './parse.ts';
 import type { ParsedSpan } from './parse.ts';
 
@@ -35,6 +40,8 @@ function applyRequestBody(node: CanonicalNode, rawRequestBody: string, repair: b
 }
 
 function applyResponseBody(node: CanonicalNode, rawResponseBody: string): void {
+  const messages = extractResponseMessages(rawResponseBody);
+  if (messages != null) node.response_messages = messages;
   const text = extractResponseText(rawResponseBody);
   if (text != null) node.response = text;
   const stopReason = extractStopReason(rawResponseBody);

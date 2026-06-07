@@ -89,7 +89,7 @@ export function decodeRawBody(raw: string): unknown {
 
 // ── Request message extraction ────────────────────────────────────────────────
 
-import type { RequestMessage } from '../../types.ts';
+import type { RequestMessage, ResponseMessage } from '../../types.ts';
 
 export function extractRequestMessages(bodyJson: string, repair: boolean): RequestMessage[] | null {
   const decoded = repair ? decodeRawBody(bodyJson) : tryLoad(bodyJson);
@@ -97,6 +97,14 @@ export function extractRequestMessages(bodyJson: string, repair: boolean): Reque
   const messages = (decoded as ReqBody).messages;
   if (!Array.isArray(messages)) return null;
   return messages;
+}
+
+export function extractResponseMessages(bodyJson: string): ResponseMessage[] | null {
+  const decoded = tryLoad(bodyJson);
+  if (decoded === null || decoded === undefined || typeof decoded !== 'object') return null;
+  const content = (decoded as ResBody).content;
+  if (!Array.isArray(content)) return null;
+  return content;
 }
 
 function extractResponseTextFromBlock(block: {
