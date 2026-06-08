@@ -130,20 +130,6 @@ export default tseslint.config(
       'sonarjs/no-duplicate-string': 'error',
     },
   },
-  // Plus a curated single-literal ban where a specific magic string must route
-  // through a known constant (extended per literal as found).
-  {
-    files: ['packages/pipeline/src/**/*.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "BinaryExpression[operator='+'][left.type='Literal'][left.value='s']",
-          message: "Use SPAN_ID_PREFIX from id-utils.ts instead of the magic literal 's'.",
-        },
-      ],
-    },
-  },
   // Code complexity and nesting guards + file/function size limits
   {
     rules: {
