@@ -8,7 +8,7 @@ import { estimateNodeH } from './estimate.ts';
 import { buildLabelLines } from '../format/format.ts';
 import { link, placeThread, pushStructural } from './place-members.ts';
 import type { Ctx } from './types.ts';
-import { HG, LG, NW, VG } from './types.ts';
+import { CANVAS_TOP, CENTERING_DIVISOR, HG, LG, NW, VG } from './types.ts';
 
 export function sessionWidth(sv: SessionExecution): number {
   return sv.interactions.reduce((max, i) => {
@@ -28,7 +28,7 @@ function placeInteraction(
   const isExpanded = ctx.expanded.has(root.id);
   const hasKids = threads.some((t) => t.members.length > 0) || interaction.userPrompt != null;
 
-  pushStructural(root, 'interaction', ctx.cx - NW / 2, y, hasKids, ctx);
+  pushStructural(root, 'interaction', ctx.cx - NW / CENTERING_DIVISOR, y, hasKids, ctx);
   link(parentId, root.id, undefined, ctx);
   y += estimateNodeH(buildLabelLines(root.canonical)) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
@@ -39,7 +39,7 @@ function placeInteraction(
   }
 
   const totalW = threads.length * NW + (threads.length - 1) * HG;
-  let tx = ctx.cx - totalW / 2;
+  let tx = ctx.cx - totalW / CENTERING_DIVISOR;
   let maxEndY = y;
 
   for (const thread of threads) {
@@ -60,7 +60,7 @@ function placeUserPrompt(
   ctx: Ctx,
 ): string {
   if (userPrompt == null) return rootId;
-  pushStructural(userPrompt, 'member', ctx.cx - NW / 2, y, false, ctx);
+  pushStructural(userPrompt, 'member', ctx.cx - NW / CENTERING_DIVISOR, y, false, ctx);
   link(rootId, userPrompt.id, undefined, ctx);
   return userPrompt.id;
 }
@@ -70,7 +70,7 @@ function placeSession(session: SessionExecution, parentId: string, y: number, ct
   const isExpanded = ctx.expanded.has(root.id);
   const hasKids = session.interactions.length > 0;
 
-  pushStructural(root, 'session', ctx.cx - NW / 2, y, hasKids, ctx);
+  pushStructural(root, 'session', ctx.cx - NW / CENTERING_DIVISOR, y, hasKids, ctx);
   link(parentId, root.id, undefined, ctx);
   y += estimateNodeH(buildLabelLines(root.canonical)) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
@@ -87,20 +87,20 @@ export function placeAgent(agent: AgentExecution, ctx: Ctx): void {
   const isExpanded = ctx.expanded.has(root.id);
   const hasKids = agent.sessions.length > 0;
 
-  pushStructural(root, 'root', ctx.cx - NW / 2, 50, hasKids, ctx);
+  pushStructural(root, 'root', ctx.cx - NW / CENTERING_DIVISOR, CANVAS_TOP, hasKids, ctx);
   if (!isExpanded || !hasKids) return;
 
-  const y = 50 + estimateNodeH(buildLabelLines(root.canonical)) + LG;
+  const y = CANVAS_TOP + estimateNodeH(buildLabelLines(root.canonical)) + LG;
   const sessionWidths = agent.sessions.map((s) => sessionWidth(s));
   const totalW = sessionWidths.reduce((sum, w) => sum + w, 0) + (agent.sessions.length - 1) * HG;
-  let sx = ctx.cx - totalW / 2;
+  let sx = ctx.cx - totalW / CENTERING_DIVISOR;
 
   for (let i = 0; i < agent.sessions.length; i++) {
     const session = agent.sessions[i];
     if (session == null) continue;
     const sw = sessionWidths[i] ?? NW;
     const savedCx = ctx.cx;
-    ctx.cx = sx + sw / 2;
+    ctx.cx = sx + sw / CENTERING_DIVISOR;
     placeSession(session, root.id, y, ctx);
     ctx.cx = savedCx;
     sx += sw + HG;

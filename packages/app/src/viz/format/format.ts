@@ -14,12 +14,20 @@ import type {
 // durations, and the signed inter-step gap.
 // ════════════════════════════════════════════════════════════════════════════
 
+// Truncation limits (chars) for the various label lines, and decimal precision.
+const TOOL_INPUT_MAX = 120;
+const INFERENCE_OUTPUT_MAX = 500;
+const INTERACTION_TITLE_MAX = 40;
+const SESSION_TITLE_MAX = 24;
+const SUBMS_DECIMALS = 2;
+const COST_DECIMALS = 6;
+
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + '…';
 }
 
 function formatDuration(ms: number): string {
-  if (ms < 1) return `${ms.toFixed(2)}ms`;
+  if (ms < 1) return `${ms.toFixed(SUBMS_DECIMALS)}ms`;
   return `${String(Math.round(ms))}ms`;
 }
 
@@ -60,9 +68,9 @@ function formatToolInput(input: string): string {
     const pairs = Object.entries(parsed)
       .map(([k, v]) => `${k}: ${String(v)}`)
       .join(', ');
-    return truncate(pairs, 120);
+    return truncate(pairs, TOOL_INPUT_MAX);
   } catch {
-    return truncate(input, 120);
+    return truncate(input, TOOL_INPUT_MAX);
   }
 }
 
@@ -81,7 +89,10 @@ function inferenceLines(node: InferenceNode): string[] {
   return [
     'inference',
     ...(node.what !== '' ? [node.what] : optionalLine(node.model, (m) => `model: ${m}`)),
-    ...optionalLine(responseText, (o) => `output: ${truncate(collapseWhitespace(o), 500)}`),
+    ...optionalLine(
+      responseText,
+      (o) => `output: ${truncate(collapseWhitespace(o), INFERENCE_OUTPUT_MAX)}`,
+    ),
   ];
 }
 
@@ -98,7 +109,7 @@ function llmRequestLines(node: LlmRequestNode): string[] {
 /** Title for an interaction node: a short prompt preview, else a positional fallback. */
 function interactionTitle(node: InteractionNode, index = 0): string {
   if (node.prompt != null && node.prompt.trim() !== '') {
-    return truncate(collapseWhitespace(node.prompt).trim(), 40);
+    return truncate(collapseWhitespace(node.prompt).trim(), INTERACTION_TITLE_MAX);
   }
   return `interaction ${String(index + 1)}`;
 }
@@ -106,7 +117,7 @@ function interactionTitle(node: InteractionNode, index = 0): string {
 /** Title for a session node: a short session_id preview, else a positional fallback. */
 function sessionTitle(node: SessionNode, index = 0): string {
   if (node.session_id.trim() !== '') {
-    return truncate(node.session_id, 24);
+    return truncate(node.session_id, SESSION_TITLE_MAX);
   }
   return `session ${String(index + 1)}`;
 }
@@ -160,7 +171,7 @@ export function buildLabelLines(node: GraphNode, index = 0): string[] {
   if ('duration_ms' in node) lines.push(`duration: ${formatDuration(node.duration_ms)}`);
   if ('tokens_in' in node) lines.push(`tokens in: ${String(node.tokens_in)}`);
   if ('tokens_out' in node) lines.push(`tokens out: ${String(node.tokens_out)}`);
-  if ('cost_usd' in node) lines.push(`cost: $${node.cost_usd.toFixed(6)}`);
+  if ('cost_usd' in node) lines.push(`cost: $${node.cost_usd.toFixed(COST_DECIMALS)}`);
 
   return lines;
 }

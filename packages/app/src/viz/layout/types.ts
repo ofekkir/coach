@@ -6,6 +6,11 @@ export const HG = 56;
 export const VG = 44;
 export const LG = 60;
 
+/** Top margin of the whole graph on the canvas, in px. */
+export const CANVAS_TOP = 50;
+/** Divisor for centering a width around a center-x (`cx - width / CENTERING_DIVISOR`). */
+export const CENTERING_DIVISOR = 2;
+
 type NodeKind = 'root' | 'session' | 'interaction' | 'member';
 
 export interface TraceRFNodeData extends Record<string, unknown> {

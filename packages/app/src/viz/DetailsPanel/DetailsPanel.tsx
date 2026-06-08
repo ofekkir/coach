@@ -1,10 +1,14 @@
 import { colorOf } from '../layout/colors.ts';
 
+// A value longer than this renders in a boxed, monospaced block instead of inline.
+const LONG_VALUE_CHARS = 80;
+const LONG_VALUE_RADIUS = 6;
+
 function renderDetailRow(line: string, i: number): React.ReactNode {
   const colon = line.indexOf(':');
   const key = colon > 0 ? line.slice(0, colon) : null;
   const val = colon > 0 ? line.slice(colon + 1).trim() : line;
-  const isLong = val.length > 80;
+  const isLong = val.length > LONG_VALUE_CHARS;
   return (
     <div key={i} style={{ marginBottom: 12 }}>
       {key !== null && (
@@ -30,7 +34,7 @@ function renderDetailRow(line: string, i: number): React.ReactNode {
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
           background: isLong ? '#f8fafc' : 'transparent',
-          borderRadius: isLong ? 6 : 0,
+          borderRadius: isLong ? LONG_VALUE_RADIUS : 0,
           padding: isLong ? '6px 8px' : 0,
           border: isLong ? '1px solid #e2e8f0' : 'none',
           maxHeight: 200,

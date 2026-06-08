@@ -4,6 +4,9 @@ const LINE: React.CSSProperties = {
   textOverflow: 'ellipsis',
 };
 
+// Gap (px) under the name line when detail lines follow it.
+const NAME_GAP_WITH_DETAILS = 2;
+
 export function NodeBody({
   name,
   details,
@@ -24,7 +27,7 @@ export function NodeBody({
             color: '#1e293b',
             fontSize: 11,
             lineHeight: 1.4,
-            marginBottom: details.length > 0 ? 2 : 0,
+            marginBottom: details.length > 0 ? NAME_GAP_WITH_DETAILS : 0,
           }}
         >
           {name}

@@ -1,6 +1,6 @@
 import type { OtlpAttribute, TempoTrace } from '../../types.ts';
 import { NS_PER_MS } from '../../types.ts';
-import { SPAN_ID_PREFIX } from '../enrich/id-utils.ts';
+import { b64toHex, SPAN_ID_PREFIX } from '../enrich/id-utils.ts';
 
 export interface ParsedSpan {
   readonly id: string;
@@ -23,10 +23,6 @@ export interface ParsedSpan {
   readonly toolInputSummary: string | null;
   readonly hookName: string | null;
   readonly sequenceIndex: number | null;
-}
-
-function b64toHex(b64: string): string {
-  return Array.from(atob(b64), (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
 }
 
 function getStringAttr(attrs: readonly OtlpAttribute[], key: string): string | null {

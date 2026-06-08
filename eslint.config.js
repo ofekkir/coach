@@ -93,30 +93,34 @@ export default tseslint.config(
       'project-structure/folder-structure': ['error', uploadStructureConfig],
     },
   },
-  // Magic-value policy for the pipeline: a literal that carries meaning must be
-  // bound to a named constant (or function), never inlined — the name IS the
-  // documentation. Enforced deterministically, not by convention:
-  //   • numbers  → no-magic-numbers. The `ignore` list holds only INTRINSIC
-  //     literals that a name could not clarify: 0/1/-1, idiomatic format/radix
-  //     args (2 padStart, 10/16 radix), the >>>24 byte shift, OTLP/W3C-spec ID
-  //     byte-lengths (8 span, 16 trace), and the FNV-1a/LCG hash constants.
-  //     Everything else must be named (e.g. NS_PER_MS, TRUNCATE_LEN).
-  //   • strings  → no-restricted-syntax, extended per known magic literal. A
-  //     blanket string ban is impractical here (≈200 legitimate OTLP attribute
-  //     keys/event names), so string magic values are caught as they're found.
+  // Magic-number policy, repo-wide: a numeric literal that carries meaning must be
+  // bound to a named constant (or function) — the name IS the documentation. The
+  // TS-aware @typescript-eslint variant is used so enums and numeric-literal types
+  // aren't false positives. The ONLY ignored values are -1/0/1 (and bigint 0n):
+  // the constants of identity, emptiness, and off-by-one/indexOf idioms, which no
+  // name can clarify (`slice(0, i)`, `idx >= 0`, `i + 1`). Everything else — radixes,
+  // byte-lengths, hash constants, durations — must be named. Enforced deterministically,
+  // not by convention. (Base no-magic-numbers stays off to avoid double-reporting.)
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      'no-magic-numbers': 'off',
+      '@typescript-eslint/no-magic-numbers': [
+        'error',
+        {
+          ignore: [-1, 0, '0n', 1],
+          ignoreArrayIndexes: true,
+          ignoreEnums: true,
+          ignoreNumericLiteralTypes: true,
+          ignoreReadonlyClassProperties: true,
+        },
+      ],
+    },
+  },
+  // Magic-string policy for the pipeline (extended per known literal as found).
   {
     files: ['packages/pipeline/src/**/*.ts'],
     rules: {
-      'no-magic-numbers': [
-        'error',
-        {
-          // 0n covers bigint zero (OTEL timestamps are bigint ns); prefer-const
-          // already forces const on named non-reassigned bindings, so enforceConst
-          // is omitted — it only false-positives on let accumulators seeded with a literal.
-          ignore: [-1, 0, '0n', 1, 2, 8, 10, 16, 24, 1664525, 1013904223, 2166136261, 16777619],
-          ignoreArrayIndexes: true,
-        },
-      ],
       'no-restricted-syntax': [
         'error',
         {
@@ -150,6 +154,7 @@ export default tseslint.config(
       'max-lines': 'off',
       'max-lines-per-function': 'off',
       'no-magic-numbers': 'off',
+      '@typescript-eslint/no-magic-numbers': 'off',
     },
   },
   // Ban barrel files everywhere except each package's public src/index.ts.

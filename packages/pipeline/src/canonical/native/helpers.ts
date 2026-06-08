@@ -1,5 +1,14 @@
 import type { OtlpAttribute } from '../../types.ts';
-import { NS_PER_MS } from '../../types.ts';
+import {
+  FNV_OFFSET_BASIS,
+  FNV_PRIME,
+  HIGH_BYTE_SHIFT,
+  LCG_INCREMENT,
+  LCG_MULTIPLIER,
+  NS_PER_MS,
+  SPAN_ID_BYTES,
+  TRACE_ID_BYTES,
+} from '../../types.ts';
 
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -8,27 +17,27 @@ function uint8ToBase64(bytes: Uint8Array): string {
 }
 
 // Deterministic pseudo-random bytes from a seed string (FNV-1a → LCG).
-// No imports required — works identically in browser and Node.js.
+// Pure arithmetic + Web APIs only — works identically in browser and Node.js.
 function deterministicBytes(seed: string, len: number): Uint8Array {
-  let h = 2166136261 >>> 0;
+  let h = FNV_OFFSET_BASIS >>> 0;
   for (let i = 0; i < seed.length; i++) {
     h = (h ^ seed.charCodeAt(i)) >>> 0;
-    h = Math.imul(h, 16777619) >>> 0;
+    h = Math.imul(h, FNV_PRIME) >>> 0;
   }
   const out = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
-    h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
-    out[i] = h >>> 24;
+    h = (Math.imul(h, LCG_MULTIPLIER) + LCG_INCREMENT) >>> 0;
+    out[i] = h >>> HIGH_BYTE_SHIFT;
   }
   return out;
 }
 
 export function spanB64(kind: string, id: string): string {
-  return uint8ToBase64(deterministicBytes(`${kind}:${id}`, 8));
+  return uint8ToBase64(deterministicBytes(`${kind}:${id}`, SPAN_ID_BYTES));
 }
 
 export function traceB64(sessionId: string): string {
-  return uint8ToBase64(deterministicBytes(sessionId, 16));
+  return uint8ToBase64(deterministicBytes(sessionId, TRACE_ID_BYTES));
 }
 
 export function isoToNano(iso: string): string {
