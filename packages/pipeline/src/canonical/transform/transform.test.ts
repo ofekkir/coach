@@ -39,6 +39,9 @@ const minimalTrace: TempoTrace = {
               attributes: [
                 { key: 'span.type', value: { stringValue: 'interaction' } },
                 { key: 'user_prompt', value: { stringValue: 'hello world' } },
+                { key: 'session.id', value: { stringValue: 's-test' } },
+                { key: 'user.id', value: { stringValue: 'u-test' } },
+                { key: 'interaction.sequence', value: { intValue: '0' } },
               ],
             },
             {

@@ -17,12 +17,12 @@ function synthetic(canonical: AgentNode | SessionNode): ExecutionNode {
 }
 
 function syntheticAgent(): ExecutionNode {
-  return synthetic({ id: '__agent__', type: 'agent' });
+  return synthetic({ id: '__agent__', type: 'agent', user_id: '' });
 }
 
 // Empty session_id so the renderer falls back to a positional title.
 function syntheticSession(): ExecutionNode {
-  return synthetic({ id: '__session__', type: 'session', session_id: '' });
+  return synthetic({ id: '__session__', type: 'session', session_id: '', user_id: '' });
 }
 
 /** Normalizes any ExecutionGraph variant into a single AgentExecution by

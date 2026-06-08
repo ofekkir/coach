@@ -109,8 +109,8 @@ export type NodeType =
   | 'user_prompt'
   | 'llm_request'
   | 'tool'
-  | 'tool.blocked_on_user'
   | 'tool.execution'
+  | 'tool.blocked_on_user'
   | 'hook'
   | 'action' // enriched: tool → semantically-labeled action
   | 'inference'; // enriched: llm_request → semantically-labeled inference
@@ -142,53 +142,62 @@ interface SpannedNode extends BaseNode {
   duration_ms: number;
 }
 
+/** Sentinel injected by the native builder when no real user identity exists.
+ *  Consumers can filter on this to distinguish real sessions from local ones. */
+export const PSEUDO_USER_ID = 'pseudo_user_id';
+
 // ── Synthesized aggregation nodes (no span, no timing) ────────────────────────
 
 export interface AgentNode extends BaseNode {
   type: 'agent';
-  user_id?: string;
+  user_id: string;
 }
 
 export interface SessionNode extends BaseNode {
   type: 'session';
   session_id: string;
-  user_id?: string;
+  user_id: string;
 }
 
 // ── Span-derived nodes ────────────────────────────────────────────────────────
 
 export interface InteractionNode extends SpannedNode {
   type: 'interaction';
-  session_id?: string;
-  user_id?: string;
-  sequence?: number;
-  prompt?: string;
+  session_id: string;
+  user_id: string;
+  sequence: number;
+  prompt: string;
 }
 
 export interface LlmRequestNode extends SpannedNode {
   type: 'llm_request';
-  model?: string;
+  model: string;
   source?: string;
   request_messages?: RequestMessage[];
   response_messages?: ResponseMessage[];
   stop_reason?: string;
-  tokens_in?: number;
-  tokens_out?: number;
+  tokens_in: number;
+  tokens_out: number;
   cost_usd?: number;
 }
 
-/** All three tool variants share one shape; they differ only by discriminant. */
-export type ToolType = 'tool' | 'tool.execution' | 'tool.blocked_on_user';
-
 export interface ToolNode extends SpannedNode {
-  type: ToolType;
+  type: 'tool';
   name?: string;
   tool_input?: string;
 }
 
+export interface ToolExecutionNode extends SpannedNode {
+  type: 'tool.execution';
+}
+
+export interface ToolBlockedOnUserNode extends SpannedNode {
+  type: 'tool.blocked_on_user';
+}
+
 export interface HookNode extends SpannedNode {
   type: 'hook';
-  name?: string;
+  name: string;
 }
 
 // ── Synthesized spine node (carries the interaction's prompt, no full span) ───
@@ -206,6 +215,8 @@ export type CanonicalNode =
   | InteractionNode
   | LlmRequestNode
   | ToolNode
+  | ToolExecutionNode
+  | ToolBlockedOnUserNode
   | HookNode
   | UserPromptNode;
 

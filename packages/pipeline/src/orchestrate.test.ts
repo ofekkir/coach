@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SYNTHETIC_AGENT_ID } from './aggregate/aggregate.ts';
 import { buildVizResults, runPipeline } from './orchestrate.ts';
+import { PSEUDO_USER_ID } from './types.ts';
 import type { UploadedFile } from './types.ts';
 
 const FIXTURES = join(import.meta.dirname, '../fixtures');
@@ -49,17 +49,17 @@ describe('buildVizResults', () => {
     expect(sessions).toHaveLength(2);
   });
 
-  it('native .jsonl session (no user.id) appears under the synthetic agent', () => {
+  it('native .jsonl session uses pseudo_user_id when no real user identity exists', () => {
     const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
 
     const results = buildVizResults(files);
 
     expect(results).toHaveLength(1);
-    expect(results[0]?.title).toBe('agent');
+    expect(results[0]?.title).toBe(PSEUDO_USER_ID);
     expect(results[0]?.data.kind).toBe('agent');
 
     const agentView = results[0]?.data.kind === 'agent' ? results[0].data.data : null;
-    expect(agentView?.root.id).toBe(SYNTHETIC_AGENT_ID);
+    expect(agentView?.root.id).toBe(`agent-${PSEUDO_USER_ID}`);
   });
 
   it('marks unrecognised files unsupported without dropping the usable ones', () => {

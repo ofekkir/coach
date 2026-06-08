@@ -98,7 +98,7 @@ function inferenceLines(node: InferenceNode): string[] {
 
 function llmRequestLines(node: LlmRequestNode): string[] {
   const lines = ['llm_request'];
-  if (node.model != null) lines.push(`model: ${node.model}`);
+  lines.push(`model: ${node.model}`);
   if (node.source != null) lines.push(`source: ${node.source}`);
   const responseText =
     node.response_messages != null ? firstResponseText(node.response_messages) : null;
@@ -108,7 +108,7 @@ function llmRequestLines(node: LlmRequestNode): string[] {
 
 /** Title for an interaction node: a short prompt preview, else a positional fallback. */
 function interactionTitle(node: InteractionNode, index = 0): string {
-  if (node.prompt != null && node.prompt.trim() !== '') {
+  if (node.prompt.trim() !== '') {
     return truncate(collapseWhitespace(node.prompt).trim(), INTERACTION_TITLE_MAX);
   }
   return `interaction ${String(index + 1)}`;

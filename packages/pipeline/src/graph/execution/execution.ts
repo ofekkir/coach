@@ -129,7 +129,7 @@ export function buildInteractionExecution(
 // The user prompt is a synthesized first node of the interaction — its input /
 // the head of the spine, carrying the full prompt. Mechanical, but not a step.
 function toUserPromptNode(interaction: InteractionNode): ExecutionNode | null {
-  if (interaction.prompt == null || interaction.prompt.trim() === '') return null;
+  if (interaction.prompt.trim() === '') return null;
   const canonical: UserPromptNode = {
     id: `${interaction.id}__prompt`,
     type: 'user_prompt',
