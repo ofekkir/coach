@@ -36,11 +36,15 @@ function extractTokenUsage(
   return { ...fromFirst, stopReason: last.message?.stop_reason ?? '' };
 }
 
-function extractLlmSpanMeta(group: NativeEntry[]): LlmSpanMeta | null {
+function extractLlmSpanMeta(
+  group: NativeEntry[],
+  trigUser: NativeEntry | null,
+): LlmSpanMeta | null {
   const bounds = extractLlmGroupBounds(group);
   if (bounds == null) return null;
   const { first, last } = bounds;
-  const spanStart = isoToNano(first.timestamp);
+  const spanStart =
+    trigUser?.timestamp != null ? isoToNano(trigUser.timestamp) : isoToNano(first.timestamp);
   const usage = extractTokenUsage(first, last);
   return {
     ...usage,
@@ -57,7 +61,7 @@ function buildLlmSpan(
   interactionSpanId: string,
   trigUser: NativeEntry | null,
 ): OtlpSpan | null {
-  const meta = extractLlmSpanMeta(group);
+  const meta = extractLlmSpanMeta(group, trigUser);
   if (meta == null) return null;
 
   const rawRequestBody = JSON.stringify({
