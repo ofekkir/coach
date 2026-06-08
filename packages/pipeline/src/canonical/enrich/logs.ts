@@ -22,8 +22,8 @@ export function attributeLogsToSpans(
     let target: string;
     if (log.request_id != null) {
       target = requestIdIndex.get(log.request_id) ?? log.span_id;
-    } else if (childIds.has(log.span_id)) {
-      target = log.span_id;
+    } else if (childIds.has('s' + log.span_id)) {
+      target = 's' + log.span_id;
     } else {
       const m = narrowestContaining(metas, BigInt(log.timestamp_ns));
       target = m !== null ? m.id : log.span_id;
