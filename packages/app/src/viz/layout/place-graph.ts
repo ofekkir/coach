@@ -5,7 +5,7 @@ import type {
   Thread,
 } from '@coach/pipeline';
 import { estimateNodeH } from './estimate.ts';
-import { buildLabelLines } from '../format/format.ts';
+import { buildNodeCard } from '../format/format.ts';
 import { link, placeThread, pushStructural } from './place-members.ts';
 import type { Ctx } from './types.ts';
 import { HG, LG, NW, VG } from './types.ts';
@@ -30,12 +30,12 @@ function placeInteraction(
 
   pushStructural(root, 'interaction', ctx.cx - NW / 2, y, hasKids, ctx);
   link(parentId, root.id, undefined, ctx);
-  y += estimateNodeH(buildLabelLines(root.canonical)) + (isExpanded && hasKids ? LG : VG);
+  y += estimateNodeH(buildNodeCard(root.canonical)) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
   const threadParent = placeUserPrompt(interaction.userPrompt, root.id, y, ctx);
   if (interaction.userPrompt != null) {
-    y += estimateNodeH(buildLabelLines(interaction.userPrompt.canonical)) + VG;
+    y += estimateNodeH(buildNodeCard(interaction.userPrompt.canonical)) + VG;
   }
 
   const totalW = threads.length * NW + (threads.length - 1) * HG;
@@ -72,7 +72,7 @@ function placeSession(session: SessionExecution, parentId: string, y: number, ct
 
   pushStructural(root, 'session', ctx.cx - NW / 2, y, hasKids, ctx);
   link(parentId, root.id, undefined, ctx);
-  y += estimateNodeH(buildLabelLines(root.canonical)) + (isExpanded && hasKids ? LG : VG);
+  y += estimateNodeH(buildNodeCard(root.canonical)) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
   for (const interaction of session.interactions) {
@@ -90,7 +90,7 @@ export function placeAgent(agent: AgentExecution, ctx: Ctx): void {
   pushStructural(root, 'root', ctx.cx - NW / 2, 50, hasKids, ctx);
   if (!isExpanded || !hasKids) return;
 
-  const y = 50 + estimateNodeH(buildLabelLines(root.canonical)) + LG;
+  const y = 50 + estimateNodeH(buildNodeCard(root.canonical)) + LG;
   const sessionWidths = agent.sessions.map((s) => sessionWidth(s));
   const totalW = sessionWidths.reduce((sum, w) => sum + w, 0) + (agent.sessions.length - 1) * HG;
   let sx = ctx.cx - totalW / 2;

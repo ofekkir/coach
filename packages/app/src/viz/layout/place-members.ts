@@ -2,7 +2,7 @@ import { MarkerType } from '@xyflow/react';
 import type { ExecutionNode, Thread } from '@coach/pipeline';
 import { colorOf, fillOf } from './colors.ts';
 import { estimateNodeH } from './estimate.ts';
-import { buildLabelLines, formatGap, threadTitle } from '../format/format.ts';
+import { buildNodeCard, formatGap, threadTitle } from '../format/format.ts';
 import type { Ctx, TraceRFNodeData } from './types.ts';
 import { VG } from './types.ts';
 
@@ -43,18 +43,17 @@ export function pushStructural(
   hasKids: boolean,
   ctx: Ctx,
 ): void {
-  const labelLines = buildLabelLines(node.canonical);
-  const type = labelLines[0] ?? '';
+  const card = buildNodeCard(node.canonical);
   push(
     node.id,
     x,
     y,
     {
       kind,
-      labelLines,
+      card,
       canonical: node.canonical,
-      color: colorOf(type),
-      fill: fillOf(type),
+      color: colorOf(card.type),
+      fill: fillOf(card.type),
       hasRFChildren: hasKids,
       isExpanded: ctx.expanded.has(node.id),
       selected: node.id === ctx.selected,
@@ -72,18 +71,17 @@ function pushExecNode(
   isExpanded: boolean,
   ctx: Ctx,
 ): void {
-  const labelLines = buildLabelLines(node.canonical);
-  const type = labelLines[0] ?? '';
+  const card = buildNodeCard(node.canonical);
   push(
     node.id,
     x,
     y,
     {
       kind,
-      labelLines,
+      card,
       canonical: node.canonical,
-      color: colorOf(type),
-      fill: fillOf(type),
+      color: colorOf(card.type),
+      fill: fillOf(card.type),
       hasRFChildren,
       isExpanded,
       selected: node.id === ctx.selected,
@@ -108,7 +106,7 @@ function placeSubtree(
     const isExpanded = hasKids && ctx.expanded.has(child.id);
     pushExecNode(child, 'member', tx, y, hasKids, isExpanded, ctx);
     link(lastId, child.id, undefined, ctx);
-    y += estimateNodeH(buildLabelLines(child.canonical)) + VG;
+    y += estimateNodeH(buildNodeCard(child.canonical)) + VG;
     lastId = child.id;
     if (!isExpanded) continue;
     const sub = placeSubtree(child, tx, y, ctx);
@@ -142,7 +140,7 @@ export function placeThread(
 
     pushExecNode(member, 'member', tx, y, hasSubNodes, isExpandedMember, ctx);
     link(prevId, member.id, edgeLabelFor(thread, i), ctx);
-    y += estimateNodeH(buildLabelLines(member.canonical)) + VG;
+    y += estimateNodeH(buildNodeCard(member.canonical)) + VG;
 
     let lastId = member.id;
     if (isExpandedMember) {

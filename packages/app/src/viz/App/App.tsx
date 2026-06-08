@@ -5,11 +5,12 @@ import type { Elements } from '../FlowInner/FlowInner.tsx';
 import { FlowInner } from '../FlowInner/FlowInner.tsx';
 import { DetailsPanel } from '../DetailsPanel/DetailsPanel.tsx';
 import { Toolbar } from '../Toolbar/Toolbar.tsx';
+import type { TraceRFNodeData } from '../layout/types.ts';
 
-function selectedLabelLines(elements: Elements, selectedId: string | null): string[] | null {
+function selectedData(elements: Elements, selectedId: string | null): TraceRFNodeData | null {
   if (selectedId == null) return null;
   const node = elements.nodes.find((n) => n.id === selectedId);
-  return node != null ? node.data.labelLines : null;
+  return node != null ? node.data : null;
 }
 
 export function App({ data, title }: { data: ExecutionGraph; title: string }) {
@@ -26,7 +27,7 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
   const allExpandable = useMemo(() => allExpandableIds(data), [data]);
   const rootId = useMemo(() => agentRoot(data), [data]);
 
-  const labelLines = selectedLabelLines(elements, selectedId);
+  const selected = selectedData(elements, selectedId);
 
   const onExpandAll = useCallback(() => {
     setExpanded(new Set(allExpandable));
@@ -46,9 +47,10 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
         onSelectId={setSelectedId}
       />
       <Toolbar title={title} onExpandAll={onExpandAll} onCollapseAll={onCollapseAll} />
-      {labelLines != null && (
+      {selected != null && (
         <DetailsPanel
-          labelLines={labelLines}
+          card={selected.card}
+          canonical={selected.canonical}
           onClose={() => {
             setSelectedId(null);
           }}

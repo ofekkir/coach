@@ -109,6 +109,16 @@ execution graph, and sessions are navigated by expand/collapse inside the graph.
 are carried through `classified` (never silently dropped) and surfaced as a count. The graph is
 consumed only by the renderer — no raw `CanonicalNode[]` reaches the visualization layer.
 
+**Display derives from structure, never content.** `viz/format/format.ts` turns each node's
+`canonical` into a typed `NodeCard` — a curated, at-a-glance summary (display type, title,
+structural key/values, numeric metrics) drawn on the node. The card reads only fields the
+canonical model guarantees; it never interprets harness-shaped content (response content blocks,
+`tool_input` JSON). That content flows untouched into a generic JSON tree (`viz/JsonView`,
+backed by `@uiw/react-json-view`) shown in the details panel. Net effect: new node types or
+content shapes from the pipeline render in the viewer for free; only the curated card touches
+`format.ts`. The renderer consumes the typed `NodeCard` (and raw `canonical` for the viewer) —
+no stringly-typed label arrays.
+
 ## Upload flow and the data-source seam
 
 The app has two intake paths, both converging on `VizResult[]` before the renderer:
