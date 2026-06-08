@@ -1,4 +1,4 @@
-import type { CanonicalNode } from '../types.ts';
+import type { CanonicalNode, InteractionNode, SessionNode } from '../types.ts';
 
 function sessionNodeId(sessionId: string): string {
   return `session-${sessionId}`;
@@ -9,8 +9,12 @@ function agentNodeId(userId: string): string {
 }
 
 // Synthesizes a session node and re-parents root interaction nodes under it.
+function isRootInteraction(n: CanonicalNode): n is InteractionNode {
+  return n.type === 'interaction' && n.parent == null;
+}
+
 export function addSessionNode(nodes: readonly CanonicalNode[]): CanonicalNode[] {
-  const interaction = nodes.find((n) => n.type === 'interaction' && n.parent == null);
+  const interaction = nodes.find(isRootInteraction);
   if (interaction?.session_id == null) return [...nodes];
 
   const sessionId = interaction.session_id;
@@ -50,8 +54,12 @@ export const SYNTHETIC_AGENT_ID = 'agent-upload';
 // Synthesizes an agent node and re-parents root session nodes under it.
 // Multi-agent is out of scope — every session rolls up under one agent.
 // Uses user_id from the first root session if present; falls back to SYNTHETIC_AGENT_ID.
+function isRootSession(n: CanonicalNode): n is SessionNode {
+  return n.type === 'session' && n.parent == null;
+}
+
 export function aggregateAgent(sessionNodes: readonly CanonicalNode[]): CanonicalNode[] {
-  const session = sessionNodes.find((n) => n.type === 'session' && n.parent == null);
+  const session = sessionNodes.find(isRootSession);
   const userId = session?.user_id ?? null;
   const agentId = userId != null ? agentNodeId(userId) : SYNTHETIC_AGENT_ID;
 

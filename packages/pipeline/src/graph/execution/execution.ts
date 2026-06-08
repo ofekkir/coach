@@ -1,4 +1,4 @@
-import type { CanonicalNode } from '../../types.ts';
+import type { CanonicalNode, InteractionNode, UserPromptNode } from '../../types.ts';
 import type {
   AgentExecution,
   ExecutionGraph,
@@ -27,6 +27,10 @@ import {
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Recursive node building ─────────────────────────────────────────────────
+
+function isInteraction(n: CanonicalNode): n is InteractionNode {
+  return n.type === 'interaction';
+}
 
 function toExecutionNode(
   node: CanonicalNode,
@@ -94,7 +98,7 @@ function orderSources(
 export function buildInteractionExecution(
   nodes: readonly CanonicalNode[],
 ): InteractionExecution | null {
-  const interaction = nodes.find((n) => n.type === 'interaction');
+  const interaction = nodes.find(isInteraction);
   if (interaction == null) return null;
 
   const childrenOf = buildChildrenOf(nodes);
@@ -123,16 +127,14 @@ export function buildInteractionExecution(
 }
 
 // The user prompt is a synthesized first node of the interaction — its input /
-// the head of the spine, carrying the full prompt. Mechanical (the prompt is on
-// the interaction span), but not a step.
-function toUserPromptNode(interaction: CanonicalNode): ExecutionNode | null {
+// the head of the spine, carrying the full prompt. Mechanical, but not a step.
+function toUserPromptNode(interaction: InteractionNode): ExecutionNode | null {
   if (interaction.prompt == null || interaction.prompt.trim() === '') return null;
-  const canonical: CanonicalNode = {
+  const canonical: UserPromptNode = {
     id: `${interaction.id}__prompt`,
     type: 'user_prompt',
     parent: interaction.id,
     prompt: interaction.prompt,
-    ...(interaction.start_time_ns != null ? { start_time_ns: interaction.start_time_ns } : {}),
   };
   return { id: canonical.id, canonical, children: [], innerEdges: [] };
 }
@@ -162,7 +164,7 @@ function buildThread(
   };
 }
 
-function emptyInteractionExecution(interaction: CanonicalNode): InteractionExecution {
+function emptyInteractionExecution(interaction: InteractionNode): InteractionExecution {
   return {
     root: { id: interaction.id, canonical: interaction, children: [], innerEdges: [] },
     userPrompt: toUserPromptNode(interaction),
@@ -198,9 +200,7 @@ function buildSessionExecution(nodes: readonly CanonicalNode[]): SessionExecutio
   if (session == null) return null;
 
   const childrenOf = buildChildrenOf(nodes);
-  const interactions = sortByStart(
-    (childrenOf.get(session.id) ?? []).filter((n) => n.type === 'interaction'),
-  );
+  const interactions = sortByStart((childrenOf.get(session.id) ?? []).filter(isInteraction));
   if (interactions.length === 0) return null;
 
   const root: ExecutionNode = { id: session.id, canonical: session, children: [], innerEdges: [] };
@@ -226,9 +226,8 @@ function buildAgentExecution(nodes: readonly CanonicalNode[]): AgentExecution | 
   if (agent == null) return null;
 
   const childrenOf = buildChildrenOf(nodes);
-  const sessions = sortByStart(
-    (childrenOf.get(agent.id) ?? []).filter((n) => n.type === 'session'),
-  );
+  const directSessions = (childrenOf.get(agent.id) ?? []).filter((n) => n.type === 'session');
+  const sessions = sortByStart(directSessions);
   if (sessions.length === 0) return null;
 
   const root: ExecutionNode = { id: agent.id, canonical: agent, children: [], innerEdges: [] };

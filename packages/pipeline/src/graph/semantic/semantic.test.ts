@@ -13,6 +13,9 @@ const interaction: CanonicalNode = {
   type: 'interaction',
   parent: 'sess',
   prompt: 'do something',
+  start_time_ns: '90000000',
+  end_time_ns: '500000000',
+  duration_ms: 410,
 };
 const llm1: CanonicalNode = {
   id: 'llm1',
@@ -26,6 +29,7 @@ const llm1: CanonicalNode = {
   tokens_out: 20,
   start_time_ns: '100000000',
   end_time_ns: '200000000',
+  duration_ms: 100,
 };
 const tool1: CanonicalNode = {
   id: 'tool1',
@@ -35,6 +39,7 @@ const tool1: CanonicalNode = {
   tool_input: 'pnpm test',
   start_time_ns: '210000000',
   end_time_ns: '300000000',
+  duration_ms: 90,
 };
 
 function makeGraph(): ExecutionGraph {
@@ -95,10 +100,8 @@ describe('enrichExecutionGraph', () => {
     const llmNode = thread?.members.find((m) => m.id === 'llm1');
     const toolNode = thread?.members.find((m) => m.id === 'tool1');
 
-    expect(llmNode?.canonical.type).toBe('inference');
-    expect(llmNode?.canonical.what).toBe('plan next steps');
-    expect(toolNode?.canonical.type).toBe('action');
-    expect(toolNode?.canonical.what).toBe('run tests');
+    expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: 'plan next steps' });
+    expect(toolNode?.canonical).toMatchObject({ type: 'action', what: 'run tests' });
   });
 
   it('falls back to tool name when label is missing', async () => {
@@ -110,10 +113,8 @@ describe('enrichExecutionGraph', () => {
     const toolNode = thread?.members.find((m) => m.id === 'tool1');
     const llmNode = thread?.members.find((m) => m.id === 'llm1');
 
-    expect(toolNode?.canonical.type).toBe('action');
-    expect(toolNode?.canonical.what).toBe('Bash'); // tool.name fallback
-    expect(llmNode?.canonical.type).toBe('inference');
-    expect(llmNode?.canonical.what).toBe('claude-haiku'); // model fallback
+    expect(toolNode?.canonical).toMatchObject({ type: 'action', what: 'Bash' }); // tool.name fallback
+    expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: 'claude-haiku' }); // model fallback
   });
 
   it('preserves graph structure: ids, edges, hierarchy, and non-tool nodes', async () => {
@@ -147,9 +148,11 @@ describe('enrichExecutionGraph', () => {
     const thread = enriched.data.sessions[0]?.interactions[0]?.threads[0];
     const llmNode = thread?.members.find((m) => m.id === 'llm1');
 
-    expect(llmNode?.canonical.tokens_in).toBe(100);
-    expect(llmNode?.canonical.tokens_out).toBe(20);
-    expect(llmNode?.canonical.model).toBe('claude-haiku');
+    expect(llmNode?.canonical).toMatchObject({
+      tokens_in: 100,
+      tokens_out: 20,
+      model: 'claude-haiku',
+    });
   });
 
   it('only calls labelBatch once for all nodes in the graph', async () => {

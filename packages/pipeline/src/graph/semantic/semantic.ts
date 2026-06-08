@@ -1,4 +1,4 @@
-import type { CanonicalNode } from '../../types.ts';
+import type { GraphNode } from '../../types.ts';
 import type {
   AgentExecution,
   ExecutionGraph,
@@ -95,17 +95,17 @@ function collectRequests(graph: ExecutionGraph): LabelRequest[] {
 
 // ── Node conversion ───────────────────────────────────────────────────────────
 
-function mechanicalLabel(canonical: CanonicalNode): string {
-  if (canonical.type === 'tool') return canonical.name ?? 'tool';
-  if (canonical.type === 'llm_request') return canonical.model ?? 'llm_request';
-  return canonical.type;
+function mechanicalLabel(node: GraphNode): string {
+  if (node.type === 'tool') return node.name ?? 'tool';
+  if (node.type === 'llm_request') return node.model ?? 'llm_request';
+  return node.type;
 }
 
-function convertCanonical(canonical: CanonicalNode, what: string | undefined): CanonicalNode {
-  const label = what ?? mechanicalLabel(canonical);
-  if (canonical.type === 'tool') return { ...canonical, type: 'action', what: label };
-  if (canonical.type === 'llm_request') return { ...canonical, type: 'inference', what: label };
-  return canonical;
+function convertCanonical(node: GraphNode, what: string | undefined): GraphNode {
+  const label = what ?? mechanicalLabel(node);
+  if (node.type === 'tool') return { ...node, type: 'action', what: label };
+  if (node.type === 'llm_request') return { ...node, type: 'inference', what: label };
+  return node;
 }
 
 function convertNode(node: ExecutionNode, labels: Map<string, string>): ExecutionNode {

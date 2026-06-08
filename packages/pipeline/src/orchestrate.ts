@@ -2,11 +2,18 @@ import { SYNTHETIC_AGENT_ID, aggregateAgent, aggregateSession } from './aggregat
 import { toCanonical } from './canonical/canonical.ts';
 import { classifyInputs } from './classify/classify.ts';
 import { buildExecutionGraph } from './graph/execution/execution.ts';
+import { startNs } from './graph/execution/thread.ts';
 import type { ExecutionGraph, VizResult } from './graph/types.ts';
 import { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 import type { LabelBatchFn } from './graph/semantic/semantic.ts';
 import { routeToSessions } from './route/route.ts';
-import type { CanonicalNode, ClassifiedInput, SessionInputs, UploadedFile } from './types.ts';
+import type {
+  AgentNode,
+  CanonicalNode,
+  ClassifiedInput,
+  SessionInputs,
+  UploadedFile,
+} from './types.ts';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -29,10 +36,12 @@ export interface PipelineResult {
 
 function sortByTime(nodes: readonly CanonicalNode[]): CanonicalNode[] {
   return [...nodes].sort((a, b) => {
-    if (!a.start_time_ns && !b.start_time_ns) return 0;
-    if (!a.start_time_ns) return -1;
-    if (!b.start_time_ns) return 1;
-    const diff = BigInt(a.start_time_ns) - BigInt(b.start_time_ns);
+    const aStart = startNs(a);
+    const bStart = startNs(b);
+    if (!aStart && !bStart) return 0;
+    if (!aStart) return -1;
+    if (!bStart) return 1;
+    const diff = BigInt(aStart) - BigInt(bStart);
     return diff < 0n ? -1 : diff > 0n ? 1 : 0;
   });
 }
@@ -97,7 +106,9 @@ export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
   // resolved a session id but produced no canonical nodes — e.g. logs with no trace).
   if (!result.agentGraph.some((n) => n.type === 'session')) return [];
 
-  const agent = result.agentGraph.find((n) => n.type === 'agent' && n.id !== SYNTHETIC_AGENT_ID);
+  const agent = result.agentGraph.find(
+    (n): n is AgentNode => n.type === 'agent' && n.id !== SYNTHETIC_AGENT_ID,
+  );
   const title = agent?.user_id ?? 'agent';
   return [{ title, data: result.executionGraph }];
 }

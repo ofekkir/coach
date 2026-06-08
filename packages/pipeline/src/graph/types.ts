@@ -1,8 +1,9 @@
-import type { CanonicalNode, RequestMessage, ResponseMessage } from '../types.ts';
+import type { GraphNode, RequestMessage, ResponseMessage } from '../types.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Execution graph — the deterministic mechanical skeleton produced from the
-// trace. Lossless: every node carries its full CanonicalNode; no display text.
+// trace. Lossless: every node carries its full GraphNode (a CanonicalNode, or
+// its semantically-relabeled counterpart after enrichment); no display text.
 //
 //   agent ▸ session ▸ interaction ▸ thread ▸ step
 //
@@ -30,7 +31,10 @@ export interface GraphEdge {
  *  non-`llm_request` nodes. */
 export interface ExecutionNode {
   readonly id: string;
-  readonly canonical: CanonicalNode;
+  // Named `canonical` for the mechanical graph, but typed `GraphNode`: after the
+  // semantic stage runs, a tool/llm_request step here holds its action/inference
+  // relabel (a SemanticNode), which is not canonical. Not renamed to avoid churn.
+  readonly canonical: GraphNode;
   readonly children: readonly ExecutionNode[];
   readonly innerEdges: readonly GraphEdge[];
   readonly requestMessagesDelta?: readonly RequestMessage[];

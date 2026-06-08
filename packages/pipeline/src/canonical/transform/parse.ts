@@ -1,4 +1,4 @@
-import type { NodeType, OtlpAttribute, TempoTrace } from '../../types.ts';
+import type { OtlpAttribute, TempoTrace } from '../../types.ts';
 
 export interface ParsedSpan {
   readonly id: string;
@@ -42,17 +42,6 @@ function getIntAttr(attrs: readonly OtlpAttribute[], key: string): number | null
     return isNaN(n) ? null : n;
   }
   return null;
-}
-
-export function isNodeType(s: string): s is NodeType {
-  return (
-    s === 'interaction' ||
-    s === 'llm_request' ||
-    s === 'tool' ||
-    s === 'tool.blocked_on_user' ||
-    s === 'tool.execution' ||
-    s === 'hook'
-  );
 }
 
 export function parseSpans(trace: TempoTrace): ParsedSpan[] {

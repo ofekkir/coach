@@ -1,23 +1,28 @@
 import type {
   AgentExecution,
-  CanonicalNode,
+  AgentNode,
   ExecutionGraph,
   ExecutionNode,
   InteractionExecution,
   SessionExecution,
+  SessionNode,
 } from '@coach/pipeline';
 import { placeAgent, sessionWidth } from './place-graph.ts';
 import type { Ctx, TraceRFNode } from './types.ts';
 import { NW, HG } from './types.ts';
 import type { Edge } from '@xyflow/react';
 
-function synthetic(id: string, type: CanonicalNode['type']): ExecutionNode {
-  return {
-    id,
-    canonical: { id, type },
-    children: [],
-    innerEdges: [],
-  };
+function synthetic(canonical: AgentNode | SessionNode): ExecutionNode {
+  return { id: canonical.id, canonical, children: [], innerEdges: [] };
+}
+
+function syntheticAgent(): ExecutionNode {
+  return synthetic({ id: '__agent__', type: 'agent' });
+}
+
+// Empty session_id so the renderer falls back to a positional title.
+function syntheticSession(): ExecutionNode {
+  return synthetic({ id: '__session__', type: 'session', session_id: '' });
 }
 
 /** Normalizes any ExecutionGraph variant into a single AgentExecution by
@@ -27,12 +32,12 @@ function toAgent(graph: ExecutionGraph): AgentExecution {
   if (graph.kind === 'agent') return graph.data;
 
   if (graph.kind === 'session') {
-    return { root: synthetic('__agent__', 'agent'), sessions: [graph.data] };
+    return { root: syntheticAgent(), sessions: [graph.data] };
   }
 
   const interactions: InteractionExecution[] = graph.data != null ? [graph.data] : [];
-  const session: SessionExecution = { root: synthetic('__session__', 'session'), interactions };
-  return { root: synthetic('__agent__', 'agent'), sessions: [session] };
+  const session: SessionExecution = { root: syntheticSession(), interactions };
+  return { root: syntheticAgent(), sessions: [session] };
 }
 
 export function buildElements(
