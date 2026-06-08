@@ -10,9 +10,36 @@ import type {
 // ════════════════════════════════════════════════════════════════════════════
 // Presentation lives in the APP, not the pipeline. The pipeline emits lossless,
 // presentation-free nodes (a full CanonicalNode per execution node); this module
-// derives every piece of display text the renderer needs: label lines, titles,
-// durations, and the signed inter-step gap.
+// derives a typed `NodeCard` — the curated, at-a-glance summary the renderer
+// draws. The card carries ONLY structural facts the canonical model guarantees
+// (display type, a title, structural key/values, numeric metrics). It never
+// interprets harness-shaped CONTENT (response content blocks, tool_input JSON):
+// that flows untouched into the JSON viewer in the details panel. Adding a node
+// type or field touches this builder; new content shapes need no change here.
 // ════════════════════════════════════════════════════════════════════════════
+
+/** A single structural key/value shown on the card body and details header. */
+export interface CardField {
+  readonly label: string;
+  readonly value: string;
+}
+
+/** Raw numeric metrics — the renderer formats them (ms, counts, dollars). */
+export interface CardMetrics {
+  readonly durationMs?: number;
+  readonly tokensIn?: number;
+  readonly tokensOut?: number;
+  readonly costUsd?: number;
+}
+
+/** The typed view-model for one node card. `type` is the display discriminant
+ *  the renderer keys its badge/color on (e.g. `tool.execution` → `execution`). */
+export interface NodeCard {
+  readonly type: string;
+  readonly title?: string;
+  readonly fields: readonly CardField[];
+  readonly metrics: CardMetrics;
+}
 
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + '…';
@@ -34,69 +61,22 @@ function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ');
 }
 
-function optionalLine(
-  value: string | null | undefined,
-  format: (v: string) => string = (v) => v,
-): string[] {
-  return value != null ? [format(value)] : [];
-}
-
-function firstResponseText(
-  messages: readonly { type: string; text?: string; thinking?: string; name?: string }[],
-): string | null {
-  for (const block of messages) {
-    if (block.type === 'text' && block.text) return block.text;
-    if (block.type === 'tool_use' && block.name) return `tool_use: ${block.name}`;
-    if (block.type === 'thinking' && block.thinking && block.thinking !== '<REDACTED>') {
-      return block.thinking;
-    }
-  }
-  return null;
-}
-
-function formatToolInput(input: string): string {
-  try {
-    const parsed = JSON.parse(input) as Record<string, unknown>;
-    const pairs = Object.entries(parsed)
-      .map(([k, v]) => `${k}: ${String(v)}`)
-      .join(', ');
-    return truncate(pairs, 120);
-  } catch {
-    return truncate(input, 120);
-  }
-}
-
-function actionLines(node: ActionNode): string[] {
-  // `what` is always set by the semantic stage; `name` is the structural fallback.
-  return [
-    'action',
-    ...(node.what !== '' ? [node.what] : optionalLine(node.name, (n) => `name: ${n}`)),
-    ...optionalLine(node.tool_input, formatToolInput),
-  ];
-}
-
-function inferenceLines(node: InferenceNode): string[] {
-  const responseText =
-    node.response_messages != null ? firstResponseText(node.response_messages) : null;
-  return [
-    'inference',
-    ...(node.what !== '' ? [node.what] : optionalLine(node.model, (m) => `model: ${m}`)),
-    ...optionalLine(responseText, (o) => `output: ${truncate(collapseWhitespace(o), 500)}`),
-  ];
-}
-
-function llmRequestLines(node: LlmRequestNode): string[] {
-  const lines = ['llm_request'];
-  lines.push(`model: ${node.model}`);
-  if (node.source != null) lines.push(`source: ${node.source}`);
-  const responseText =
-    node.response_messages != null ? firstResponseText(node.response_messages) : null;
-  if (responseText != null) lines.push(collapseWhitespace(responseText));
-  return lines;
+/** Renders a card's numeric metrics for display: the duration becomes a chip,
+ *  token counts and cost collapse into one secondary line. */
+export function formatMetrics(metrics: CardMetrics): {
+  duration: string | null;
+  secondary: string | null;
+} {
+  const duration = metrics.durationMs != null ? formatDuration(metrics.durationMs) : null;
+  const parts: string[] = [];
+  if (metrics.tokensIn != null) parts.push(`in ${String(metrics.tokensIn)}`);
+  if (metrics.tokensOut != null) parts.push(`out ${String(metrics.tokensOut)}`);
+  if (metrics.costUsd != null) parts.push(`$${metrics.costUsd.toFixed(6)}`);
+  return { duration, secondary: parts.length > 0 ? parts.join(' · ') : null };
 }
 
 /** Title for an interaction node: a short prompt preview, else a positional fallback. */
-function interactionTitle(node: InteractionNode, index = 0): string {
+function interactionTitle(node: InteractionNode, index: number): string {
   if (node.prompt.trim() !== '') {
     return truncate(collapseWhitespace(node.prompt).trim(), 40);
   }
@@ -104,7 +84,7 @@ function interactionTitle(node: InteractionNode, index = 0): string {
 }
 
 /** Title for a session node: a short session_id preview, else a positional fallback. */
-function sessionTitle(node: SessionNode, index = 0): string {
+function sessionTitle(node: SessionNode, index: number): string {
   if (node.session_id.trim() !== '') {
     return truncate(node.session_id, 24);
   }
@@ -116,51 +96,79 @@ export function threadTitle(source: string): string {
   return `thread: ${source}`;
 }
 
-// Each builder is typed to the node member its discriminant selects, so field
-// access inside is checked against the right shape (no wide-union guards).
-type LineBuilders = {
-  [N in GraphNode as N['type']]?: (node: N, index: number) => string[];
-};
-
-const TYPE_LINE_BUILDERS: LineBuilders = {
-  agent: (n) => ['agent', ...optionalLine(n.user_id)],
-  session: (n, i) => ['session', sessionTitle(n, i)],
-  interaction: (n, i) => ['interaction', interactionTitle(n, i)],
-  user_prompt: (n) => ['user_prompt', ...optionalLine(n.prompt, collapseWhitespace)],
-  llm_request: (n) => llmRequestLines(n),
-  tool: (n) => [
-    'tool',
-    ...optionalLine(n.name, (x) => `name: ${x}`),
-    ...optionalLine(n.tool_input, formatToolInput),
-  ],
-  'tool.blocked_on_user': () => ['blocked_on_user'],
-  'tool.execution': () => ['execution'],
-  hook: (n) => ['hook', ...optionalLine(n.name, (x) => `name: ${x}`)],
-  action: (n) => actionLines(n),
-  inference: (n) => inferenceLines(n),
-};
-
-function typeLines(node: GraphNode, index: number): string[] {
-  // The table is keyed by discriminant; TS can't correlate the lookup with the
-  // node's narrowed type, so assert the resolved builder accepts this node.
-  const builder = TYPE_LINE_BUILDERS[node.type] as
-    | ((node: GraphNode, index: number) => string[])
-    | undefined;
-  return builder?.(node, index) ?? [node.type];
+function field(label: string, value: string | undefined): CardField[] {
+  return value != null && value !== '' ? [{ label, value }] : [];
 }
 
-/** The full ordered label lines for a node: `[type, ...details, duration?, tokens?, cost?]`.
- *  Line 0 is always the structural type — the renderer keys its badge/color on it.
- *  `index` supplies positional fallbacks for session/interaction titles. */
-export function buildLabelLines(node: GraphNode, index = 0): string[] {
-  const lines = typeLines(node, index);
+/** Display type + title + structural fields for a node. `what` (set by the
+ *  semantic stage) is the headline for relabeled nodes, with the structural
+ *  name/model as fallback. Content lives in the JSON viewer, never here. */
+interface CardShape {
+  type: string;
+  title?: string | undefined;
+  fields?: readonly CardField[] | undefined;
+}
 
+function actionShape(node: ActionNode): CardShape {
+  return { type: 'action', title: node.what !== '' ? node.what : node.name };
+}
+
+function inferenceShape(node: InferenceNode): CardShape {
+  return { type: 'inference', title: node.what !== '' ? node.what : node.model };
+}
+
+function llmRequestShape(node: LlmRequestNode): CardShape {
+  return { type: 'llm_request', title: node.model, fields: field('source', node.source) };
+}
+
+// Each builder is typed to the node member its discriminant selects, so field
+// access inside is checked against the right shape (no wide-union guards).
+type ShapeBuilders = {
+  [N in GraphNode as N['type']]?: (node: N, index: number) => CardShape;
+};
+
+const TYPE_SHAPE_BUILDERS: ShapeBuilders = {
+  agent: (n) => ({ type: 'agent', title: n.user_id }),
+  session: (n, i) => ({ type: 'session', title: sessionTitle(n, i) }),
+  interaction: (n, i) => ({ type: 'interaction', title: interactionTitle(n, i) }),
+  user_prompt: (n) => ({ type: 'user_prompt', title: collapseWhitespace(n.prompt) }),
+  llm_request: (n) => llmRequestShape(n),
+  tool: (n) => ({ type: 'tool', title: n.name }),
+  'tool.blocked_on_user': () => ({ type: 'blocked_on_user' }),
+  'tool.execution': () => ({ type: 'execution' }),
+  hook: (n) => ({ type: 'hook', title: n.name }),
+  action: (n) => actionShape(n),
+  inference: (n) => inferenceShape(n),
+};
+
+function shapeOf(node: GraphNode, index: number): CardShape {
+  // The table is keyed by discriminant; TS can't correlate the lookup with the
+  // node's narrowed type, so assert the resolved builder accepts this node.
+  const builder = TYPE_SHAPE_BUILDERS[node.type] as
+    | ((node: GraphNode, index: number) => CardShape)
+    | undefined;
+  return builder?.(node, index) ?? { type: node.type };
+}
+
+function metricsOf(node: GraphNode): CardMetrics {
   // `in` narrows to the members carrying each field and, since these are only
   // ever set when present, confirms a real value (no extra null guard needed).
-  if ('duration_ms' in node) lines.push(`duration: ${formatDuration(node.duration_ms)}`);
-  if ('tokens_in' in node) lines.push(`tokens in: ${String(node.tokens_in)}`);
-  if ('tokens_out' in node) lines.push(`tokens out: ${String(node.tokens_out)}`);
-  if ('cost_usd' in node) lines.push(`cost: $${node.cost_usd.toFixed(6)}`);
+  return {
+    ...('duration_ms' in node ? { durationMs: node.duration_ms } : {}),
+    ...('tokens_in' in node ? { tokensIn: node.tokens_in } : {}),
+    ...('tokens_out' in node ? { tokensOut: node.tokens_out } : {}),
+    ...('cost_usd' in node ? { costUsd: node.cost_usd } : {}),
+  };
+}
 
-  return lines;
+/** The curated card for a node. `index` supplies positional fallbacks for
+ *  session/interaction titles. */
+export function buildNodeCard(node: GraphNode, index = 0): NodeCard {
+  const shape = shapeOf(node, index);
+  return {
+    type: shape.type,
+    ...(shape.title != null && shape.title !== '' ? { title: shape.title } : {}),
+    fields: shape.fields ?? [],
+    metrics: metricsOf(node),
+  };
 }

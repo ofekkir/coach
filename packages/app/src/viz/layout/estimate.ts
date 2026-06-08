@@ -1,10 +1,14 @@
-export function estimateNodeH(labelLines: readonly string[]): number {
-  const body = labelLines.slice(1);
-  const timingIdx = body.findIndex((l) => l.startsWith('duration:'));
-  const hasTiming = timingIdx >= 0;
-  const displayLines = hasTiming ? body.filter((_, i) => i !== timingIdx) : body;
-  const hasName = displayLines.length > 0;
-  const detailCount = Math.max(0, displayLines.length - (hasName ? 1 : 0));
+import type { NodeCard } from '../format/format.ts';
 
-  return Math.max(62, 28 + 6 + (hasName ? 18 : 0) + detailCount * 16 + (hasTiming ? 20 : 0) + 8);
+function hasAnyMetric(card: NodeCard): boolean {
+  const { durationMs, tokensIn, tokensOut, costUsd } = card.metrics;
+  return durationMs != null || tokensIn != null || tokensOut != null || costUsd != null;
+}
+
+export function estimateNodeH(card: NodeCard): number {
+  const titleH = card.title != null ? 18 : 0;
+  const fieldsH = card.fields.length * 16;
+  const metricsH = hasAnyMetric(card) ? 24 : 0;
+
+  return Math.max(62, 28 + 6 + titleH + fieldsH + metricsH + 8);
 }

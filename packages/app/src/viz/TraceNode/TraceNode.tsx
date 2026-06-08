@@ -16,24 +16,6 @@ const TYPE_BADGES: Record<string, string> = {
   inference: 'INFER',
 };
 
-function splitLines(lines: readonly string[]): {
-  name: string;
-  details: string[];
-  timing: string | null;
-} {
-  const body = lines.slice(1);
-  const timingIdx = body.findIndex((l) => l.startsWith('duration:'));
-  const hasTiming = timingIdx >= 0;
-  const nonTimingBody = hasTiming ? body.filter((_, i) => i !== timingIdx) : body;
-  const timing = hasTiming ? (body[timingIdx]?.match(/^duration:\s*(.+)$/)?.[1] ?? null) : null;
-
-  return {
-    name: nonTimingBody[0] ?? '',
-    details: nonTimingBody.slice(1),
-    timing,
-  };
-}
-
 function cardStyle(
   color: string,
   fill: string,
@@ -56,10 +38,8 @@ function cardStyle(
 }
 
 export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
-  const { labelLines, color, fill, hasRFChildren, isExpanded }: TraceRFNodeData = data;
-  const type = labelLines[0] ?? '';
-  const badge = TYPE_BADGES[type] ?? type.toUpperCase();
-  const { name, details, timing } = splitLines(labelLines);
+  const { card, color, fill, hasRFChildren, isExpanded }: TraceRFNodeData = data;
+  const badge = TYPE_BADGES[card.type] ?? card.type.toUpperCase();
 
   return (
     <>
@@ -101,7 +81,7 @@ export function TraceNodeView({ data, selected }: NodeProps<TraceRFNode>) {
           )}
         </div>
 
-        <NodeBody name={name} details={details} timing={timing} color={color} />
+        <NodeBody title={card.title} fields={card.fields} metrics={card.metrics} color={color} />
       </div>
 
       <Handle
