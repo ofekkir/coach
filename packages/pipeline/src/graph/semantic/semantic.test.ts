@@ -7,11 +7,20 @@ import { enrichExecutionGraph } from './semantic.ts';
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
 const agent: CanonicalNode = { id: 'agent', type: 'agent', user_id: 'u1' };
-const session: CanonicalNode = { id: 'sess', type: 'session', parent: 'agent', session_id: 's-1' };
+const session: CanonicalNode = {
+  id: 'sess',
+  type: 'session',
+  parent: 'agent',
+  session_id: 's-1',
+  user_id: 'u-1',
+};
 const interaction: CanonicalNode = {
   id: 'inter',
   type: 'interaction',
   parent: 'sess',
+  session_id: 's-1',
+  user_id: 'u-1',
+  sequence: 0,
   prompt: 'do something',
   start_time_ns: '90000000',
   end_time_ns: '500000000',

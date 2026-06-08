@@ -2,6 +2,7 @@
 export { enrichTrace } from './canonical/enrich/enrich.ts';
 export { transformTrace } from './canonical/transform/transform.ts';
 export { TempoTraceSchema } from './canonical/tempo.schema.ts';
+export { PSEUDO_USER_ID } from './types.ts';
 export type {
   ActionNode,
   AgentNode,
@@ -22,8 +23,9 @@ export type {
   SemanticNode,
   SessionNode,
   TempoTrace,
+  ToolBlockedOnUserNode,
+  ToolExecutionNode,
   ToolNode,
-  ToolType,
   UploadedFile,
   UserPromptNode,
 } from './types.ts';

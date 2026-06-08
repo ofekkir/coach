@@ -97,7 +97,7 @@ function collectRequests(graph: ExecutionGraph): LabelRequest[] {
 
 function mechanicalLabel(node: GraphNode): string {
   if (node.type === 'tool') return node.name ?? 'tool';
-  if (node.type === 'llm_request') return node.model ?? 'llm_request';
+  if (node.type === 'llm_request') return node.model;
   return node.type;
 }
 

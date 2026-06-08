@@ -1,3 +1,4 @@
+import { PSEUDO_USER_ID } from '../../types.ts';
 import type { OtlpSpan } from '../../types.ts';
 import { clampEnd, intAttr, isoToNano, spanB64, strAttr } from './helpers.ts';
 import type { NativeEntry } from './types.ts';
@@ -37,6 +38,7 @@ export function buildInteractionSpan(
         strAttr('span.type', 'interaction'),
         strAttr('user_prompt', userPrompt),
         strAttr('session.id', sessionId),
+        strAttr('user.id', PSEUDO_USER_ID),
         intAttr('interaction.sequence', seqIdx),
       ],
     },
