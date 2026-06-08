@@ -66,6 +66,22 @@ model (`OLLAMA_MODEL`, default `llama3.2:3b`, at `OLLAMA_HOST`, default
 `claude-haiku-4-5`) instead. The enriched graph is loadable by the app's
 "Load pipeline output" button.
 
+### Local enrichment setup (Ollama)
+
+Enrichment is the only stage that calls a model. By default it runs **locally
+via [Ollama](https://ollama.com)** — a native binary and model, **not** an npm
+dependency, so `pnpm install` does not provision it. One-time setup:
+
+```bash
+brew install --cask ollama   # macOS — install the app bundle, then launch it
+                             # (the `ollama` formula ships without llama-server)
+pnpm enrich:setup            # verifies the daemon is up and pulls OLLAMA_MODEL
+```
+
+`pnpm enrich:setup` is idempotent. Override the model or host via env, e.g.
+`OLLAMA_MODEL=llama3.2:3b-instruct-q8_0 pnpm enrich:setup`. No local model? Set
+`COACH_LABELER=claude` to fall back to the cloud Claude CLI (no Ollama needed).
+
 ## Quick start
 
 ```bash
@@ -76,14 +92,15 @@ pnpm --filter @coach/app dev   # upload landing page at http://localhost:5173
 
 ## Development
 
-| Command                                    | What it does                                   |
-| ------------------------------------------ | ---------------------------------------------- |
-| `pnpm check`                               | Full gate: typecheck, lint, format, test, knip |
-| `pnpm lint:fix`                            | Auto-fix lint issues                           |
-| `pnpm format`                              | Auto-format with Prettier                      |
-| `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                           |
-| `pnpm e2e <fixture>`                       | Run pipeline on a fixture, write `out/`        |
-| `pnpm e2e <fixture> --enrich`              | Also run semantic enrichment (calls Claude)    |
+| Command                                    | What it does                                    |
+| ------------------------------------------ | ----------------------------------------------- |
+| `pnpm check`                               | Full gate: typecheck, lint, format, test, knip  |
+| `pnpm lint:fix`                            | Auto-fix lint issues                            |
+| `pnpm format`                              | Auto-format with Prettier                       |
+| `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                            |
+| `pnpm enrich:setup`                        | Pull the local Ollama labeling model (one-time) |
+| `pnpm e2e <fixture>`                       | Run pipeline on a fixture, write `out/`         |
+| `pnpm e2e <fixture> --enrich`              | Also run semantic enrichment (local Ollama)     |
 
 ## Contributing workflow
 
