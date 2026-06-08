@@ -1,47 +1,57 @@
+import type { CardField, CardMetrics } from '../format/format.ts';
+import { formatMetrics } from '../format/format.ts';
+
 const LINE: React.CSSProperties = {
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
 };
 
-// Gap (px) under the name line when detail lines follow it.
-const NAME_GAP_WITH_DETAILS = 2;
+// Gap (px) under the title line when field lines follow it.
+const TITLE_GAP_WITH_FIELDS = 2;
 
 export function NodeBody({
-  name,
-  details,
-  timing,
+  title,
+  fields,
+  metrics,
   color,
 }: {
-  name: string;
-  details: string[];
-  timing: string | null;
+  title: string | undefined;
+  fields: readonly CardField[];
+  metrics: CardMetrics;
   color: string;
 }) {
+  const { duration, secondary } = formatMetrics(metrics);
+
   return (
     <div style={{ padding: '6px 10px 8px' }}>
-      {name !== '' && (
+      {title != null && (
         <div
           style={{
             ...LINE,
             color: '#1e293b',
             fontSize: 11,
             lineHeight: 1.4,
-            marginBottom: details.length > 0 ? NAME_GAP_WITH_DETAILS : 0,
+            marginBottom: fields.length > 0 ? TITLE_GAP_WITH_FIELDS : 0,
           }}
         >
-          {name}
+          {title}
         </div>
       )}
-      {details.map((line, i) => (
+      {fields.map((f) => (
         <div
-          key={i}
+          key={f.label}
           style={{ ...LINE, color: '#64748b', fontSize: 10, lineHeight: 1.45, marginTop: 1 }}
         >
-          {line}
+          {f.label}: {f.value}
         </div>
       ))}
-      {timing !== null && (
+      {secondary != null && (
+        <div style={{ ...LINE, color: '#64748b', fontSize: 10, lineHeight: 1.45, marginTop: 1 }}>
+          {secondary}
+        </div>
+      )}
+      {duration != null && (
         <div
           style={{
             display: 'inline-block',
@@ -55,7 +65,7 @@ export function NodeBody({
             letterSpacing: '0.02em',
           }}
         >
-          {timing}
+          {duration}
         </div>
       )}
     </div>

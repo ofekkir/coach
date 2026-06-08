@@ -66,6 +66,9 @@ importers:
       '@coach/pipeline':
         specifier: workspace:*
         version: link:../pipeline
+      '@uiw/react-json-view':
+        specifier: 2.0.0-alpha.43
+        version: 2.0.0-alpha.43(@babel/runtime@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@xyflow/react':
         specifier: ^12.10.2
         version: 12.11.0(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -91,6 +94,9 @@ importers:
       vite:
         specifier: ^8.0.15
         version: 8.0.16(@types/node@22.19.19)(jiti@2.7.0)(yaml@2.9.0)
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.19)(lightningcss@1.32.0)
 
   packages/logger:
     dependencies:
@@ -199,6 +205,10 @@ packages:
     engines: {node: '>=6.9.0'}
     peerDependencies:
       '@babel/core': ^7.0.0-0
+
+  '@babel/runtime@7.29.7':
+    resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
+    engines: {node: '>=6.9.0'}
 
   '@babel/template@7.29.7':
     resolution: {integrity: sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg==}
@@ -1028,6 +1038,13 @@ packages:
   '@typescript-eslint/visitor-keys@8.60.0':
     resolution: {integrity: sha512-9WI52t8ZGLVGrPMBet25yAftqY/n95+zmoUUtJBBQTKDSKUu7OsPTroT2op7U9JatkoRccL0YkWDNMFfC4Sjxg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@uiw/react-json-view@2.0.0-alpha.43':
+    resolution: {integrity: sha512-PMj+6xRDCPbVGccfLUDhx7yGrmVBSeFx3py6bqDds4QIYScXo9GEgtTbWXn3gXpoehsmOu//6dveYTf872wu3Q==}
+    peerDependencies:
+      '@babel/runtime': '>=7.10.0'
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
 
   '@vitejs/plugin-react@5.2.0':
     resolution: {integrity: sha512-YmKkfhOAi3wsB1PhJq5Scj3GXMn3WvtQ/JC0xoopuHoXSdmtdStOpFrYaT1kie2YgFBcIe64ROzMYRjCrYOdYw==}
@@ -2798,6 +2815,8 @@ snapshots:
       '@babel/core': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
 
+  '@babel/runtime@7.29.7': {}
+
   '@babel/template@7.29.7':
     dependencies:
       '@babel/code-frame': 7.29.7
@@ -3409,6 +3428,12 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 8.60.0
       eslint-visitor-keys: 5.0.1
+
+  '@uiw/react-json-view@2.0.0-alpha.43(@babel/runtime@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@babel/runtime': 7.29.7
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   '@vitejs/plugin-react@5.2.0(vite@8.0.16(@types/node@22.19.19)(jiti@2.7.0)(yaml@2.9.0))':
     dependencies:

@@ -1,62 +1,52 @@
+import type { GraphNode } from '@coach/pipeline';
 import { colorOf } from '../layout/colors.ts';
+import type { NodeCard } from '../format/format.ts';
+import { formatMetrics } from '../format/format.ts';
+import { JsonView } from '../JsonView/JsonView.tsx';
 
-// A value longer than this renders in a boxed, monospaced block instead of inline.
-const LONG_VALUE_CHARS = 80;
-const LONG_VALUE_RADIUS = 6;
-const HAIRLINE_BORDER = '1px solid #e2e8f0';
-
-function renderDetailRow(line: string, i: number): React.ReactNode {
-  const colon = line.indexOf(':');
-  const key = colon > 0 ? line.slice(0, colon) : null;
-  const val = colon > 0 ? line.slice(colon + 1).trim() : line;
-  const isLong = val.length > LONG_VALUE_CHARS;
+function sectionLabel(text: string): React.ReactNode {
   return (
-    <div key={i} style={{ marginBottom: 12 }}>
-      {key !== null && (
-        <div
-          style={{
-            color: '#94a3b8',
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            marginBottom: 3,
-          }}
-        >
-          {key}
-        </div>
-      )}
-      <div
-        style={{
-          color: '#374151',
-          fontSize: 11,
-          fontFamily: isLong ? 'monospace' : 'system-ui, sans-serif',
-          lineHeight: 1.55,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-          background: isLong ? '#f8fafc' : 'transparent',
-          borderRadius: isLong ? LONG_VALUE_RADIUS : 0,
-          padding: isLong ? '6px 8px' : 0,
-          border: isLong ? HAIRLINE_BORDER : 'none',
-          maxHeight: 200,
-          overflowY: 'auto',
-        }}
-      >
-        {val}
-      </div>
+    <div
+      style={{
+        color: '#94a3b8',
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        marginBottom: 6,
+      }}
+    >
+      {text}
     </div>
   );
 }
 
+function summaryRows(card: NodeCard): React.ReactNode {
+  const { duration, secondary } = formatMetrics(card.metrics);
+  const rows: { label: string; value: string }[] = [
+    ...(card.title != null ? [{ label: 'title', value: card.title }] : []),
+    ...card.fields.map((f) => ({ label: f.label, value: f.value })),
+    ...(duration != null ? [{ label: 'duration', value: duration }] : []),
+    ...(secondary != null ? [{ label: 'metrics', value: secondary }] : []),
+  ];
+  return rows.map((r) => (
+    <div key={r.label} style={{ marginBottom: 8, fontSize: 11, color: '#374151', lineHeight: 1.5 }}>
+      <span style={{ color: '#94a3b8' }}>{r.label}: </span>
+      {r.value}
+    </div>
+  ));
+}
+
 export function DetailsPanel({
-  labelLines,
+  card,
+  canonical,
   onClose,
 }: {
-  labelLines: readonly string[];
+  card: NodeCard;
+  canonical: GraphNode | undefined;
   onClose: () => void;
 }) {
-  const type = labelLines[0] ?? '';
-  const color = colorOf(type);
+  const color = colorOf(card.type);
 
   return (
     <div
@@ -67,7 +57,7 @@ export function DetailsPanel({
         bottom: 0,
         width: 320,
         background: '#ffffff',
-        borderLeft: HAIRLINE_BORDER,
+        borderLeft: '1px solid #e2e8f0',
         boxShadow: '-4px 0 16px rgba(0,0,0,0.06)',
         zIndex: 20,
         display: 'flex',
@@ -78,7 +68,7 @@ export function DetailsPanel({
       <div
         style={{
           padding: '12px 16px',
-          borderBottom: HAIRLINE_BORDER,
+          borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           alignItems: 'center',
           gap: 8,
@@ -95,7 +85,7 @@ export function DetailsPanel({
             letterSpacing: '0.07em',
           }}
         >
-          {type.toUpperCase()}
+          {card.type.toUpperCase()}
         </span>
         <button
           onClick={onClose}
@@ -114,7 +104,11 @@ export function DetailsPanel({
         </button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-        {labelLines.slice(1).map(renderDetailRow)}
+        {sectionLabel('Summary')}
+        {summaryRows(card)}
+        <div style={{ height: 1, background: '#e2e8f0', margin: '14px 0' }} />
+        {sectionLabel('Raw node')}
+        <JsonView value={canonical} />
       </div>
     </div>
   );
