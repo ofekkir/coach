@@ -3,6 +3,7 @@ import { colorOf } from '../layout/colors.ts';
 // A value longer than this renders in a boxed, monospaced block instead of inline.
 const LONG_VALUE_CHARS = 80;
 const LONG_VALUE_RADIUS = 6;
+const HAIRLINE_BORDER = '1px solid #e2e8f0';
 
 function renderDetailRow(line: string, i: number): React.ReactNode {
   const colon = line.indexOf(':');
@@ -36,7 +37,7 @@ function renderDetailRow(line: string, i: number): React.ReactNode {
           background: isLong ? '#f8fafc' : 'transparent',
           borderRadius: isLong ? LONG_VALUE_RADIUS : 0,
           padding: isLong ? '6px 8px' : 0,
-          border: isLong ? '1px solid #e2e8f0' : 'none',
+          border: isLong ? HAIRLINE_BORDER : 'none',
           maxHeight: 200,
           overflowY: 'auto',
         }}
@@ -66,7 +67,7 @@ export function DetailsPanel({
         bottom: 0,
         width: 320,
         background: '#ffffff',
-        borderLeft: '1px solid #e2e8f0',
+        borderLeft: HAIRLINE_BORDER,
         boxShadow: '-4px 0 16px rgba(0,0,0,0.06)',
         zIndex: 20,
         display: 'flex',
@@ -77,7 +78,7 @@ export function DetailsPanel({
       <div
         style={{
           padding: '12px 16px',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: HAIRLINE_BORDER,
           display: 'flex',
           alignItems: 'center',
           gap: 8,

@@ -6,6 +6,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactPlugin from 'eslint-plugin-react';
 import { createFolderStructure, projectStructurePlugin } from 'eslint-plugin-project-structure';
 import noBarrelFiles from 'eslint-plugin-no-barrel-files';
+import sonarjs from 'eslint-plugin-sonarjs';
 
 // TODO: projectStructureParser integration was kept minimal due to parser-layering
 // complexity with typescript-eslint's projectService. The rule enforces PascalCase
@@ -117,7 +118,20 @@ export default tseslint.config(
       ],
     },
   },
-  // Magic-string policy for the pipeline (extended per known literal as found).
+  // Magic-string policy, repo-wide: a string literal repeated 3+ times must be a
+  // named constant (sonarjs default threshold). This is the deterministic general
+  // rule — there is no maintained "ban every string literal", and a blanket ban
+  // would flag hundreds of legitimate one-off keys/props/discriminants. Repetition
+  // is the tractable signal that a string carries shared meaning worth naming.
+  {
+    files: ['**/*.{ts,tsx}'],
+    plugins: { sonarjs },
+    rules: {
+      'sonarjs/no-duplicate-string': 'error',
+    },
+  },
+  // Plus a curated single-literal ban where a specific magic string must route
+  // through a known constant (extended per literal as found).
   {
     files: ['packages/pipeline/src/**/*.ts'],
     rules: {
@@ -155,6 +169,7 @@ export default tseslint.config(
       'max-lines-per-function': 'off',
       'no-magic-numbers': 'off',
       '@typescript-eslint/no-magic-numbers': 'off',
+      'sonarjs/no-duplicate-string': 'off',
     },
   },
   // Ban barrel files everywhere except each package's public src/index.ts.
