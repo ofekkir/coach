@@ -34,7 +34,7 @@ UploadedFile[]   (*.jsonl · logs.json + trace*.json)
                                the mechanical skeleton: agent ▸ session ▸ interaction ▸ thread ▸ step
         ▼ 6. semantic graph  enrichExecutionGraph → ExecutionGraph (opt-in, requires --enrich)
                                tool → action  ·  llm_request → inference  (LLM-labeled one-liners)
-                               pure stage; LLM adapter (claude -p haiku) injected by e2e script only
+                               pure stage; LLM adapter (local Ollama, claude CLI opt-in) injected by e2e only
         │
         ▼ React Flow graph   (@coach/app, via the buildVizResults adapter)
 ```
@@ -58,9 +58,29 @@ single **agent** (multi-agent is out of scope). Use the staging UI to mix files 
 `01-classified.json`, `02-sessions.json`, `03-canonical-by-session.json`,
 `04-agent-graph.json`, `05-execution-graph.json`.
 
-Pass `--enrich` to also run the semantic enrichment stage (calls `claude -p` with
-`claude-haiku-4-5` per batch) and write `06-enriched-graph.json`. The enriched
-graph is loadable by the app's "Load pipeline output" button.
+Pass `--enrich` to also run the semantic enrichment stage and write
+`06-enriched-graph.json`. By default this labels batches via a **local Ollama**
+model (`OLLAMA_MODEL`, default `llama3.2:3b`, at `OLLAMA_HOST`, default
+`http://localhost:11434`) using JSON-schema-constrained output. Set
+`COACH_LABELER=claude` to use the cloud Claude CLI (`claude -p`,
+`claude-haiku-4-5`) instead. The enriched graph is loadable by the app's
+"Load pipeline output" button.
+
+### Local enrichment setup (Ollama)
+
+Enrichment is the only stage that calls a model. By default it runs **locally
+via [Ollama](https://ollama.com)** — a native binary and model, **not** an npm
+dependency, so `pnpm install` does not provision it. One-time setup:
+
+```bash
+brew install --cask ollama   # macOS — install the app bundle, then launch it
+                             # (the `ollama` formula ships without llama-server)
+pnpm enrich:setup            # verifies the daemon is up and pulls OLLAMA_MODEL
+```
+
+`pnpm enrich:setup` is idempotent. Override the model or host via env, e.g.
+`OLLAMA_MODEL=llama3.2:3b-instruct-q8_0 pnpm enrich:setup`. No local model? Set
+`COACH_LABELER=claude` to fall back to the cloud Claude CLI (no Ollama needed).
 
 ## Quick start
 
@@ -72,14 +92,15 @@ pnpm --filter @coach/app dev   # upload landing page at http://localhost:5173
 
 ## Development
 
-| Command                                    | What it does                                   |
-| ------------------------------------------ | ---------------------------------------------- |
-| `pnpm check`                               | Full gate: typecheck, lint, format, test, knip |
-| `pnpm lint:fix`                            | Auto-fix lint issues                           |
-| `pnpm format`                              | Auto-format with Prettier                      |
-| `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                           |
-| `pnpm e2e <fixture>`                       | Run pipeline on a fixture, write `out/`        |
-| `pnpm e2e <fixture> --enrich`              | Also run semantic enrichment (calls Claude)    |
+| Command                                    | What it does                                    |
+| ------------------------------------------ | ----------------------------------------------- |
+| `pnpm check`                               | Full gate: typecheck, lint, format, test, knip  |
+| `pnpm lint:fix`                            | Auto-fix lint issues                            |
+| `pnpm format`                              | Auto-format with Prettier                       |
+| `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                            |
+| `pnpm enrich:setup`                        | Pull the local Ollama labeling model (one-time) |
+| `pnpm e2e <fixture>`                       | Run pipeline on a fixture, write `out/`         |
+| `pnpm e2e <fixture> --enrich`              | Also run semantic enrichment (local Ollama)     |
 
 ## Contributing workflow
 
