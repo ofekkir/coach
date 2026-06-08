@@ -1,64 +1,19 @@
 import { spawn } from 'node:child_process';
-import { log } from '@coach/logger';
-import type { LabelBatchFn, LabelRequest } from '@coach/pipeline';
+import type { LabelBatchFn } from '@coach/pipeline';
+import { makeLabelBatch } from './label-batch.ts';
 
 const BYTES_PER_KIB = 1024;
 const MAX_BUFFER_MIB = 4;
-const STDOUT_PREVIEW_CHARS = 500;
 
-const BATCH_SIZE = 25;
 const MAX_BUFFER = MAX_BUFFER_MIB * BYTES_PER_KIB * BYTES_PER_KIB;
 const TIMEOUT_MS = 120_000;
 
-// ── Custom error carries subprocess output for diagnostics ────────────────────
-
-class ClaudeSubprocessError extends Error {
-  readonly stderr: string;
-  readonly stdout: string;
-
-  constructor(message: string, stderr: string, stdout: string) {
-    super(message);
-    this.name = 'ClaudeSubprocessError';
-    this.stderr = stderr;
-    this.stdout = stdout;
-  }
-}
-
-// ── Prompt ────────────────────────────────────────────────────────────────────
-
-function buildPrompt(batch: readonly LabelRequest[]): string {
-  const nodes = batch.map((r) => {
-    if (r.kind === 'tool')
-      return { id: r.id, kind: r.kind, name: r.name ?? '', input: r.tool_input ?? '' };
-    return {
-      id: r.id,
-      kind: r.kind,
-      request_delta: r.request_delta ?? '',
-      response_delta: r.response_delta ?? '',
-    };
-  });
-
-  return `Label each agent execution node with a short "what" description (max 12 words, no filler).
-- tool: what high-level action did the agent take? Prefer intent over mechanics.
-  (e.g. "run tests", "edit the CI workflow", "read project manifest", "delete dead code")
-- llm_request: what cognitive task(s)? Use "and" when one inference covers multiple tasks.
-  (e.g. "plan next steps", "answer user question", "assess context and decide next action",
-   "summarize tool output and draft response")
-
-Nodes:
-${JSON.stringify(nodes)}
-
-Respond with ONLY a JSON array, no other text:
-[{"id":"<id>","what":"<description>"},...]`;
-}
-
 // ── Subprocess call ───────────────────────────────────────────────────────────
 
-async function callClaude(prompt: string): Promise<Map<string, string>> {
-  return new Promise((resolve, reject) => {
+const callClaude = async (prompt: string): Promise<string> =>
+  new Promise((resolve, reject) => {
     // stdio: ['ignore', ...] closes stdin so Claude does not wait for terminal input.
-    // --output-format text gives the model's response directly; we parse it as JSON
-    // ourselves (simpler than hunting the result event in the stream-json array).
+    // --output-format text gives the model's response directly; label-batch parses it.
     const proc = spawn(
       'claude',
       ['-p', prompt, '--model', 'claude-haiku-4-5', '--output-format', 'text'],
@@ -70,7 +25,7 @@ async function callClaude(prompt: string): Promise<Map<string, string>> {
 
     const timer = setTimeout(() => {
       proc.kill();
-      reject(new ClaudeSubprocessError(`timed out after ${String(TIMEOUT_MS)}ms`, stderr, stdout));
+      reject(new Error(`claude timed out after ${String(TIMEOUT_MS)}ms: ${stderr}`));
     }, TIMEOUT_MS);
 
     proc.stdout.setEncoding('utf8');
@@ -88,19 +43,10 @@ async function callClaude(prompt: string): Promise<Map<string, string>> {
     proc.on('close', (code) => {
       clearTimeout(timer);
       if (code !== 0) {
-        reject(new ClaudeSubprocessError(`exited with code ${String(code)}`, stderr, stdout));
+        reject(new Error(`claude exited with code ${String(code)}: ${stderr}`));
         return;
       }
-      try {
-        // Extract the first JSON array from the response (handles any preamble text).
-        const match = /\[[\s\S]*\]/.exec(stdout);
-        const jsonText = match != null ? match[0] : stdout.trim();
-        const items = JSON.parse(jsonText) as { id: string; what: string }[];
-        resolve(new Map(items.map((item) => [item.id, item.what])));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        reject(new ClaudeSubprocessError(`parse failed: ${msg}`, stderr, stdout));
-      }
+      resolve(stdout);
     });
 
     proc.on('error', (err) => {
@@ -108,50 +54,7 @@ async function callClaude(prompt: string): Promise<Map<string, string>> {
       reject(err);
     });
   });
-}
-
-// ── Retry + fallback ──────────────────────────────────────────────────────────
-
-async function callClaudeWithRetry(
-  prompt: string,
-  batchIds: string[],
-): Promise<Map<string, string>> {
-  let lastError: unknown;
-  try {
-    return await callClaude(prompt);
-  } catch (err) {
-    lastError = err;
-  }
-  try {
-    return await callClaude(prompt);
-  } catch (err) {
-    lastError = err;
-  }
-  const e = lastError instanceof ClaudeSubprocessError ? lastError : null;
-  log.error(
-    {
-      ids: batchIds,
-      error: lastError instanceof Error ? lastError.message : String(lastError),
-      stdout: e?.stdout.slice(0, STDOUT_PREVIEW_CHARS),
-    },
-    '[claude-labeler] batch failed',
-  );
-  return new Map();
-}
 
 // ── Public export ─────────────────────────────────────────────────────────────
 
-export const claudeLabelBatch: LabelBatchFn = async (requests) => {
-  const results = new Map<string, string>();
-
-  for (const r of requests) log.debug(r, 'label request');
-
-  for (let i = 0; i < requests.length; i += BATCH_SIZE) {
-    const batch = requests.slice(i, i + BATCH_SIZE);
-    const batchIds = batch.map((r) => r.id);
-    const labels = await callClaudeWithRetry(buildPrompt(batch), batchIds);
-    for (const [id, what] of labels) results.set(id, what);
-  }
-
-  return results;
-};
+export const claudeLabelBatch: LabelBatchFn = makeLabelBatch(callClaude);

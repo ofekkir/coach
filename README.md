@@ -34,7 +34,7 @@ UploadedFile[]   (*.jsonl · logs.json + trace*.json)
                                the mechanical skeleton: agent ▸ session ▸ interaction ▸ thread ▸ step
         ▼ 6. semantic graph  enrichExecutionGraph → ExecutionGraph (opt-in, requires --enrich)
                                tool → action  ·  llm_request → inference  (LLM-labeled one-liners)
-                               pure stage; LLM adapter (claude -p haiku) injected by e2e script only
+                               pure stage; LLM adapter (local Ollama, claude CLI opt-in) injected by e2e only
         │
         ▼ React Flow graph   (@coach/app, via the buildVizResults adapter)
 ```
@@ -58,9 +58,13 @@ single **agent** (multi-agent is out of scope). Use the staging UI to mix files 
 `01-classified.json`, `02-sessions.json`, `03-canonical-by-session.json`,
 `04-agent-graph.json`, `05-execution-graph.json`.
 
-Pass `--enrich` to also run the semantic enrichment stage (calls `claude -p` with
-`claude-haiku-4-5` per batch) and write `06-enriched-graph.json`. The enriched
-graph is loadable by the app's "Load pipeline output" button.
+Pass `--enrich` to also run the semantic enrichment stage and write
+`06-enriched-graph.json`. By default this labels batches via a **local Ollama**
+model (`OLLAMA_MODEL`, default `llama3.2:3b`, at `OLLAMA_HOST`, default
+`http://localhost:11434`) using JSON-schema-constrained output. Set
+`COACH_LABELER=claude` to use the cloud Claude CLI (`claude -p`,
+`claude-haiku-4-5`) instead. The enriched graph is loadable by the app's
+"Load pipeline output" button.
 
 ## Quick start
 
