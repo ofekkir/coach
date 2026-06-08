@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { addSessionNode } from '../../aggregate/aggregate.ts';
 import { TempoTraceSchema } from '../tempo.schema.ts';
-import type { CanonicalNode } from '../../types.ts';
+import type { CanonicalNode, ToolNode } from '../../types.ts';
 import { transformTrace } from '../transform/transform.ts';
 import { nativeSessionToTrace } from './native.ts';
 
@@ -44,7 +44,7 @@ describe('nativeSessionToTrace', () => {
     expect(interactions[0]?.prompt).toBe('fetch ynet.co.il');
     expect(interactions[0]?.session_id).toBe(SESSION_ID);
 
-    const tools = nodes.filter((n) => n.type === 'tool');
+    const tools = nodes.filter((n): n is ToolNode => n.type === 'tool');
     expect(tools).toHaveLength(2);
     expect(tools.map((t) => t.name).sort()).toEqual(['ToolSearch', 'WebFetch']);
 

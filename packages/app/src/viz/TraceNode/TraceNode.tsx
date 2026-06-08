@@ -12,6 +12,8 @@ const TYPE_BADGES: Record<string, string> = {
   blocked_on_user: 'WAIT',
   execution: 'EXEC',
   hook: 'HOOK',
+  action: 'ACTION',
+  inference: 'INFER',
 };
 
 function splitLines(lines: readonly string[]): {

@@ -5,15 +5,36 @@ import { buildExecutionGraph, buildInteractionExecution } from './execution.ts';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-const interaction: CanonicalNode = { id: 'root', type: 'interaction', prompt: 'hello' };
+// Span-derived nodes carry real OTLP timing; this keeps fixtures self-consistent
+// (ns = ms × 1e6) without spelling out all three fields each time.
+function span(
+  startMs: number,
+  endMs: number,
+): {
+  start_time_ns: string;
+  end_time_ns: string;
+  duration_ms: number;
+} {
+  return {
+    start_time_ns: String(startMs * 1_000_000),
+    end_time_ns: String(endMs * 1_000_000),
+    duration_ms: endMs - startMs,
+  };
+}
+
+const interaction: CanonicalNode = {
+  id: 'root',
+  type: 'interaction',
+  prompt: 'hello',
+  ...span(90, 500),
+};
 
 const llm1: CanonicalNode = {
   id: 'llm1',
   type: 'llm_request',
   parent: 'root',
   source: 'repl_main_thread',
-  start_time_ns: '100000000',
-  end_time_ns: '200000000',
+  ...span(100, 200),
 };
 
 const llm2: CanonicalNode = {
@@ -21,8 +42,7 @@ const llm2: CanonicalNode = {
   type: 'llm_request',
   parent: 'root',
   source: 'repl_main_thread',
-  start_time_ns: '310000000',
-  end_time_ns: '400000000',
+  ...span(310, 400),
 };
 
 const toolAfterLlm1: CanonicalNode = {
@@ -30,8 +50,7 @@ const toolAfterLlm1: CanonicalNode = {
   type: 'tool',
   parent: 'root',
   name: 'Read',
-  start_time_ns: '210000000',
-  end_time_ns: '300000000',
+  ...span(210, 300),
 };
 
 // A small full agent forest: agent ▸ session ▸ interaction ▸ (llm1, toolA, llm2).
@@ -42,13 +61,8 @@ function agentForest(): CanonicalNode[] {
     type: 'session',
     parent: 'agent',
     session_id: 's-123',
-    start_time_ns: '50000000',
   };
-  const inter: CanonicalNode = {
-    ...interaction,
-    parent: 'sess',
-    start_time_ns: '90000000',
-  };
+  const inter: CanonicalNode = { ...interaction, parent: 'sess' };
   return [agent, session, inter, llm1, toolAfterLlm1, llm2];
 }
 
@@ -112,7 +126,7 @@ describe('buildExecutionGraph', () => {
     const agent = soleAgent(buildExecutionGraph(agentForest()));
     const inter = agent.sessions[0]?.interactions[0];
     expect(inter?.userPrompt?.canonical.type).toBe('user_prompt');
-    expect(inter?.userPrompt?.canonical.prompt).toBe('hello');
+    expect(inter?.userPrompt?.canonical).toMatchObject({ prompt: 'hello' });
   });
 
   it('embeds the full CanonicalNode losslessly on every node', () => {
@@ -120,7 +134,7 @@ describe('buildExecutionGraph', () => {
 
     const llm1Node = soleThread(agent).members.find((m) => m.id === 'llm1');
     expect(llm1Node?.canonical).toBe(llm1);
-    expect(llm1Node?.canonical.source).toBe('repl_main_thread');
+    expect(llm1Node?.canonical).toMatchObject({ source: 'repl_main_thread' });
 
     everyNode(agent).forEach(assertClean);
   });
@@ -142,14 +156,13 @@ describe('buildExecutionGraph', () => {
       type: 'tool',
       parent: 'root',
       name: 'Skill',
-      start_time_ns: '210000000',
-      end_time_ns: '300000000',
+      ...span(210, 300),
     };
     const child: CanonicalNode = {
       id: 'child1',
       type: 'tool.execution',
       parent: 'twc',
-      start_time_ns: '215000000',
+      ...span(215, 220),
     };
     const inter = buildInteractionExecution([interaction, llm1, toolWithChild, child]);
     const thread = inter?.threads.find((t) => t.id === 'thread_repl_main_thread');
@@ -166,14 +179,13 @@ describe('buildExecutionGraph', () => {
       type: 'tool',
       parent: 'root',
       name: 'Skill',
-      start_time_ns: '210000000',
-      end_time_ns: '300000000',
+      ...span(210, 300),
     };
     const child: CanonicalNode = {
       id: 'child1',
       type: 'tool.execution',
       parent: 'twc',
-      start_time_ns: '215000000',
+      ...span(215, 220),
     };
     const inter = buildInteractionExecution([interaction, llm1, toolWithChild, child]);
     const member = inter?.threads[0]?.members.find((m) => m.id === 'twc');
@@ -212,7 +224,7 @@ const resMsgs1: ResponseMessage[] = [{ type: 'text', text: 'Hi there' }];
 const resMsgs2: ResponseMessage[] = [{ type: 'tool_use', name: 'Read', id: 'tu1' }];
 
 function makeInteractionWithLlms(llmNodes: CanonicalNode[]): CanonicalNode[] {
-  return [{ id: 'root', type: 'interaction', prompt: 'test' }, ...llmNodes];
+  return [{ id: 'root', type: 'interaction', prompt: 'test', ...span(90, 500) }, ...llmNodes];
 }
 
 function findMember(
@@ -231,8 +243,7 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
-      start_time_ns: '100000000',
-      end_time_ns: '200000000',
+      ...span(100, 200),
       request_messages: [msg1],
       response_messages: resMsgs1,
     };
@@ -248,8 +259,7 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
-      start_time_ns: '100000000',
-      end_time_ns: '200000000',
+      ...span(100, 200),
       request_messages: [msg1, msg2],
       response_messages: resMsgs1,
     };
@@ -258,8 +268,7 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
-      start_time_ns: '300000000',
-      end_time_ns: '400000000',
+      ...span(300, 400),
       request_messages: [msg1, msg2, msg3],
       response_messages: resMsgs2,
     };
@@ -278,8 +287,7 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
-      start_time_ns: '100000000',
-      end_time_ns: '200000000',
+      ...span(100, 200),
       request_messages: [msg1, msg2, msg3],
       response_messages: resMsgs1,
     };
@@ -295,8 +303,7 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
-      start_time_ns: '100000000',
-      end_time_ns: '200000000',
+      ...span(100, 200),
       request_messages: [msg1, msg2],
       response_messages: resMsgs1,
     };
@@ -305,8 +312,7 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
-      start_time_ns: '300000000',
-      end_time_ns: '400000000',
+      ...span(300, 400),
       // Native: only the new message, not the full history
       request_messages: [msg3],
       response_messages: resMsgs2,
@@ -325,8 +331,7 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
-      start_time_ns: '100000000',
-      end_time_ns: '200000000',
+      ...span(100, 200),
       request_messages: [msg1],
     };
     const tool: CanonicalNode = {
@@ -334,8 +339,7 @@ describe('message deltas on thread members', () => {
       type: 'tool',
       parent: 'root',
       name: 'Read',
-      start_time_ns: '210000000',
-      end_time_ns: '300000000',
+      ...span(210, 300),
     };
     const inter = buildInteractionExecution(makeInteractionWithLlms([llm, tool]));
     const toolMember = findMember(inter, 'toolA');

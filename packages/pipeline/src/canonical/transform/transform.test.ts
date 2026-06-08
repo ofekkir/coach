@@ -4,10 +4,20 @@ import logsFixture from '../../../fixtures/otel/update-claude-config/logs.json';
 import traceFixture from '../../../fixtures/otel/update-claude-config/trace.json';
 import { enrichTrace } from '../enrich/enrich.ts';
 import { transformTrace } from './transform.ts';
-import type { TempoTrace } from '../../types.ts';
+import type { CanonicalNode, InteractionNode, LlmRequestNode, TempoTrace } from '../../types.ts';
 
 function hex2b64(hex: string): string {
   return Buffer.from(hex, 'hex').toString('base64');
+}
+
+function findLlm(nodes: CanonicalNode[], id: string): LlmRequestNode | undefined {
+  const node = nodes.find((n) => n.id === id);
+  return node?.type === 'llm_request' ? node : undefined;
+}
+
+function findInteraction(nodes: CanonicalNode[], id: string): InteractionNode | undefined {
+  const node = nodes.find((n) => n.id === id);
+  return node?.type === 'interaction' ? node : undefined;
 }
 
 const TRACE_HEX = '00000000000000000000000000000001';
@@ -91,17 +101,17 @@ describe('transformTrace', () => {
   it('computes duration_ms from span timestamps', () => {
     const nodes = transformTrace(minimalTrace);
     // (2000000000 - 1500000000) ns = 500ms
-    expect(nodes.find((n) => n.id === `s${CHILD_HEX}`)?.duration_ms).toBeCloseTo(500);
+    expect(findLlm(nodes, `s${CHILD_HEX}`)?.duration_ms).toBeCloseTo(500);
   });
 
   it('maps interaction user_prompt to node.prompt', () => {
     const nodes = transformTrace(minimalTrace);
-    expect(nodes.find((n) => n.id === `s${PARENT_HEX}`)?.prompt).toBe('hello world');
+    expect(findInteraction(nodes, `s${PARENT_HEX}`)?.prompt).toBe('hello world');
   });
 
   it('maps llm_request enriched attributes to node fields', () => {
     const nodes = transformTrace(minimalTrace);
-    const child = nodes.find((n) => n.id === `s${CHILD_HEX}`);
+    const child = findLlm(nodes, `s${CHILD_HEX}`);
     expect(child?.model).toBe('claude-sonnet-4-6');
     expect(child?.source).toBe('repl_main_thread');
     expect(child?.request_messages).toEqual([{ role: 'user', content: 'Do the thing' }]);
@@ -118,7 +128,9 @@ describe('transformTrace', () => {
     expect(nodes.some((n) => n.type === 'interaction')).toBe(true);
     expect(nodes.some((n) => n.type === 'llm_request')).toBe(true);
     expect(nodes.some((n) => n.type === 'hook')).toBe(true);
-    const llm = nodes.find((n) => n.type === 'llm_request' && n.source != null);
+    const llm = nodes.find(
+      (n): n is LlmRequestNode => n.type === 'llm_request' && n.source != null,
+    );
     expect(llm?.model).toBeDefined();
     expect(llm?.cost_usd).toBeDefined();
     expect(llm?.tokens_in).toBeDefined();

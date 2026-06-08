@@ -43,23 +43,36 @@ function nsOf(ns: string | undefined): bigint {
   return ns != null ? BigInt(ns) : 0n;
 }
 
+// Timing lives on span-derived nodes (and optionally on the synthesized
+// user_prompt); aggregation nodes (agent/session) have none. These accessors
+// read it across the whole union without forcing a narrow at every call site.
+export function startNs(node: CanonicalNode): string | undefined {
+  return 'start_time_ns' in node ? node.start_time_ns : undefined;
+}
+
+function endNs(node: CanonicalNode): string | undefined {
+  return 'end_time_ns' in node ? node.end_time_ns : undefined;
+}
+
 export function compareStart(a: CanonicalNode, b: CanonicalNode): number {
-  const diff = nsOf(a.start_time_ns) - nsOf(b.start_time_ns);
+  const diff = nsOf(startNs(a)) - nsOf(startNs(b));
   if (diff !== 0n) return diff < 0n ? -1 : 1;
   const priority = (t: string) =>
     t === 'tool.blocked_on_user' ? 0 : t === 'tool.execution' ? 1 : 2;
   return priority(a.type) - priority(b.type);
 }
 
-export function sortByStart(list: CanonicalNode[]): CanonicalNode[] {
+export function sortByStart<T extends CanonicalNode>(list: T[]): T[] {
   return [...list].sort(compareStart);
 }
 
 /** Signed gap between two adjacent steps in milliseconds, or null when either
  *  timestamp is missing or the gap is zero/non-finite. Raw number — no format. */
 export function gapMsBetween(prev: CanonicalNode, next: CanonicalNode): number | null {
-  if (prev.end_time_ns == null || next.start_time_ns == null) return null;
-  const ms = Number(BigInt(next.start_time_ns) - BigInt(prev.end_time_ns)) / 1_000_000;
+  const prevEnd = endNs(prev);
+  const nextStart = startNs(next);
+  if (prevEnd == null || nextStart == null) return null;
+  const ms = Number(BigInt(nextStart) - BigInt(prevEnd)) / 1_000_000;
   if (!Number.isFinite(ms) || ms === 0) return null;
   return ms;
 }
@@ -98,9 +111,11 @@ function findOverlappingThread(
   let overlappingThread: string | null = null;
   let overlappingStart = -1n;
   for (const { source, req } of flattenThreadReqs(llmsByThread)) {
-    if (req.start_time_ns == null || req.end_time_ns == null) continue;
-    const s = BigInt(req.start_time_ns);
-    const e = BigInt(req.end_time_ns);
+    const reqStart = startNs(req);
+    const reqEnd = endNs(req);
+    if (reqStart == null || reqEnd == null) continue;
+    const s = BigInt(reqStart);
+    const e = BigInt(reqEnd);
     if (s <= nodeStart && nodeStart <= e && s > overlappingStart) {
       overlappingStart = s;
       overlappingThread = source;
@@ -119,12 +134,14 @@ function findPrecedingThread(
   let firstStart = 99999999999999999999n;
 
   for (const { source, req } of flattenThreadReqs(llmsByThread)) {
-    if (req.start_time_ns != null) {
-      const s = BigInt(req.start_time_ns);
+    const reqStart = startNs(req);
+    const reqEnd = endNs(req);
+    if (reqStart != null) {
+      const s = BigInt(reqStart);
       firstStart = s < firstStart ? ((firstByStart = source), s) : firstStart;
     }
-    if (nodeStart != null && req.end_time_ns != null) {
-      const e = BigInt(req.end_time_ns);
+    if (nodeStart != null && reqEnd != null) {
+      const e = BigInt(reqEnd);
       bestEnd = e <= nodeStart && e > bestEnd ? ((bestByEnd = source), e) : bestEnd;
     }
   }
@@ -140,7 +157,8 @@ function assignNodeToThread(
     return llmsByThread.has('repl_main_thread') ? 'repl_main_thread' : null;
   }
 
-  const nodeStart = node.start_time_ns != null ? BigInt(node.start_time_ns) : null;
+  const nodeStartNs = startNs(node);
+  const nodeStart = nodeStartNs != null ? BigInt(nodeStartNs) : null;
 
   if (nodeStart != null) {
     const overlapping = findOverlappingThread(llmsByThread, nodeStart);

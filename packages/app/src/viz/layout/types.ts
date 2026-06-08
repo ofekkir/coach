@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import type { CanonicalNode } from '@coach/pipeline';
+import type { GraphNode } from '@coach/pipeline';
 
 export const NW = 210;
 export const HG = 56;
@@ -12,8 +12,9 @@ export interface TraceRFNodeData extends Record<string, unknown> {
   kind: NodeKind;
   /** Derived display text (line 0 == structural type), computed app-side from canonical. */
   labelLines: string[];
-  /** The structural canonical node behind this card (absent on synthetic nodes). */
-  canonical?: CanonicalNode;
+  /** The node behind this card — canonical, or its semantic relabel after
+   *  enrichment (absent on synthetic nodes). */
+  canonical?: GraphNode;
   color: string;
   fill: string;
   hasRFChildren: boolean;

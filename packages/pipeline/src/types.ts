@@ -95,7 +95,9 @@ export type NodeType =
   | 'tool'
   | 'tool.blocked_on_user'
   | 'tool.execution'
-  | 'hook';
+  | 'hook'
+  | 'action' // enriched: tool → semantically-labeled action
+  | 'inference'; // enriched: llm_request → semantically-labeled inference
 
 export interface RequestMessage {
   role: string;
@@ -107,27 +109,101 @@ export interface ResponseMessage {
   [key: string]: unknown;
 }
 
-export interface CanonicalNode {
+/** Fields shared by every node. `type` is the discriminant; concrete members
+ *  narrow it to a literal. Read it directly (`switch (node.type)`) without
+ *  narrowing first. */
+interface BaseNode {
   id: string;
   type: NodeType;
   parent?: string;
-  // Ambient identifiers — present on interaction nodes and synthesized aggregation nodes
+}
+
+/** Span-derived nodes always carry real OTLP timing — `parse.ts` computes all
+ *  three from required span timestamps, so they are never absent here. */
+interface SpannedNode extends BaseNode {
+  start_time_ns: string;
+  end_time_ns: string;
+  duration_ms: number;
+}
+
+// ── Synthesized aggregation nodes (no span, no timing) ────────────────────────
+
+export interface AgentNode extends BaseNode {
+  type: 'agent';
+  user_id?: string;
+}
+
+export interface SessionNode extends BaseNode {
+  type: 'session';
+  session_id: string;
+  user_id?: string;
+}
+
+// ── Span-derived nodes ────────────────────────────────────────────────────────
+
+export interface InteractionNode extends SpannedNode {
+  type: 'interaction';
   session_id?: string;
   user_id?: string;
-  // Span timing — absent on synthesized nodes
-  start_time_ns?: string;
-  end_time_ns?: string;
-  duration_ms?: number;
-  name?: string;
-  model?: string;
-  source?: string;
   sequence?: number;
   prompt?: string;
+}
+
+export interface LlmRequestNode extends SpannedNode {
+  type: 'llm_request';
+  model?: string;
+  source?: string;
   request_messages?: RequestMessage[];
   response_messages?: ResponseMessage[];
   stop_reason?: string;
   tokens_in?: number;
   tokens_out?: number;
   cost_usd?: number;
+}
+
+/** All three tool variants share one shape; they differ only by discriminant. */
+export type ToolType = 'tool' | 'tool.execution' | 'tool.blocked_on_user';
+
+export interface ToolNode extends SpannedNode {
+  type: ToolType;
+  name?: string;
   tool_input?: string;
 }
+
+export interface HookNode extends SpannedNode {
+  type: 'hook';
+  name?: string;
+}
+
+// ── Synthesized spine node (carries the interaction's prompt, no full span) ───
+
+export interface UserPromptNode extends BaseNode {
+  type: 'user_prompt';
+  prompt: string;
+}
+
+// Canonical = the mechanical pipeline's output. No LLM is in this loop; every
+// field is read or derived from the trace. Stays harness-agnostic.
+export type CanonicalNode =
+  | AgentNode
+  | SessionNode
+  | InteractionNode
+  | LlmRequestNode
+  | ToolNode
+  | HookNode
+  | UserPromptNode;
+
+// ── Semantic nodes — produced by the semantic stage, NOT canonical ────────────
+// A canonical step relabeled by an LLM: a `tool` becomes an `action`, an
+// `llm_request` becomes an `inference`, each carrying a generated `what`. These
+// only exist after enrichment, so they are a distinct type from CanonicalNode.
+
+export type InferenceNode = Omit<LlmRequestNode, 'type'> & { type: 'inference'; what: string };
+
+export type ActionNode = Omit<ToolNode, 'type'> & { type: 'action'; what: string };
+
+export type SemanticNode = ActionNode | InferenceNode;
+
+// What an execution-graph step carries: a mechanical node, or — once the
+// semantic stage has run — its relabeled counterpart.
+export type GraphNode = CanonicalNode | SemanticNode;

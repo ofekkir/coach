@@ -32,6 +32,9 @@ UploadedFile[]   (*.jsonl · logs.json + trace*.json)
         ▼ 4. aggregate       all sessions under one agent → agentGraph (CanonicalNode[])
         ▼ 5. execution graph buildExecutionGraph → executionGraph (ExecutionGraph)
                                the mechanical skeleton: agent ▸ session ▸ interaction ▸ thread ▸ step
+        ▼ 6. semantic graph  enrichExecutionGraph → ExecutionGraph (opt-in, requires --enrich)
+                               tool → action  ·  llm_request → inference  (LLM-labeled one-liners)
+                               pure stage; LLM adapter (claude -p haiku) injected by e2e script only
         │
         ▼ React Flow graph   (@coach/app, via the buildVizResults adapter)
 ```
@@ -55,6 +58,10 @@ single **agent** (multi-agent is out of scope). Use the staging UI to mix files 
 `01-classified.json`, `02-sessions.json`, `03-canonical-by-session.json`,
 `04-agent-graph.json`, `05-execution-graph.json`.
 
+Pass `--enrich` to also run the semantic enrichment stage (calls `claude -p` with
+`claude-haiku-4-5` per batch) and write `06-enriched-graph.json`. The enriched
+graph is loadable by the app's "Load pipeline output" button.
+
 ## Quick start
 
 ```bash
@@ -72,6 +79,7 @@ pnpm --filter @coach/app dev   # upload landing page at http://localhost:5173
 | `pnpm format`                              | Auto-format with Prettier                      |
 | `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                           |
 | `pnpm e2e <fixture>`                       | Run pipeline on a fixture, write `out/`        |
+| `pnpm e2e <fixture> --enrich`              | Also run semantic enrichment (calls Claude)    |
 
 ## Contributing workflow
 

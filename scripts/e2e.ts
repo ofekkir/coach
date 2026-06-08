@@ -1,15 +1,23 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { log } from '@coach/logger';
-import { runPipeline } from '@coach/pipeline';
+import { runPipelineAsync } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
+import { claudeLabelBatch } from './claude-labeler.ts';
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
-const arg = process.argv[2];
+const cliArgs = process.argv.slice(2);
+const enrichFlag = cliArgs.includes('--enrich');
+const debugFlag = cliArgs.includes('--debug');
+const positionals = cliArgs.filter((a) => !a.startsWith('--'));
+const arg = positionals[0];
+
+if (debugFlag) log.level = 'debug';
+
 if (!arg) {
   log.error(
-    'Usage: pnpm e2e <path>  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website)',
+    'Usage: pnpm e2e <path> [--enrich] [--debug]  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website --enrich)',
   );
   process.exit(1);
 }
@@ -51,7 +59,7 @@ function dump(stepLabel: string, data: unknown): void {
 const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
-const result = runPipeline(files);
+const result = await runPipelineAsync(files, enrichFlag ? claudeLabelBatch : undefined);
 
 // Input-bearing members are projected to names/types so the dumps stay readable;
 // the graph members are dumped in full — they are the point of inspection.
@@ -70,6 +78,9 @@ dump(
 dump('03-canonical-by-session', result.canonicalBySession);
 dump('04-agent-graph', result.agentGraph);
 dump('05-execution-graph', result.executionGraph);
+if (result.enrichedGraph != null) {
+  dump('06-enriched-graph', { executionGraph: result.enrichedGraph });
+}
 
 const unsupported = result.classified.filter((c) => c.type === 'unsupported');
 if (unsupported.length > 0) {

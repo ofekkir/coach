@@ -1,4 +1,4 @@
-import type { NodeType, OtlpAttribute, TempoTrace } from '../../types.ts';
+import type { OtlpAttribute, TempoTrace } from '../../types.ts';
 
 export interface ParsedSpan {
   readonly id: string;
@@ -18,7 +18,7 @@ export interface ParsedSpan {
   readonly rawRequestBody: string | null;
   readonly rawResponseBody: string | null;
   readonly costUsd: string | null;
-  readonly toolInput: string | null;
+  readonly toolInputSummary: string | null;
   readonly hookName: string | null;
   readonly sequenceIndex: number | null;
 }
@@ -42,17 +42,6 @@ function getIntAttr(attrs: readonly OtlpAttribute[], key: string): number | null
     return isNaN(n) ? null : n;
   }
   return null;
-}
-
-export function isNodeType(s: string): s is NodeType {
-  return (
-    s === 'interaction' ||
-    s === 'llm_request' ||
-    s === 'tool' ||
-    s === 'tool.blocked_on_user' ||
-    s === 'tool.execution' ||
-    s === 'hook'
-  );
 }
 
 export function parseSpans(trace: TempoTrace): ParsedSpan[] {
@@ -79,7 +68,7 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
         rawRequestBody: getStringAttr(span.attributes, 'raw_request_body'),
         rawResponseBody: getStringAttr(span.attributes, 'raw_response_body'),
         costUsd: getStringAttr(span.attributes, 'cost_usd'),
-        toolInput: getStringAttr(span.attributes, 'tool_input'),
+        toolInputSummary: getStringAttr(span.attributes, 'tool_input_summary'),
         hookName: getStringAttr(span.attributes, 'hook.name'),
         sequenceIndex: getIntAttr(span.attributes, 'interaction.sequence'),
       };

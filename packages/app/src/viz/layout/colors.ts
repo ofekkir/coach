@@ -8,6 +8,9 @@ const TYPE_COLORS: Record<string, string> = {
   blocked_on_user: '#B8A840',
   execution: '#999933',
   hook: '#117733',
+  // enriched node types
+  action: '#AA4455',
+  inference: '#664499',
 };
 
 const TYPE_FILLS: Record<string, string> = {
@@ -20,6 +23,9 @@ const TYPE_FILLS: Record<string, string> = {
   blocked_on_user: '#FBF9EC',
   execution: '#F4F4E9',
   hook: '#E5F0E9',
+  // enriched node types
+  action: '#F5ECED',
+  inference: '#EEE9F5',
 };
 
 export function colorOf(type: string): string {
