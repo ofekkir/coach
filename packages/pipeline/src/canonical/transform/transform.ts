@@ -4,7 +4,8 @@ import type {
   InteractionNode,
   LlmRequestNode,
   ToolNode,
-  ToolType,
+  ToolExecutionNode,
+  ToolBlockedOnUserNode,
   HookNode,
 } from '../../types.ts';
 import {
@@ -32,18 +33,22 @@ function parentField(parent: string | null): { parent?: string } {
   return parent !== null ? { parent } : {};
 }
 
+function require<T>(value: T | null, spanId: string, attr: string): T {
+  if (value == null) throw new Error(`span ${spanId}: missing required attribute '${attr}'`);
+  return value;
+}
+
 function buildInteractionNode(span: ParsedSpan, parent: string | null): InteractionNode {
-  const node: InteractionNode = {
+  return {
     id: span.id,
     type: 'interaction',
     ...spanTiming(span),
     ...parentField(parent),
+    session_id: require(span.sessionId, span.id, 'session.id'),
+    sequence: require(span.sequenceIndex, span.id, 'interaction.sequence'),
+    prompt: require(span.userPrompt, span.id, 'user_prompt'),
+    user_id: require(span.userId, span.id, 'user.id'),
   };
-  if (span.sequenceIndex != null) node.sequence = span.sequenceIndex;
-  if (span.userPrompt != null) node.prompt = span.userPrompt;
-  if (span.sessionId != null) node.session_id = span.sessionId;
-  if (span.userId != null) node.user_id = span.userId;
-  return node;
 }
 
 function applyRequestBody(node: LlmRequestNode, rawRequestBody: string, repair: boolean): void {
@@ -69,13 +74,13 @@ function buildLlmRequestNode(
     type: 'llm_request',
     ...spanTiming(span),
     ...parentField(parent),
+    model: require(span.model, span.id, 'model'),
+    tokens_in: require(span.inputTokens, span.id, 'input_tokens'),
+    tokens_out: require(span.outputTokens, span.id, 'output_tokens'),
   };
-  if (span.model != null) node.model = span.model;
   if (span.querySource != null) node.source = span.querySource;
   if (span.rawRequestBody != null) applyRequestBody(node, span.rawRequestBody, repair);
   if (span.rawResponseBody != null) applyResponseBody(node, span.rawResponseBody);
-  if (span.inputTokens != null) node.tokens_in = span.inputTokens;
-  if (span.outputTokens != null) node.tokens_out = span.outputTokens;
   if (span.costUsd != null) {
     const n = parseFloat(span.costUsd);
     if (!isNaN(n)) node.cost_usd = n;
@@ -83,20 +88,32 @@ function buildLlmRequestNode(
   return node;
 }
 
-// One builder for all three tool variants — they share a shape and differ only
-// by discriminant. (The previous flat-struct code only handled bare `tool`,
-// silently dropping name/tool_input on `tool.execution` and `tool.blocked_on_user`.)
-function buildToolNode(span: ParsedSpan, parent: string | null, type: ToolType): ToolNode {
-  const node: ToolNode = { id: span.id, type, ...spanTiming(span), ...parentField(parent) };
+function buildToolNode(span: ParsedSpan, parent: string | null): ToolNode {
+  const node: ToolNode = { id: span.id, type: 'tool', ...spanTiming(span), ...parentField(parent) };
   if (span.toolName != null) node.name = span.toolName;
   if (span.toolInputSummary != null) node.tool_input = span.toolInputSummary;
   return node;
 }
 
+function buildToolExecutionNode(span: ParsedSpan, parent: string | null): ToolExecutionNode {
+  return { id: span.id, type: 'tool.execution', ...spanTiming(span), ...parentField(parent) };
+}
+
+function buildToolBlockedOnUserNode(
+  span: ParsedSpan,
+  parent: string | null,
+): ToolBlockedOnUserNode {
+  return { id: span.id, type: 'tool.blocked_on_user', ...spanTiming(span), ...parentField(parent) };
+}
+
 function buildHookNode(span: ParsedSpan, parent: string | null): HookNode {
-  const node: HookNode = { id: span.id, type: 'hook', ...spanTiming(span), ...parentField(parent) };
-  if (span.hookName != null) node.name = span.hookName;
-  return node;
+  return {
+    id: span.id,
+    type: 'hook',
+    ...spanTiming(span),
+    ...parentField(parent),
+    name: require(span.hookName, span.id, 'hook.name'),
+  };
 }
 
 function spanToNode(span: ParsedSpan, rootId: string | null, repair: boolean): CanonicalNode {
@@ -105,11 +122,11 @@ function spanToNode(span: ParsedSpan, rootId: string | null, repair: boolean): C
     case 'llm_request':
       return buildLlmRequestNode(span, parent, repair);
     case 'tool':
-      return buildToolNode(span, parent, 'tool');
+      return buildToolNode(span, parent);
     case 'tool.execution':
-      return buildToolNode(span, parent, 'tool.execution');
+      return buildToolExecutionNode(span, parent);
     case 'tool.blocked_on_user':
-      return buildToolNode(span, parent, 'tool.blocked_on_user');
+      return buildToolBlockedOnUserNode(span, parent);
     case 'hook':
       return buildHookNode(span, parent);
     default:

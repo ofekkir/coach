@@ -1,4 +1,4 @@
-import { SYNTHETIC_AGENT_ID, aggregateAgent, aggregateSession } from './aggregate/aggregate.ts';
+import { aggregateAgent, aggregateSession } from './aggregate/aggregate.ts';
 import { toCanonical } from './canonical/canonical.ts';
 import { classifyInputs } from './classify/classify.ts';
 import { buildExecutionGraph } from './graph/execution/execution.ts';
@@ -106,9 +106,7 @@ export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
   // resolved a session id but produced no canonical nodes — e.g. logs with no trace).
   if (!result.agentGraph.some((n) => n.type === 'session')) return [];
 
-  const agent = result.agentGraph.find(
-    (n): n is AgentNode => n.type === 'agent' && n.id !== SYNTHETIC_AGENT_ID,
-  );
+  const agent = result.agentGraph.find((n): n is AgentNode => n.type === 'agent');
   const title = agent?.user_id ?? 'agent';
   return [{ title, data: result.executionGraph }];
 }

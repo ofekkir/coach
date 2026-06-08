@@ -25,6 +25,9 @@ function span(
 const interaction: CanonicalNode = {
   id: 'root',
   type: 'interaction',
+  session_id: 's-1',
+  user_id: 'u-1',
+  sequence: 0,
   prompt: 'hello',
   ...span(90, 500),
 };
@@ -34,6 +37,9 @@ const llm1: CanonicalNode = {
   type: 'llm_request',
   parent: 'root',
   source: 'repl_main_thread',
+  model: '',
+  tokens_in: 0,
+  tokens_out: 0,
   ...span(100, 200),
 };
 
@@ -42,6 +48,9 @@ const llm2: CanonicalNode = {
   type: 'llm_request',
   parent: 'root',
   source: 'repl_main_thread',
+  model: '',
+  tokens_in: 0,
+  tokens_out: 0,
   ...span(310, 400),
 };
 
@@ -61,6 +70,7 @@ function agentForest(): CanonicalNode[] {
     type: 'session',
     parent: 'agent',
     session_id: 's-123',
+    user_id: 'u1',
   };
   const inter: CanonicalNode = { ...interaction, parent: 'sess' };
   return [agent, session, inter, llm1, toolAfterLlm1, llm2];
@@ -195,7 +205,12 @@ describe('buildExecutionGraph', () => {
   });
 
   it('degrades to kind:session when no agent node is present', () => {
-    const session: CanonicalNode = { id: 'sess', type: 'session', session_id: 's-1' };
+    const session: CanonicalNode = {
+      id: 'sess',
+      type: 'session',
+      session_id: 's-1',
+      user_id: 'u-1',
+    };
     const inter: CanonicalNode = { ...interaction, parent: 'sess' };
     const graph = buildExecutionGraph([session, inter, { ...llm1, parent: 'root' }]);
     expect(graph.kind).toBe('session');
@@ -224,7 +239,18 @@ const resMsgs1: ResponseMessage[] = [{ type: 'text', text: 'Hi there' }];
 const resMsgs2: ResponseMessage[] = [{ type: 'tool_use', name: 'Read', id: 'tu1' }];
 
 function makeInteractionWithLlms(llmNodes: CanonicalNode[]): CanonicalNode[] {
-  return [{ id: 'root', type: 'interaction', prompt: 'test', ...span(90, 500) }, ...llmNodes];
+  return [
+    {
+      id: 'root',
+      type: 'interaction',
+      session_id: 's-1',
+      user_id: 'u-1',
+      sequence: 0,
+      prompt: 'test',
+      ...span(90, 500),
+    },
+    ...llmNodes,
+  ];
 }
 
 function findMember(
@@ -243,6 +269,9 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
       ...span(100, 200),
       request_messages: [msg1],
       response_messages: resMsgs1,
@@ -259,6 +288,9 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
       ...span(100, 200),
       request_messages: [msg1, msg2],
       response_messages: resMsgs1,
@@ -268,6 +300,9 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
       ...span(300, 400),
       request_messages: [msg1, msg2, msg3],
       response_messages: resMsgs2,
@@ -287,6 +322,9 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
       ...span(100, 200),
       request_messages: [msg1, msg2, msg3],
       response_messages: resMsgs1,
@@ -303,6 +341,9 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
       ...span(100, 200),
       request_messages: [msg1, msg2],
       response_messages: resMsgs1,
@@ -312,6 +353,9 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
       ...span(300, 400),
       // Native: only the new message, not the full history
       request_messages: [msg3],
@@ -331,6 +375,9 @@ describe('message deltas on thread members', () => {
       type: 'llm_request',
       parent: 'root',
       source: 'repl_main_thread',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
       ...span(100, 200),
       request_messages: [msg1],
     };
