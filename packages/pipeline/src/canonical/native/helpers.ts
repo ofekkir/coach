@@ -1,4 +1,5 @@
 import type { OtlpAttribute } from '../../types.ts';
+import { NS_PER_MS } from '../../types.ts';
 
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -31,7 +32,7 @@ export function traceB64(sessionId: string): string {
 }
 
 export function isoToNano(iso: string): string {
-  return String(BigInt(Date.parse(iso)) * 1_000_000n);
+  return String(BigInt(Date.parse(iso)) * NS_PER_MS);
 }
 
 export function clampEnd(start: string, end: string): string {

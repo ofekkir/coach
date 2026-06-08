@@ -1,4 +1,5 @@
 import type { OtlpAttribute, TempoTrace } from '../../types.ts';
+import { NS_PER_MS } from '../../types.ts';
 import { SPAN_ID_PREFIX } from '../enrich/id-utils.ts';
 
 export interface ParsedSpan {
@@ -56,7 +57,7 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
         parentId: span.parentSpanId ? SPAN_ID_PREFIX + b64toHex(span.parentSpanId) : null,
         startNs: span.startTimeUnixNano,
         endNs: span.endTimeUnixNano,
-        durationMs: Number(endNsBig - startNsBig) / 1_000_000,
+        durationMs: Number(endNsBig - startNsBig) / Number(NS_PER_MS),
         spanType: getStringAttr(span.attributes, 'span.type') ?? span.name,
         model: getStringAttr(span.attributes, 'model'),
         toolName: getStringAttr(span.attributes, 'tool_name'),

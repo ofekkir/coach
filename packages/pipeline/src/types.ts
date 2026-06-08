@@ -1,3 +1,6 @@
+/** Nanoseconds per millisecond. OTEL timestamps are ns (bigint); UI gaps/durations are ms. */
+export const NS_PER_MS = 1_000_000n;
+
 // ── Pipeline input ──────────────────────────────────────────────────────────
 
 /** A single in-memory file presented by the caller (browser File.text() or Node fs.readFileSync). */
