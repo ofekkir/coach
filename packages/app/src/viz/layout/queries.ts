@@ -9,7 +9,7 @@ import type {
 } from '@coach/pipeline';
 import { placeAgent, sessionWidth } from './place-graph.ts';
 import type { Ctx, TraceRFNode } from './types.ts';
-import { NW, HG } from './types.ts';
+import { CANVAS_TOP, CENTERING_DIVISOR, NW, HG } from './types.ts';
 import type { Edge } from '@xyflow/react';
 
 function synthetic(canonical: AgentNode | SessionNode): ExecutionNode {
@@ -50,7 +50,7 @@ export function buildElements(
     return sum + sessionWidth(s) + (i > 0 ? HG : 0);
   }, 0);
   const ctx: Ctx = {
-    cx: Math.max(NW, totalSessionsW) / 2 + 50,
+    cx: Math.max(NW, totalSessionsW) / CENTERING_DIVISOR + CANVAS_TOP,
     expanded,
     selected,
     nodes: [],

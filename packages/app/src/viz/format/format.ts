@@ -41,12 +41,18 @@ export interface NodeCard {
   readonly metrics: CardMetrics;
 }
 
+// Truncation limits (chars) for title lines, and decimal precision for metrics.
+const INTERACTION_TITLE_MAX = 40;
+const SESSION_TITLE_MAX = 24;
+const SUBMS_DECIMALS = 2;
+const COST_DECIMALS = 6;
+
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + '…';
 }
 
 function formatDuration(ms: number): string {
-  if (ms < 1) return `${ms.toFixed(2)}ms`;
+  if (ms < 1) return `${ms.toFixed(SUBMS_DECIMALS)}ms`;
   return `${String(Math.round(ms))}ms`;
 }
 
@@ -71,14 +77,14 @@ export function formatMetrics(metrics: CardMetrics): {
   const parts: string[] = [];
   if (metrics.tokensIn != null) parts.push(`in ${String(metrics.tokensIn)}`);
   if (metrics.tokensOut != null) parts.push(`out ${String(metrics.tokensOut)}`);
-  if (metrics.costUsd != null) parts.push(`$${metrics.costUsd.toFixed(6)}`);
+  if (metrics.costUsd != null) parts.push(`$${metrics.costUsd.toFixed(COST_DECIMALS)}`);
   return { duration, secondary: parts.length > 0 ? parts.join(' · ') : null };
 }
 
 /** Title for an interaction node: a short prompt preview, else a positional fallback. */
 function interactionTitle(node: InteractionNode, index: number): string {
   if (node.prompt.trim() !== '') {
-    return truncate(collapseWhitespace(node.prompt).trim(), 40);
+    return truncate(collapseWhitespace(node.prompt).trim(), INTERACTION_TITLE_MAX);
   }
   return `interaction ${String(index + 1)}`;
 }
@@ -86,7 +92,7 @@ function interactionTitle(node: InteractionNode, index: number): string {
 /** Title for a session node: a short session_id preview, else a positional fallback. */
 function sessionTitle(node: SessionNode, index: number): string {
   if (node.session_id.trim() !== '') {
-    return truncate(node.session_id, 24);
+    return truncate(node.session_id, SESSION_TITLE_MAX);
   }
   return `session ${String(index + 1)}`;
 }

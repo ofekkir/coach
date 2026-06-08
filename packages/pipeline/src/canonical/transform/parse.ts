@@ -1,4 +1,6 @@
 import type { OtlpAttribute, TempoTrace } from '../../types.ts';
+import { NS_PER_MS } from '../../types.ts';
+import { b64toHex, SPAN_ID_PREFIX } from '../enrich/id-utils.ts';
 
 export interface ParsedSpan {
   readonly id: string;
@@ -21,10 +23,6 @@ export interface ParsedSpan {
   readonly toolInputSummary: string | null;
   readonly hookName: string | null;
   readonly sequenceIndex: number | null;
-}
-
-function b64toHex(b64: string): string {
-  return Array.from(atob(b64), (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
 }
 
 function getStringAttr(attrs: readonly OtlpAttribute[], key: string): string | null {
@@ -51,11 +49,11 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
       const startNsBig = BigInt(span.startTimeUnixNano);
       const endNsBig = BigInt(span.endTimeUnixNano);
       return {
-        id: 's' + b64toHex(span.spanId),
-        parentId: span.parentSpanId ? 's' + b64toHex(span.parentSpanId) : null,
+        id: SPAN_ID_PREFIX + b64toHex(span.spanId),
+        parentId: span.parentSpanId ? SPAN_ID_PREFIX + b64toHex(span.parentSpanId) : null,
         startNs: span.startTimeUnixNano,
         endNs: span.endTimeUnixNano,
-        durationMs: Number(endNsBig - startNsBig) / 1_000_000,
+        durationMs: Number(endNsBig - startNsBig) / Number(NS_PER_MS),
         spanType: getStringAttr(span.attributes, 'span.type') ?? span.name,
         model: getStringAttr(span.attributes, 'model'),
         toolName: getStringAttr(span.attributes, 'tool_name'),

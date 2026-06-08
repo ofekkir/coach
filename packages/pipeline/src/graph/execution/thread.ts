@@ -1,5 +1,9 @@
 import type { CanonicalNode, RequestMessage, ResponseMessage } from '../../types.ts';
+import { NS_PER_MS } from '../../types.ts';
 import type { ExecutionNode } from '../types.ts';
+
+/** Sentinel "later than any real timestamp" seed for an earliest-start min-search. */
+const FAR_FUTURE_NS = 99999999999999999999n;
 
 // ── Message delta helpers ───────────────────────────────────────────────────
 
@@ -54,12 +58,19 @@ function endNs(node: CanonicalNode): string | undefined {
   return 'end_time_ns' in node ? node.end_time_ns : undefined;
 }
 
+// Tie-break order when two nodes share a start timestamp: a blocked-on-user gate
+// sorts before its execution, both before anything else.
+const SORT_RANK_BY_TYPE = new Map<string, number>([
+  ['tool.blocked_on_user', 0],
+  ['tool.execution', 1],
+]);
+const DEFAULT_SORT_RANK = 2;
+
 export function compareStart(a: CanonicalNode, b: CanonicalNode): number {
   const diff = nsOf(startNs(a)) - nsOf(startNs(b));
   if (diff !== 0n) return diff < 0n ? -1 : 1;
-  const priority = (t: string) =>
-    t === 'tool.blocked_on_user' ? 0 : t === 'tool.execution' ? 1 : 2;
-  return priority(a.type) - priority(b.type);
+  const rank = (t: string) => SORT_RANK_BY_TYPE.get(t) ?? DEFAULT_SORT_RANK;
+  return rank(a.type) - rank(b.type);
 }
 
 export function sortByStart<T extends CanonicalNode>(list: T[]): T[] {
@@ -72,7 +83,7 @@ export function gapMsBetween(prev: CanonicalNode, next: CanonicalNode): number |
   const prevEnd = endNs(prev);
   const nextStart = startNs(next);
   if (prevEnd == null || nextStart == null) return null;
-  const ms = Number(BigInt(nextStart) - BigInt(prevEnd)) / 1_000_000;
+  const ms = Number(BigInt(nextStart) - BigInt(prevEnd)) / Number(NS_PER_MS);
   if (!Number.isFinite(ms) || ms === 0) return null;
   return ms;
 }
@@ -131,7 +142,7 @@ function findPrecedingThread(
   let bestByEnd: string | null = null;
   let bestEnd = -1n;
   let firstByStart: string | null = null;
-  let firstStart = 99999999999999999999n;
+  let firstStart = FAR_FUTURE_NS;
 
   for (const { source, req } of flattenThreadReqs(llmsByThread)) {
     const reqStart = startNs(req);

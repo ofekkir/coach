@@ -1,4 +1,12 @@
 import type { LogEntry, OtlpAttribute, OtlpBatch, OtlpSpan, TempoTrace } from '../../types.ts';
+import {
+  FNV_OFFSET_BASIS,
+  FNV_PRIME,
+  HIGH_BYTE_SHIFT,
+  LCG_INCREMENT,
+  LCG_MULTIPLIER,
+  SPAN_ID_BYTES,
+} from '../../types.ts';
 import { allSpansFlat, collectSpanMeta, strAttr } from './id-utils.ts';
 import type { SpanMeta } from './id-utils.ts';
 import { attributeLogsToSpans, buildRequestBodyIndex, buildToolInputIndex } from './logs.ts';
@@ -12,19 +20,19 @@ function hookSpanB64(index: number): string {
     return btoa(binary);
   }
   function deterministicBytes(seed: string, len: number): Uint8Array {
-    let h = 2166136261 >>> 0;
+    let h = FNV_OFFSET_BASIS >>> 0;
     for (let i = 0; i < seed.length; i++) {
       h = (h ^ seed.charCodeAt(i)) >>> 0;
-      h = Math.imul(h, 16777619) >>> 0;
+      h = Math.imul(h, FNV_PRIME) >>> 0;
     }
     const out = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
-      h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
-      out[i] = h >>> 24;
+      h = (Math.imul(h, LCG_MULTIPLIER) + LCG_INCREMENT) >>> 0;
+      out[i] = h >>> HIGH_BYTE_SHIFT;
     }
     return out;
   }
-  return uint8ToBase64(deterministicBytes(`coach-hook-span-${String(index)}`, 8));
+  return uint8ToBase64(deterministicBytes(`coach-hook-span-${String(index)}`, SPAN_ID_BYTES));
 }
 
 function resolveRawRequestBody(

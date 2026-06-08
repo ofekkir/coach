@@ -1,3 +1,19 @@
+/** Nanoseconds per millisecond. OTEL timestamps are ns (bigint); UI gaps/durations are ms. */
+export const NS_PER_MS = 1_000_000n;
+
+/** OTLP/W3C identifier byte-lengths (fixed by spec): 8-byte span ids, 16-byte trace ids. */
+export const SPAN_ID_BYTES = 8;
+export const TRACE_ID_BYTES = 16;
+
+/** Constants of the dependency-free deterministic byte generator (FNV-1a hash → LCG)
+ *  used to synthesize stable span/trace ids for native (non-OTEL) inputs. */
+export const FNV_OFFSET_BASIS = 2166136261;
+export const FNV_PRIME = 16777619;
+export const LCG_MULTIPLIER = 1664525;
+export const LCG_INCREMENT = 1013904223;
+/** Right-shift to take the high byte of a 32-bit word. */
+export const HIGH_BYTE_SHIFT = 24;
+
 // ── Pipeline input ──────────────────────────────────────────────────────────
 
 /** A single in-memory file presented by the caller (browser File.text() or Node fs.readFileSync). */

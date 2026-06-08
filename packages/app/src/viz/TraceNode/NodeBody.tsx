@@ -7,6 +7,9 @@ const LINE: React.CSSProperties = {
   textOverflow: 'ellipsis',
 };
 
+// Gap (px) under the title line when field lines follow it.
+const TITLE_GAP_WITH_FIELDS = 2;
+
 export function NodeBody({
   title,
   fields,
@@ -29,7 +32,7 @@ export function NodeBody({
             color: '#1e293b',
             fontSize: 11,
             lineHeight: 1.4,
-            marginBottom: fields.length > 0 ? 2 : 0,
+            marginBottom: fields.length > 0 ? TITLE_GAP_WITH_FIELDS : 0,
           }}
         >
           {title}

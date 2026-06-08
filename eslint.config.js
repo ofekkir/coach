@@ -6,6 +6,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactPlugin from 'eslint-plugin-react';
 import { createFolderStructure, projectStructurePlugin } from 'eslint-plugin-project-structure';
 import noBarrelFiles from 'eslint-plugin-no-barrel-files';
+import sonarjs from 'eslint-plugin-sonarjs';
 
 // TODO: projectStructureParser integration was kept minimal due to parser-layering
 // complexity with typescript-eslint's projectService. The rule enforces PascalCase
@@ -93,6 +94,42 @@ export default tseslint.config(
       'project-structure/folder-structure': ['error', uploadStructureConfig],
     },
   },
+  // Magic-number policy, repo-wide: a numeric literal that carries meaning must be
+  // bound to a named constant (or function) — the name IS the documentation. The
+  // TS-aware @typescript-eslint variant is used so enums and numeric-literal types
+  // aren't false positives. The ONLY ignored values are -1/0/1 (and bigint 0n):
+  // the constants of identity, emptiness, and off-by-one/indexOf idioms, which no
+  // name can clarify (`slice(0, i)`, `idx >= 0`, `i + 1`). Everything else — radixes,
+  // byte-lengths, hash constants, durations — must be named. Enforced deterministically,
+  // not by convention. (Base no-magic-numbers stays off to avoid double-reporting.)
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      'no-magic-numbers': 'off',
+      '@typescript-eslint/no-magic-numbers': [
+        'error',
+        {
+          ignore: [-1, 0, '0n', 1],
+          ignoreArrayIndexes: true,
+          ignoreEnums: true,
+          ignoreNumericLiteralTypes: true,
+          ignoreReadonlyClassProperties: true,
+        },
+      ],
+    },
+  },
+  // Magic-string policy, repo-wide: a string literal repeated 3+ times must be a
+  // named constant (sonarjs default threshold). This is the deterministic general
+  // rule — there is no maintained "ban every string literal", and a blanket ban
+  // would flag hundreds of legitimate one-off keys/props/discriminants. Repetition
+  // is the tractable signal that a string carries shared meaning worth naming.
+  {
+    files: ['**/*.{ts,tsx}'],
+    plugins: { sonarjs },
+    rules: {
+      'sonarjs/no-duplicate-string': 'error',
+    },
+  },
   // Code complexity and nesting guards + file/function size limits
   {
     rules: {
@@ -116,6 +153,9 @@ export default tseslint.config(
       'max-nested-callbacks': 'off',
       'max-lines': 'off',
       'max-lines-per-function': 'off',
+      'no-magic-numbers': 'off',
+      '@typescript-eslint/no-magic-numbers': 'off',
+      'sonarjs/no-duplicate-string': 'off',
     },
   },
   // Ban barrel files everywhere except each package's public src/index.ts.

@@ -2,8 +2,12 @@ import { spawn } from 'node:child_process';
 import { log } from '@coach/logger';
 import type { LabelBatchFn, LabelRequest } from '@coach/pipeline';
 
+const BYTES_PER_KIB = 1024;
+const MAX_BUFFER_MIB = 4;
+const STDOUT_PREVIEW_CHARS = 500;
+
 const BATCH_SIZE = 25;
-const MAX_BUFFER = 4 * 1024 * 1024;
+const MAX_BUFFER = MAX_BUFFER_MIB * BYTES_PER_KIB * BYTES_PER_KIB;
 const TIMEOUT_MS = 120_000;
 
 // ── Custom error carries subprocess output for diagnostics ────────────────────
@@ -128,7 +132,7 @@ async function callClaudeWithRetry(
     {
       ids: batchIds,
       error: lastError instanceof Error ? lastError.message : String(lastError),
-      stdout: e?.stdout.slice(0, 500),
+      stdout: e?.stdout.slice(0, STDOUT_PREVIEW_CHARS),
     },
     '[claude-labeler] batch failed',
   );

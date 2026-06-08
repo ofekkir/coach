@@ -1,5 +1,12 @@
 import type { OtlpAttribute, OtlpSpan, TempoTrace } from '../../types.ts';
 
+/** Prefix applied to all canonical span IDs to distinguish them from raw base64 span IDs. */
+export const SPAN_ID_PREFIX = 's';
+
+/** Hex formatting for byte→string conversion: base-16, two zero-padded digits per byte. */
+const HEX_RADIX = 16;
+const HEX_DIGITS_PER_BYTE = 2;
+
 export interface SpanMeta {
   readonly id: string;
   readonly b64: string;
@@ -12,7 +19,9 @@ export interface SpanMeta {
 }
 
 export function b64toHex(b64: string): string {
-  return Array.from(atob(b64), (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+  return Array.from(atob(b64), (c) =>
+    c.charCodeAt(0).toString(HEX_RADIX).padStart(HEX_DIGITS_PER_BYTE, '0'),
+  ).join('');
 }
 
 export function strAttr(key: string, value: string): OtlpAttribute {
@@ -31,7 +40,7 @@ export function allSpansFlat(trace: TempoTrace): OtlpSpan[] {
 
 export function collectSpanMeta(trace: TempoTrace): SpanMeta[] {
   const metas = allSpansFlat(trace).map((span) => ({
-    id: 's' + b64toHex(span.spanId),
+    id: SPAN_ID_PREFIX + b64toHex(span.spanId),
     b64: span.spanId,
     parentB64: span.parentSpanId ?? null,
     startNs: BigInt(span.startTimeUnixNano),

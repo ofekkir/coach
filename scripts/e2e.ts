@@ -7,7 +7,11 @@ import { claudeLabelBatch } from './claude-labeler.ts';
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
-const cliArgs = process.argv.slice(2);
+// argv[0]=node, argv[1]=script — user args start after them.
+const ARGV_USER_START = 2;
+const JSON_INDENT = 2;
+
+const cliArgs = process.argv.slice(ARGV_USER_START);
 const enrichFlag = cliArgs.includes('--enrich');
 const debugFlag = cliArgs.includes('--debug');
 const positionals = cliArgs.filter((a) => !a.startsWith('--'));
@@ -52,7 +56,7 @@ function gatherFiles(dir: string, rootDir: string): UploadedFile[] {
 
 function dump(stepLabel: string, data: unknown): void {
   const filePath = join(outDir, `${stepLabel}.json`);
-  writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
+  writeFileSync(filePath, JSON.stringify(data, null, JSON_INDENT) + '\n');
   log.info(`  → ${filePath}`);
 }
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SPAN_ID_BYTES, TRACE_ID_BYTES } from '../types.ts';
 
 function b64ByteLength(s: string): number {
   try {
@@ -10,11 +11,11 @@ function b64ByteLength(s: string): number {
 
 const b64SpanId = z
   .string()
-  .refine((s) => b64ByteLength(s) === 8, 'must be base64-encoded 8 bytes');
+  .refine((s) => b64ByteLength(s) === SPAN_ID_BYTES, 'must be base64-encoded 8 bytes');
 
 const b64TraceId = z
   .string()
-  .refine((s) => b64ByteLength(s) === 16, 'must be base64-encoded 16 bytes');
+  .refine((s) => b64ByteLength(s) === TRACE_ID_BYTES, 'must be base64-encoded 16 bytes');
 
 const OtlpAttributeValueSchema = z.union([
   z.object({ stringValue: z.string() }),
