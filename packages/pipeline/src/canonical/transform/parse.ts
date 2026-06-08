@@ -68,7 +68,7 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
         rawRequestBody: getStringAttr(span.attributes, 'raw_request_body'),
         rawResponseBody: getStringAttr(span.attributes, 'raw_response_body'),
         costUsd: getStringAttr(span.attributes, 'cost_usd'),
-        toolInputSummary: getStringAttr(span.attributes, 'tool_input_summary'),
+        toolInputSummary: getStringAttr(span.attributes, 'tool_input'),
         hookName: getStringAttr(span.attributes, 'hook.name'),
         sequenceIndex: getIntAttr(span.attributes, 'interaction.sequence'),
       };
