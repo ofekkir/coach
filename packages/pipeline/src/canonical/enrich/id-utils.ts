@@ -1,5 +1,8 @@
 import type { OtlpAttribute, OtlpSpan, TempoTrace } from '../../types.ts';
 
+/** Prefix applied to all canonical span IDs to distinguish them from raw base64 span IDs. */
+export const SPAN_ID_PREFIX = 's';
+
 export interface SpanMeta {
   readonly id: string;
   readonly b64: string;
@@ -31,7 +34,7 @@ export function allSpansFlat(trace: TempoTrace): OtlpSpan[] {
 
 export function collectSpanMeta(trace: TempoTrace): SpanMeta[] {
   const metas = allSpansFlat(trace).map((span) => ({
-    id: 's' + b64toHex(span.spanId),
+    id: SPAN_ID_PREFIX + b64toHex(span.spanId),
     b64: span.spanId,
     parentB64: span.parentSpanId ?? null,
     startNs: BigInt(span.startTimeUnixNano),

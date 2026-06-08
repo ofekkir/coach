@@ -1,5 +1,5 @@
 import type { LogEntry } from '../../types.ts';
-import { b64toHex, narrowestContaining } from './id-utils.ts';
+import { b64toHex, narrowestContaining, SPAN_ID_PREFIX } from './id-utils.ts';
 import type { SpanMeta } from './id-utils.ts';
 
 export function attributeLogsToSpans(
@@ -22,8 +22,8 @@ export function attributeLogsToSpans(
     let target: string;
     if (log.request_id != null) {
       target = requestIdIndex.get(log.request_id) ?? log.span_id;
-    } else if (childIds.has('s' + log.span_id)) {
-      target = 's' + log.span_id;
+    } else if (childIds.has(SPAN_ID_PREFIX + log.span_id)) {
+      target = SPAN_ID_PREFIX + log.span_id;
     } else {
       const m = narrowestContaining(metas, BigInt(log.timestamp_ns));
       target = m !== null ? m.id : log.span_id;
@@ -85,7 +85,7 @@ export function buildToolInputIndex(
   for (const m of metas) {
     const input = resolveToolInput(m, logsBySpan, useIdToInput);
     if (input == null || m.parentB64 == null) continue;
-    const parentId = 's' + b64toHex(m.parentB64);
+    const parentId = SPAN_ID_PREFIX + b64toHex(m.parentB64);
     result.set(parentId, input);
   }
   return result;

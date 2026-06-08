@@ -93,6 +93,19 @@ export default tseslint.config(
       'project-structure/folder-structure': ['error', uploadStructureConfig],
     },
   },
+  // Ban raw 's' + x span-ID construction — use SPAN_ID_PREFIX from id-utils.ts instead.
+  {
+    files: ['packages/pipeline/src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "BinaryExpression[operator='+'][left.type='Literal'][left.value='s']",
+          message: "Use SPAN_ID_PREFIX from id-utils.ts instead of the magic literal 's'.",
+        },
+      ],
+    },
+  },
   // Code complexity and nesting guards + file/function size limits
   {
     rules: {

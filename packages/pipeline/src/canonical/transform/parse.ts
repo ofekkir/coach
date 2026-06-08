@@ -1,4 +1,5 @@
 import type { OtlpAttribute, TempoTrace } from '../../types.ts';
+import { SPAN_ID_PREFIX } from '../enrich/id-utils.ts';
 
 export interface ParsedSpan {
   readonly id: string;
@@ -51,8 +52,8 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
       const startNsBig = BigInt(span.startTimeUnixNano);
       const endNsBig = BigInt(span.endTimeUnixNano);
       return {
-        id: 's' + b64toHex(span.spanId),
-        parentId: span.parentSpanId ? 's' + b64toHex(span.parentSpanId) : null,
+        id: SPAN_ID_PREFIX + b64toHex(span.spanId),
+        parentId: span.parentSpanId ? SPAN_ID_PREFIX + b64toHex(span.parentSpanId) : null,
         startNs: span.startTimeUnixNano,
         endNs: span.endTimeUnixNano,
         durationMs: Number(endNsBig - startNsBig) / 1_000_000,
