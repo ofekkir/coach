@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { decodeRawBody, extractRequestMessages } from './request-body.ts';
 
 const REQ = { messages: [{ role: 'user', content: 'hello' }] };
+const SYSTEM_CONTENT = [{ type: 'text', text: 'You are a helpful assistant.' }];
+const REQ_WITH_SYSTEM = { system: SYSTEM_CONTENT, messages: [{ role: 'user', content: 'hello' }] };
 
 describe('decodeRawBody', () => {
   it('parses plain JSON', () => {
@@ -53,5 +55,18 @@ describe('extractRequestMessages', () => {
   it('returns null for invalid input', () => {
     expect(extractRequestMessages('not json', false)).toBeNull();
     expect(extractRequestMessages('not json', true)).toBeNull();
+  });
+
+  it('prepends system message when system field is present', () => {
+    const msgs = extractRequestMessages(JSON.stringify(REQ_WITH_SYSTEM), false);
+    expect(msgs).toEqual([
+      { role: 'system', content: SYSTEM_CONTENT },
+      { role: 'user', content: 'hello' },
+    ]);
+  });
+
+  it('returns messages without system prefix when system field is absent', () => {
+    const msgs = extractRequestMessages(JSON.stringify(REQ), false);
+    expect(msgs).toEqual([{ role: 'user', content: 'hello' }]);
   });
 });
