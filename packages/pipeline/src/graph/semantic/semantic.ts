@@ -1,4 +1,4 @@
-import type { GraphNode, LlmRequestNode, RequestMessage, ResponseMessage } from '../../types.ts';
+import type { GraphNode, LlmRequestNode, ResponseMessage } from '../../types.ts';
 import type {
   AgentExecution,
   ExecutionGraph,
@@ -7,6 +7,19 @@ import type {
   SessionExecution,
   Thread,
 } from '../types.ts';
+import {
+  PLAN_LABEL,
+  PREDICT_PROMPT_LABEL,
+  SESSION_TITLE_LABEL,
+  hasThinking,
+  invokePhrase,
+  isSessionTitleResponse,
+  isSuggestionMode,
+  parseToolInput,
+  responseText,
+  responseToolCall,
+  toolPhrases,
+} from './derive.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Semantic enrichment stage — converts mechanical tool/llm_request nodes into
@@ -20,142 +33,73 @@ import type {
 // ── Public types ──────────────────────────────────────────────────────────────
 
 /**
- * Compact summary of one node sent to the labeler. For `llm_request` nodes we
- * extract the semantically-relevant text rather than ship the raw message delta:
- * a small local model fixates on the noise (billing headers, base64 thinking
- * signatures, system reminders) and falls back to echoing a model id. The
- * deterministic cases (empty nodes, session-title calls) are short-circuited in
- * `planLabels` and never appear here.
+ * One node sent to the labeler. The model's only job is to classify the *act* of
+ * a genuine final assistant message into an ordered list of short action phrases
+ * (`["confirm edit", "suggest next steps"]`). Everything the model is bad at —
+ * tool intent (derivable from the input), structural roles (thinking → plan,
+ * tool_use → invoke), and harness calls (session-title, suggestion-mode) — is
+ * derived deterministically in `planLabels` and never reaches here. `response_text`
+ * is the assistant's final message; the model names what it did, never quotes it.
  */
 export interface LabelRequest {
   id: string;
-  kind: 'tool' | 'llm_request';
-  /** tool: the tool name. */
-  name?: string;
-  /** tool: the raw tool input (carries the intent — file path, url, query). */
-  tool_input?: string;
-  /** llm_request: text of the last user-role message (system messages stripped). */
-  last_user_text?: string;
-  /** llm_request: the first non-thinking text block the model emitted. */
-  response_text?: string;
-  /** llm_request: name of the tool this inference decided to invoke next, if any. */
-  response_tool?: string;
+  response_text: string;
 }
 
 /**
- * Injected async callback that labels a batch of nodes. Returns a map from node
- * id → ordered list of atomic action phrases. Missing ids receive mechanical
- * fallbacks (tool name or model id).
+ * Injected async callback that classifies a batch of final-message nodes. Returns
+ * a map from node id → ordered list of action phrases. Missing ids fall back to
+ * their deterministic prefix or a mechanical label (tool name or model id).
  */
 export type LabelBatchFn = (
   requests: readonly LabelRequest[],
 ) => Promise<Map<string, readonly string[]>>;
 
-// ── Deterministic short-circuits (no LLM) ───────────────────────────────────---
-// Two node shapes are labeled without the model: nodes with no message delta at
-// all (the model can only fabricate), and the harness's own session-title calls
-// (an unambiguous {"title": …} response). Pre-classifying them both removes a
-// large class of hallucinations and saves the round-trip.
-
-const SESSION_TITLE_LABEL = 'generate session title';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function textFromContent(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return '';
-  return content
-    .filter(isRecord)
-    .filter((block) => block.type === 'text' && typeof block.text === 'string')
-    .map((block) => block.text as string)
-    .join('\n');
-}
-
-function lastUserText(messages: readonly RequestMessage[]): string | undefined {
-  const userMessages = messages.filter((m) => m.role === 'user');
-  const last = userMessages[userMessages.length - 1];
-  if (last == null) return undefined;
-  const text = textFromContent(last.content).trim();
-  return text === '' ? undefined : text;
-}
-
-function responseText(messages: readonly ResponseMessage[]): string | undefined {
-  const block = messages.find((m) => m.type === 'text' && typeof m.text === 'string');
-  const text = block != null ? String(block.text).trim() : '';
-  return text === '' ? undefined : text;
-}
-
-function responseToolName(messages: readonly ResponseMessage[]): string | undefined {
-  const block = messages.find((m) => m.type === 'tool_use' && typeof m.name === 'string');
-  return block != null ? String(block.name) : undefined;
-}
-
-/** A session-title call returns a JSON object whose only meaningful key is `title`. */
-function isSessionTitleResponse(text: string): boolean {
-  if (!text.startsWith('{')) return false;
-  try {
-    const parsed: unknown = JSON.parse(text);
-    return isRecord(parsed) && typeof parsed.title === 'string';
-  } catch {
-    return false;
-  }
-}
-
 // ── Label planning ────────────────────────────────────────────────────────────
+// Each node gets a deterministic `prefix` (possibly empty) plus, when it ends in a
+// genuine assistant message, a `request` for the model to classify the act. The
+// final label is `prefix ++ modelResult`. All derivation lives in derive.ts.
 
 interface LabelPlan {
   requests: LabelRequest[];
-  deterministic: Map<string, readonly string[]>;
+  prefixes: Map<string, readonly string[]>;
 }
 
-interface LlmSignals {
-  userText: string | undefined;
-  respText: string | undefined;
-  toolName: string | undefined;
-}
-
-function readLlmSignals(node: ExecutionNode): LlmSignals {
-  const request = node.requestMessagesDelta;
-  const response = node.responseMessagesDelta;
-  return {
-    userText: request != null ? lastUserText(request) : undefined,
-    respText: response != null ? responseText(response) : undefined,
-    toolName: response != null ? responseToolName(response) : undefined,
-  };
-}
-
-function llmRequestFromSignals(id: string, signals: LlmSignals): LabelRequest {
-  const req: LabelRequest = { id, kind: 'llm_request' };
-  if (signals.userText != null) req.last_user_text = signals.userText;
-  if (signals.respText != null) req.response_text = signals.respText;
-  if (signals.toolName != null) req.response_tool = signals.toolName;
-  return req;
+function structuralPrefix(response: readonly ResponseMessage[]): string[] {
+  const prefix: string[] = [];
+  if (hasThinking(response)) prefix.push(PLAN_LABEL);
+  const call = responseToolCall(response);
+  if (call != null) prefix.push(invokePhrase(call));
+  return prefix;
 }
 
 function planLlmRequest(node: ExecutionNode, canonical: LlmRequestNode, plan: LabelPlan): void {
-  const signals = readLlmSignals(node);
-  if (signals.respText != null && isSessionTitleResponse(signals.respText)) {
-    plan.deterministic.set(canonical.id, [SESSION_TITLE_LABEL]);
+  const response = node.responseMessagesDelta ?? [];
+  const respText = responseText(response);
+  if (respText != null && isSessionTitleResponse(respText)) {
+    plan.prefixes.set(canonical.id, [SESSION_TITLE_LABEL]);
     return;
   }
-  const hasSignal =
-    signals.userText != null || signals.respText != null || signals.toolName != null;
-  if (!hasSignal) {
-    plan.deterministic.set(canonical.id, mechanicalLabel(canonical));
+  if (isSuggestionMode(node.requestMessagesDelta ?? [])) {
+    plan.prefixes.set(canonical.id, [PREDICT_PROMPT_LABEL]);
     return;
   }
-  plan.requests.push(llmRequestFromSignals(canonical.id, signals));
+  const prefix = structuralPrefix(response);
+  // Text that precedes a tool call is preamble to the action, not a terminal
+  // message — only classify the act when the turn actually ends in text.
+  const isTerminalMessage = respText != null && responseToolCall(response) == null;
+  if (isTerminalMessage) plan.requests.push({ id: canonical.id, response_text: respText });
+  if (prefix.length > 0) plan.prefixes.set(canonical.id, prefix);
+  else if (!isTerminalMessage) plan.prefixes.set(canonical.id, mechanicalLabel(canonical));
 }
 
 function planNode(node: ExecutionNode, plan: LabelPlan): void {
   const canonical = node.canonical;
   if (canonical.type === 'tool') {
-    const req: LabelRequest = { id: canonical.id, kind: 'tool' };
-    if (canonical.name != null) req.name = canonical.name;
-    if (canonical.tool_input != null) req.tool_input = canonical.tool_input;
-    plan.requests.push(req);
+    plan.prefixes.set(
+      canonical.id,
+      toolPhrases(canonical.name, parseToolInput(canonical.tool_input)),
+    );
   } else if (canonical.type === 'llm_request') {
     planLlmRequest(node, canonical, plan);
   }
@@ -175,7 +119,7 @@ function planSession(session: SessionExecution, plan: LabelPlan): void {
 }
 
 function planLabels(graph: ExecutionGraph): LabelPlan {
-  const plan: LabelPlan = { requests: [], deterministic: new Map() };
+  const plan: LabelPlan = { requests: [], prefixes: new Map() };
   if (graph.kind === 'agent') {
     for (const session of graph.data.sessions) planSession(session, plan);
   } else if (graph.kind === 'session') {
@@ -255,21 +199,33 @@ function applyLabels(
  * into semantically-labeled action/inference nodes.
  *
  * The graph structure (hierarchy, ids, edges) is preserved exactly — only the
- * node payloads change. All other node types pass through unchanged. Empty nodes
- * and session-title calls are labeled deterministically; everything else goes to
- * `labelBatch`, which returns id → ordered action phrases. Missing ids receive
- * mechanical fallbacks (tool name or model id).
+ * node payloads change. All other node types pass through unchanged. Each node's
+ * final label is its deterministic prefix (tool intent, structural role, harness
+ * call) concatenated with the model's act-classification of any final message.
+ * Nodes with neither receive a mechanical fallback (tool name or model id).
  */
+function mergeLabels(
+  prefixes: Map<string, readonly string[]>,
+  modelLabels: Map<string, readonly string[]>,
+): Map<string, readonly string[]> {
+  const ids = new Set([...prefixes.keys(), ...modelLabels.keys()]);
+  const merged = new Map<string, readonly string[]>();
+  for (const id of ids) {
+    const phrases = [...(prefixes.get(id) ?? []), ...(modelLabels.get(id) ?? [])];
+    if (phrases.length > 0) merged.set(id, phrases);
+  }
+  return merged;
+}
+
 export async function enrichExecutionGraph(
   graph: ExecutionGraph,
   labelBatch: LabelBatchFn,
 ): Promise<ExecutionGraph> {
   const plan = planLabels(graph);
-  if (plan.requests.length === 0 && plan.deterministic.size === 0) return graph;
+  if (plan.requests.length === 0 && plan.prefixes.size === 0) return graph;
   const modelLabels =
     plan.requests.length > 0
       ? await labelBatch(plan.requests)
       : new Map<string, readonly string[]>();
-  const labels = new Map<string, readonly string[]>([...plan.deterministic, ...modelLabels]);
-  return applyLabels(graph, labels);
+  return applyLabels(graph, mergeLabels(plan.prefixes, modelLabels));
 }

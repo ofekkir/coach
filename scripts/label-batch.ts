@@ -12,36 +12,26 @@ const MAX_ATTEMPTS = 2;
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
 export function buildPrompt(batch: readonly LabelRequest[]): string {
-  const nodes = batch.map((r) =>
-    r.kind === 'tool'
-      ? { id: r.id, kind: r.kind, tool: r.name ?? '', input: r.tool_input ?? '' }
-      : {
-          id: r.id,
-          kind: r.kind,
-          user_message: r.last_user_text ?? '',
-          response_text: r.response_text ?? '',
-          called_tool: r.response_tool ?? '',
-        },
-  );
+  const items = batch.map((r) => ({ id: r.id, text: r.response_text }));
 
-  return `You label nodes in an AI agent's execution trace. For each node, output an ARRAY of short
-action phrases (each ≤6 words, lowercase, no filler) describing what the agent actually DID at
-that node. Most nodes are a single action — use multiple entries only when the node genuinely
-performs several distinct steps in sequence.
+  return `You are given the final messages an AI agent sent to its user. For each item, output a
+JSON array naming the ACT(s) the message performed — never quote, summarize, or repeat the
+content itself, and never output a model name. Each phrase is "<verb> <generic object>",
+≤5 words, lowercase. Emit one phrase per distinct act, in order.
 
-tool node — describe the INTENT behind the call; read \`input\`, never just echo the tool name.
-  {"tool":"Read","input":"{\\"file_path\\":\\"~/.claude/settings.json\\"}"}  ->  ["read claude settings file"]
-  {"tool":"WebFetch","input":"{\\"url\\":\\"ynet.co.il\\",\\"prompt\\":\\"summarize headlines\\"}"}  ->  ["fetch ynet.co.il", "summarize headlines"]
-  BAD: ["read"], ["run webfetch"]   <- echoing the tool name carries no intent
+Use verbs from: answer, summarize, confirm, suggest, translate, explain, acknowledge.
+Pair each with a generic object (e.g. "session", "edit", "next steps", "question", "text").
 
-llm_request node — \`response_text\` is your primary signal (what the model produced); \`user_message\`
-gives context; \`called_tool\` is the tool the inference decided to invoke next, if any.
-  {"user_message":"translate it to french now"}  ->  ["recognize request to translate to french"]
-  {"response_text":"I'll read the settings then edit it","called_tool":"Read"}  ->  ["plan settings edit", "read settings file"]
-  BAD: a model name like "claude-sonnet-4-6"; a phrase copied verbatim from these instructions.
+  "Done. The Grafana server is configured. Next: replace the token and test it."
+     ->  ["confirm edit", "suggest next steps"]
+  "We fetched ynet and summarized its headlines. No next action is pending."
+     ->  ["summarize session", "suggest next action"]
+  "A city inspector caught on tape, threatening a teen in a beach-side scrape."
+     ->  ["translate text"]
+  BAD: ["claude-sonnet-4-6"]; quoting the message; copying these example phrases verbatim.
 
-Nodes:
-${JSON.stringify(nodes)}
+Items:
+${JSON.stringify(items)}
 
 Respond with ONLY a JSON array, no other text:
 [{"id":"<id>","what":["<phrase>", ...]},...]`;

@@ -93,11 +93,12 @@ Input files (accumulating — user stages N files/folders before submitting)
                             vs. the previous request in the same thread
         │
         ▼  Stage 6 (opt-in) — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
-   enrichExecutionGraph()  converts tool → action and llm_request → inference nodes
-                            using an injected LabelBatchFn callback (returns ordered
-                            `what` phrases per node). Empty nodes and session-title
-                            calls are labeled deterministically and never reach the
-                            model; only runs when --enrich is passed (no LLM otherwise)
+   enrichExecutionGraph()  converts tool → action and llm_request → inference nodes.
+                            derive.ts builds each node's deterministic prefix (tool
+                            intent, thinking→plan, tool_use→invoke, session-title,
+                            suggestion-mode); the injected LabelBatchFn only classifies
+                            the act of a genuine final message. Final `what` = prefix ++
+                            model phrases. Runs only when --enrich is passed.
         │
         ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)

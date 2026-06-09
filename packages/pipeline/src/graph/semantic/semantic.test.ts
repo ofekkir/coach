@@ -93,14 +93,10 @@ function makeGraph(): ExecutionGraph {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('enrichExecutionGraph', () => {
-  it('converts tool → action and llm_request → inference with provided labels', async () => {
-    const labelBatch: LabelBatchFn = (requests) => {
-      const map = new Map<string, readonly string[]>();
-      for (const r of requests) {
-        map.set(r.id, r.kind === 'tool' ? ['run tests'] : ['plan next steps']);
-      }
-      return Promise.resolve(map);
-    };
+  it('derives tool intent deterministically and classifies the llm final message', async () => {
+    // Tools never reach the model — only the llm node's final text is classified.
+    const labelBatch: LabelBatchFn = (requests) =>
+      Promise.resolve(new Map(requests.map((r) => [r.id, ['answer question']])));
 
     const enriched = await enrichExecutionGraph(makeGraph(), labelBatch);
     if (enriched.kind !== 'agent') throw new Error('expected agent');
@@ -109,11 +105,11 @@ describe('enrichExecutionGraph', () => {
     const llmNode = thread?.members.find((m) => m.id === 'llm1');
     const toolNode = thread?.members.find((m) => m.id === 'tool1');
 
-    expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: ['plan next steps'] });
-    expect(toolNode?.canonical).toMatchObject({ type: 'action', what: ['run tests'] });
+    expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: ['answer question'] });
+    expect(toolNode?.canonical).toMatchObject({ type: 'action', what: ['run command'] }); // Bash → deterministic
   });
 
-  it('falls back to tool name when label is missing', async () => {
+  it('falls back to the model id when the llm message is left unclassified', async () => {
     const labelBatch: LabelBatchFn = () => Promise.resolve(new Map<string, readonly string[]>()); // empty — no labels
     const enriched = await enrichExecutionGraph(makeGraph(), labelBatch);
     if (enriched.kind !== 'agent') throw new Error('expected agent');
@@ -122,7 +118,7 @@ describe('enrichExecutionGraph', () => {
     const toolNode = thread?.members.find((m) => m.id === 'tool1');
     const llmNode = thread?.members.find((m) => m.id === 'llm1');
 
-    expect(toolNode?.canonical).toMatchObject({ type: 'action', what: ['Bash'] }); // tool.name fallback
+    expect(toolNode?.canonical).toMatchObject({ type: 'action', what: ['run command'] }); // deterministic, model-free
     expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: ['claude-haiku'] }); // model fallback
   });
 
@@ -164,13 +160,13 @@ describe('enrichExecutionGraph', () => {
     });
   });
 
-  it('only calls labelBatch once for all nodes in the graph', async () => {
+  it('calls labelBatch once, only for nodes with a final message to classify', async () => {
     const labelBatch = vi.fn((requests: readonly LabelRequest[]) =>
       Promise.resolve(new Map(requests.map((r) => [r.id, ['x']]))),
     );
     await enrichExecutionGraph(makeGraph(), labelBatch);
     expect(labelBatch).toHaveBeenCalledTimes(1);
-    expect(labelBatch.mock.calls[0]?.[0]).toHaveLength(2); // llm1 + tool1
+    expect(labelBatch.mock.calls[0]?.[0]).toHaveLength(1); // llm1 only — tool1 is deterministic
   });
 
   it('returns the graph unchanged when there are no tool or llm_request nodes', async () => {
