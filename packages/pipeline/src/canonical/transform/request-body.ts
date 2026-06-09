@@ -1,5 +1,8 @@
+type MessageContent = string | { type: string; text?: string }[];
+
 interface ReqBody {
-  messages?: { role: string; content: string | { type: string; text?: string }[] }[];
+  system?: MessageContent;
+  messages?: { role: string; content: MessageContent }[];
 }
 
 interface ResBody {
@@ -94,9 +97,11 @@ import type { RequestMessage, ResponseMessage } from '../../types.ts';
 export function extractRequestMessages(bodyJson: string, repair: boolean): RequestMessage[] | null {
   const decoded = repair ? decodeRawBody(bodyJson) : tryLoad(bodyJson);
   if (decoded === null || decoded === undefined || typeof decoded !== 'object') return null;
-  const messages = (decoded as ReqBody).messages;
+  const body = decoded as ReqBody;
+  const messages = body.messages;
   if (!Array.isArray(messages)) return null;
-  return messages;
+  if (body.system == null) return messages;
+  return [{ role: 'system', content: body.system }, ...messages];
 }
 
 export function extractResponseMessages(bodyJson: string): ResponseMessage[] | null {
