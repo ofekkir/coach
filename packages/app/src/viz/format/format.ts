@@ -116,11 +116,11 @@ interface CardShape {
 }
 
 function actionShape(node: ActionNode): CardShape {
-  return { type: 'action', title: node.what !== '' ? node.what : node.name };
+  return { type: 'action', title: node.what.length > 0 ? node.what.join(' · ') : node.name };
 }
 
 function inferenceShape(node: InferenceNode): CardShape {
-  return { type: 'inference', title: node.what !== '' ? node.what : node.model };
+  return { type: 'inference', title: node.what.length > 0 ? node.what.join(' · ') : node.model };
 }
 
 function llmRequestShape(node: LlmRequestNode): CardShape {

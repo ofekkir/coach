@@ -60,7 +60,7 @@ describe('buildNodeCard', () => {
     const inference: InferenceNode = {
       id: 'i',
       type: 'inference',
-      what: 'decides to read the file',
+      what: ['decides to read the file'],
       model: 'claude-opus-4-8',
       response_messages: [{ type: 'text', text: 'should never appear on the card' }],
       ...span,
@@ -76,13 +76,24 @@ describe('buildNodeCard', () => {
     const action: ActionNode = {
       id: 'ac',
       type: 'action',
-      what: 'edits config',
+      what: ['edits config'],
       name: 'Edit',
       tool_input: '{"file":"/secret/path"}',
       ...span,
     };
     const card = buildNodeCard(action);
     expect(JSON.stringify(card)).not.toContain('/secret/path');
+  });
+
+  it('joins a multi-action `what` into a single title', () => {
+    const action: ActionNode = {
+      id: 'wf',
+      type: 'action',
+      what: ['fetch ynet.co.il', 'summarize headlines'],
+      name: 'WebFetch',
+      ...span,
+    };
+    expect(buildNodeCard(action).title).toBe('fetch ynet.co.il · summarize headlines');
   });
 });
 

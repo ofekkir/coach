@@ -94,8 +94,10 @@ Input files (accumulating — user stages N files/folders before submitting)
         │
         ▼  Stage 6 (opt-in) — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
    enrichExecutionGraph()  converts tool → action and llm_request → inference nodes
-                            using an injected LabelBatchFn callback; only runs when
-                            --enrich is passed to the e2e script (no LLM calls otherwise)
+                            using an injected LabelBatchFn callback (returns ordered
+                            `what` phrases per node). Empty nodes and session-title
+                            calls are labeled deterministically and never reach the
+                            model; only runs when --enrich is passed (no LLM otherwise)
         │
         ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)

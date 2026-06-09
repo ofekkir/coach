@@ -12,7 +12,10 @@ const RESPONSE_SCHEMA = {
   type: 'array',
   items: {
     type: 'object',
-    properties: { id: { type: 'string' }, what: { type: 'string' } },
+    properties: {
+      id: { type: 'string' },
+      what: { type: 'array', items: { type: 'string' } },
+    },
     required: ['id', 'what'],
   },
 } as const;
