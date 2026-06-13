@@ -15,7 +15,7 @@ import {
   responseToolCall,
   structuralPrefix,
 } from './derive.ts';
-import { toolPhrases } from './tool-intent.ts';
+import { toolComment, toolPhrases } from './tool-intent.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Semantic enrichment stage — converts mechanical tool/llm_request nodes into
@@ -128,58 +128,76 @@ function mechanicalLabel(node: GraphNode): readonly string[] {
   return [node.type];
 }
 
-function convertCanonical(node: GraphNode, what: readonly string[] | undefined): GraphNode {
+function convertCanonical(
+  node: GraphNode,
+  what: readonly string[] | undefined,
+  config: SemanticsConfig,
+): GraphNode {
   const label = what ?? mechanicalLabel(node);
-  if (node.type === 'tool') return { ...node, type: 'action', what: label };
+  if (node.type === 'tool') {
+    const comment = toolComment(config, node.name, parseToolInput(node.tool_input));
+    return { ...node, type: 'action', what: label, ...(comment != null ? { comment } : {}) };
+  }
   if (node.type === 'llm_request') return { ...node, type: 'inference', what: label };
   return node;
 }
 
-function convertNode(node: ExecutionNode, labels: Map<string, readonly string[]>): ExecutionNode {
+function convertNode(
+  node: ExecutionNode,
+  labels: Map<string, readonly string[]>,
+  config: SemanticsConfig,
+): ExecutionNode {
   return {
     ...node,
-    canonical: convertCanonical(node.canonical, labels.get(node.id)),
-    children: node.children.map((c) => convertNode(c, labels)),
+    canonical: convertCanonical(node.canonical, labels.get(node.id), config),
+    children: node.children.map((c) => convertNode(c, labels, config)),
   };
 }
 
-function convertThread(thread: Thread, labels: Map<string, readonly string[]>): Thread {
-  return { ...thread, members: thread.members.map((m) => convertNode(m, labels)) };
+function convertThread(
+  thread: Thread,
+  labels: Map<string, readonly string[]>,
+  config: SemanticsConfig,
+): Thread {
+  return { ...thread, members: thread.members.map((m) => convertNode(m, labels, config)) };
 }
 
 function convertInteraction(
   ix: InteractionExecution,
   labels: Map<string, readonly string[]>,
+  config: SemanticsConfig,
 ): InteractionExecution {
-  return { ...ix, threads: ix.threads.map((t) => convertThread(t, labels)) };
+  return { ...ix, threads: ix.threads.map((t) => convertThread(t, labels, config)) };
 }
 
 function convertSession(
   session: SessionExecution,
   labels: Map<string, readonly string[]>,
+  config: SemanticsConfig,
 ): SessionExecution {
   return {
     ...session,
-    interactions: session.interactions.map((ix) => convertInteraction(ix, labels)),
+    interactions: session.interactions.map((ix) => convertInteraction(ix, labels, config)),
   };
 }
 
 function applyLabels(
   graph: ExecutionGraph,
   labels: Map<string, readonly string[]>,
+  config: SemanticsConfig,
 ): ExecutionGraph {
   if (graph.kind === 'agent') {
     const data: AgentExecution = {
       root: graph.data.root,
-      sessions: graph.data.sessions.map((s) => convertSession(s, labels)),
+      sessions: graph.data.sessions.map((s) => convertSession(s, labels, config)),
     };
     return { kind: 'agent', data };
   }
   if (graph.kind === 'session') {
-    return { kind: 'session', data: convertSession(graph.data, labels) };
+    return { kind: 'session', data: convertSession(graph.data, labels, config) };
   }
   if (graph.data == null) return graph;
-  return { kind: 'interaction', data: convertInteraction(graph.data, labels) };
+  return { kind: 'interaction', data: convertInteraction(graph.data, labels, config) };
 }
 
 // ── Public entry point ────────────────────────────────────────────────────────
@@ -218,5 +236,5 @@ export async function enrichExecutionGraph(
     plan.requests.length > 0
       ? await labelBatch(plan.requests)
       : new Map<string, readonly string[]>();
-  return applyLabels(graph, mergeLabels(plan.prefixes, modelLabels));
+  return applyLabels(graph, mergeLabels(plan.prefixes, modelLabels), config);
 }

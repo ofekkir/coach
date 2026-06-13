@@ -96,6 +96,7 @@ export const testConfig: SemanticsConfig = {
       Bash: {
         escapeHatch: true,
         target: { field: 'command', kind: 'literal' },
+        commentField: 'description',
         grammarRef: 'bashCommandGrammar',
       },
       _unknownTool: { action: 'act', object: 'unknown', phrase: '{toolNameLower}' },

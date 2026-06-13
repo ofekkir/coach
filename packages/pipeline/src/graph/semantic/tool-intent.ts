@@ -191,6 +191,20 @@ export function toolPhrases(
   ];
 }
 
+/** The agent's own intent annotation for a tool call, read verbatim from the
+ *  per-agent-configured `commentField` (e.g. Bash `description`). Display only —
+ *  never part of the closed `what` vocabulary. Undefined when unconfigured/empty. */
+export function toolComment(
+  config: SemanticsConfig,
+  name: string | undefined,
+  input: Record<string, unknown>,
+): string | undefined {
+  const field = (name != null ? config.agent.tools[name] : undefined)?.commentField;
+  if (field == null) return undefined;
+  const value = strField(input, field).trim();
+  return value !== '' ? value : undefined;
+}
+
 /** Deterministic label for a Bash/shell command — project commands first
  *  (more specific), then the agent's generic command grammar. */
 function commandPhrase(config: SemanticsConfig, command: string): string {

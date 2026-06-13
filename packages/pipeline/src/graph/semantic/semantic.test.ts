@@ -46,7 +46,8 @@ const tool1: CanonicalNode = {
   type: 'tool',
   parent: 'inter',
   name: 'Bash',
-  tool_input: '{"command":"pnpm test"}', // real traces carry JSON tool_input
+  // real traces carry JSON tool_input; `description` is the agent's own intent annotation
+  tool_input: '{"command":"pnpm test","description":"Run the test suite"}',
   start_time_ns: '210000000',
   end_time_ns: '300000000',
   duration_ms: 90,
@@ -107,7 +108,12 @@ describe('enrichExecutionGraph', () => {
     const toolNode = thread?.members.find((m) => m.id === 'tool1');
 
     expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: ['answer question'] });
-    expect(toolNode?.canonical).toMatchObject({ type: 'action', what: ['run tests'] }); // Bash 'pnpm test' → project command grounding
+    // `what` is the derived label; `comment` is the agent's verbatim description (display only)
+    expect(toolNode?.canonical).toMatchObject({
+      type: 'action',
+      what: ['run tests'],
+      comment: 'Run the test suite',
+    });
   });
 
   it('falls back to the model id when the llm message is left unclassified', async () => {

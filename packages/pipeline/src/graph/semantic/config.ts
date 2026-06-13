@@ -79,6 +79,9 @@ export interface ToolSemantics {
   grammarRef?: string;
   overrides?: readonly ToolOverride[];
   modifiers?: readonly ToolModifier[];
+  /** Input field carrying the agent's own intent annotation (e.g. Bash
+   *  `description`), surfaced verbatim as the node's `comment`. Display only. */
+  commentField?: string;
 }
 
 /** A well-known path the *agent* owns (e.g. ~/.claude/settings.json). First

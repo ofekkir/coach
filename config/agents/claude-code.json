@@ -156,7 +156,8 @@
     "Bash": {
       "escapeHatch": true,
       "target": { "field": "command", "kind": "literal" },
-      "note": "Freeform command — action/object come from bashCommandGrammar (first match wins). Project grounding may override via its own `commands` rules before this generic grammar applies.",
+      "commentField": "description",
+      "note": "Freeform command — action/object come from bashCommandGrammar (first match wins). Project grounding may override via its own `commands` rules before this generic grammar applies. `commentField` surfaces the agent's own 5-10 word `description` verbatim as the node's `comment` (display only, never part of `what`).",
       "grammarRef": "bashCommandGrammar"
     },
 

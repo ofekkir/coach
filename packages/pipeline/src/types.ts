@@ -227,13 +227,24 @@ export type CanonicalNode =
 // in sequence — e.g. ["fetch ynet.co.il", "summarize headlines"]); a single-
 // action node carries a one-element array. These only exist after enrichment, so
 // they are a distinct type from CanonicalNode.
+//
+// `comment` is an OPTIONAL agent-authored annotation harvested verbatim from a
+// per-agent-configured input field (e.g. Claude Code's Bash `description`). It is
+// free text — a display/explanation signal only, never part of the closed `what`
+// vocabulary, so it is kept separate and never feeds aggregation. The gap between
+// the agent's stated `comment` and the derived `what` is itself a coach signal.
 
 export type InferenceNode = Omit<LlmRequestNode, 'type'> & {
   type: 'inference';
   what: readonly string[];
+  comment?: string;
 };
 
-export type ActionNode = Omit<ToolNode, 'type'> & { type: 'action'; what: readonly string[] };
+export type ActionNode = Omit<ToolNode, 'type'> & {
+  type: 'action';
+  what: readonly string[];
+  comment?: string;
+};
 
 export type SemanticNode = ActionNode | InferenceNode;
 
