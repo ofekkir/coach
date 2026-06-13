@@ -205,13 +205,12 @@ export function toolComment(
   return value !== '' ? value : undefined;
 }
 
-/** Deterministic label for a Bash/shell command — project commands first
- *  (more specific), then the agent's generic command grammar. */
+/** Deterministic label for a Bash/shell command. Command→action interpretation
+ *  is project/tech-specific, so the grammar lives in project grounding's
+ *  `commands` (ending in a `.*` catch-all). With no project, falls back to the
+ *  command's first word. */
 function commandPhrase(config: SemanticsConfig, command: string): string {
-  const projectRules = config.project?.commands.rules ?? [];
-  const hit =
-    matchCommand(projectRules, command) ??
-    matchCommand(config.agent.bashCommandGrammar.rules, command);
+  const hit = matchCommand(config.project?.commands.rules ?? [], command);
   if (hit == null) return command.trim().split(/\s+/)[0] ?? 'command';
   return hit.label ?? actionLabel(config, hit.action);
 }

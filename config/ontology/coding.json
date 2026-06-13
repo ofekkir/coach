@@ -382,7 +382,7 @@
   "escape": { "action": "act", "object": "unknown" },
 
   "messageActs": {
-    "note": "Closed verb set for the model-residual: the weak model classifies the ACT of a genuine terminal assistant message into one or more of these, pairing each verb with a generic object to form a phrase like 'confirm edit' or 'suggest next steps'. This is a distinct axis from the leaf `actions` above (which are derived deterministically). The label-batch prompt is built from this list — add a verb here rather than editing the prompt.",
+    "note": "Closed verb set for the model-residual: the weak model classifies the ACT of a genuine terminal assistant message into one or more of these, pairing each verb with a generic object to form a phrase like 'confirm edit' or 'suggest next steps'. This is a distinct axis from the leaf `actions` above (which are derived deterministically). The model prompt is built from this list — add a verb here rather than editing any prompt.",
     "verbs": [
       { "verb": "answer", "hint": "directly answers the user's question" },
       { "verb": "summarize", "hint": "recaps what was done or found" },

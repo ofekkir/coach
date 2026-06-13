@@ -3,7 +3,6 @@ import { basename, join, resolve } from 'node:path';
 import { log } from '@coach/logger';
 import { runPipelineAsync } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
-import { makeClaudeLabelBatch } from './claude-labeler.ts';
 import { loadSemanticsConfig } from './load-semantics-config.ts';
 import { makeOllamaLabelBatch } from './ollama-labeler.ts';
 
@@ -24,7 +23,7 @@ if (debugFlag) log.level = 'debug';
 if (!arg) {
   log.error(
     'Usage: pnpm e2e <path> [--enrich] [--debug]  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website --enrich)\n' +
-      '  --enrich labels nodes via a local model (Ollama, OLLAMA_MODEL=llama3.2:3b). Set COACH_LABELER=claude for the cloud Claude CLI.',
+      '  --enrich labels nodes via a local Ollama model (override with OLLAMA_MODEL, default llama3.2:3b).',
   );
   process.exit(1);
 }
@@ -66,13 +65,13 @@ function dump(stepLabel: string, data: unknown): void {
 const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
-// Local Ollama by default; set COACH_LABELER=claude to use the cloud Claude CLI.
-// The labeler's allowed verbs come from the ontology's messageActs (injected, not hardcoded).
+// Enrichment runs a local Ollama model (override with OLLAMA_MODEL). The labeler's
+// allowed verbs come from the ontology's messageActs (injected, not hardcoded).
 const config = enrichFlag ? loadSemanticsConfig() : undefined;
-const makeLabeler =
-  process.env.COACH_LABELER === 'claude' ? makeClaudeLabelBatch : makeOllamaLabelBatch;
 const labelBatch =
-  enrichFlag && config != null ? makeLabeler(config.ontology.messageActs?.verbs ?? []) : undefined;
+  enrichFlag && config != null
+    ? makeOllamaLabelBatch(config.ontology.messageActs?.verbs ?? [])
+    : undefined;
 const result = await runPipelineAsync(files, labelBatch, config);
 
 // Input-bearing members are projected to names/types so the dumps stay readable;

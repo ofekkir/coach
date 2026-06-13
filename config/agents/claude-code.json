@@ -3,7 +3,7 @@
   "kind": "agent-tool-semantics",
   "id": "claude-code",
   "ontology": "coding",
-  "description": "Per-agent layer for Claude Code. Maps each tool name + input to an ontology action and a target field, plus the freeform-command grammar for Bash and the harness-internal markers/structural roles. Every `action` and `object` value here MUST be an id defined in ontology/coding.json. This file externalizes what derive.ts currently hardcodes (TOOL_HANDLERS, describePath, SUGGESTION_MARKER, session-title, thinking/tool_use roles).",
+  "description": "Per-agent layer for Claude Code. Maps each tool name + input to an ontology action and a target field, declares the harness-internal markers (session-title, suggestion-mode) and structural roles (thinking, tool_use), and names agent-owned well-known paths. Command→action interpretation is NOT here — it is project/tech-specific and lives in project grounding's `commands`. Every `action` and `object` value here MUST be an id defined in ontology/coding.json.",
 
   "targetKinds": {
     "path": "Take the named input field as a filesystem path; hand it to project grounding to resolve an object type and label.",
@@ -68,16 +68,17 @@
     "Grep": {
       "action": "search",
       "target": { "field": "pattern", "kind": "literal" },
-      "phrase": "search code for {target}"
+      "phrase": "search files for {target}"
     },
     "WebFetch": {
       "action": "fetch",
       "target": { "field": "url", "kind": "host" },
       "phrase": "fetch {target}",
+      "commentField": "prompt",
       "modifiers": [
         {
-          "when": { "field": "prompt", "matches": "summar" },
-          "append": { "action": "respond", "label": "summarize content" }
+          "when": { "field": "prompt", "matches": ".+" },
+          "append": { "action": "respond", "label": "process result with weak model" }
         }
       ]
     },
@@ -118,21 +119,13 @@
     "Skill": {
       "action": "use-skill",
       "target": { "field": "skill", "kind": "literal" },
-      "phrase": "use {target} skill",
-      "overrides": [
-        {
-          "when": { "field": "skill", "equals": "update-config" },
-          "action": "configure",
-          "object": "agent-config",
-          "label": "update claude code config"
-        }
-      ]
+      "phrase": "use {target} skill"
     },
     "SlashCommand": {
-      "action": "use-skill",
+      "action": "run",
       "target": { "field": "command", "kind": "literal", "extract": "^/?([A-Za-z0-9_-]+)" },
       "phrase": "run {target} command",
-      "note": "Custom project slash command (.claude/commands/*.md), distinct from the Skill tool. Field is `command` (e.g. '/review-pr 123')."
+      "note": "A user/project-defined command whose effect is arbitrary (it expands to a prompt), so it is `run`, not `use-skill`. Field is `command` (e.g. '/review-pr 123')."
     },
     "ToolSearch": {
       "action": "load-schema",
@@ -157,8 +150,7 @@
       "escapeHatch": true,
       "target": { "field": "command", "kind": "literal" },
       "commentField": "description",
-      "note": "Freeform command — action/object come from bashCommandGrammar (first match wins). Project grounding may override via its own `commands` rules before this generic grammar applies. `commentField` surfaces the agent's own 5-10 word `description` verbatim as the node's `comment` (display only, never part of `what`).",
-      "grammarRef": "bashCommandGrammar"
+      "note": "Freeform command. The agent only knows this is an escape-hatch command tool; the command→(action, object) grammar is project/tech-specific and lives in project grounding's `commands`. `commentField` surfaces the agent's own 5-10 word `description` verbatim as the node's `comment` (display only, never part of `what`)."
     },
 
     "_unknownTool": {
@@ -169,51 +161,8 @@
     }
   },
 
-  "bashCommandGrammar": {
-    "note": "Ordered; first regex (matched case-insensitively against the trimmed command) wins. The final catch-all guarantees a label. Object is often left to project grounding when it depends on which file the command touches.",
-    "rules": [
-      { "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?lint", "action": "lint" },
-      { "match": "\\beslint\\b", "action": "lint" },
-      { "match": "\\bknip\\b", "action": "lint", "object": "repo", "label": "check for dead code" },
-      { "match": "\\bprettier\\b", "action": "format" },
-      { "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?format", "action": "format" },
-      { "match": "\\b(tsc|tsgo)\\b|typecheck", "action": "typecheck" },
-      {
-        "match": "\\b(vitest|jest|mocha|pytest|go\\s+test|cargo\\s+test|rspec)\\b",
-        "action": "test",
-        "object": "test-code"
-      },
-      {
-        "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?test",
-        "action": "test",
-        "object": "test-code"
-      },
-      {
-        "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?build|\\btsup\\b|\\bvite build\\b|\\bwebpack\\b",
-        "action": "build"
-      },
-      {
-        "match": "^(pnpm|npm|yarn|bun)\\s+(install|add|remove|i)\\b",
-        "action": "configure",
-        "object": "dependency"
-      },
-      { "match": "^git\\s+commit\\b", "action": "vcs", "label": "commit changes" },
-      {
-        "match": "^git\\s+(push|pull|fetch|merge|rebase|checkout|switch|branch|stash|tag)\\b",
-        "action": "vcs"
-      },
-      { "match": "^gh\\s+pr\\b", "action": "vcs", "label": "manage pull request" },
-      { "match": "^git\\s+(status|log|diff|show|blame)\\b", "action": "read", "object": "repo" },
-      { "match": "^(ls|cat|head|tail|find|rg|grep|tree|pwd|wc|stat)\\b", "action": "read" },
-      { "match": "^(mkdir|touch|cp|mv)\\b", "action": "write" },
-      { "match": "^rm\\b", "action": "delete" },
-      { "match": "^(curl|wget)\\b", "action": "fetch", "object": "web-resource" },
-      { "match": ".*", "action": "run", "object": "shell" }
-    ]
-  },
-
   "markers": {
-    "note": "Deterministic short-circuits at the llm_request level — these fully determine the label and pre-empt any model call. Each is exactly what derive.ts detects today.",
+    "note": "Deterministic short-circuits at the llm_request level — when a rule matches, it fully determines the label and pre-empts any model call.",
     "rules": [
       {
         "id": "session-title",
@@ -231,7 +180,7 @@
   },
 
   "structuralRoles": {
-    "note": "Deterministic prefix phrases derived from response-message structure. Prepended to (not replacing) any model classification of a final message. Mirrors structuralPrefix() in semantic.ts.",
+    "note": "Deterministic prefix phrases derived from the shape of the response (a thinking block, a trailing tool call). Prepended to — not replacing — any model classification of a final message.",
     "rules": [
       {
         "id": "thinking",
@@ -250,7 +199,7 @@
   },
 
   "modelResidual": {
-    "note": "What is LEFT for the weak model after all of the above. Only fires for a genuine terminal assistant message (response_text present AND the turn does not end in a tool_use). The model classifies the ACT into an ordered list of phrases, each a verb from the ontology's `messageActs` paired with a generic object (e.g. ['confirm edit','suggest next steps']); it never quotes the message. Everything else is deterministic. messageActs is a distinct axis from the leaf `actions` (which are derived, not modeled); the label-batch prompt is generated from that list, so add a verb to the ontology rather than editing the prompt.",
+    "note": "What is LEFT for the weak model after all of the above. Only fires for a genuine terminal assistant message (a final message that does not end in a tool call). The model classifies the ACT into an ordered list of phrases, each a verb from the ontology's `messageActs` paired with a generic object (e.g. ['confirm edit','suggest next steps']); it never quotes the message. Everything else is deterministic. messageActs is a distinct axis from the leaf `actions` (which are derived, not modeled); the model prompt is generated from that list, so add a verb to the ontology rather than editing any prompt.",
     "constrainTo": "ontology.messageActs verbs",
     "outputShape": "ordered string[] of '<verb> <generic object>' phrases"
   }

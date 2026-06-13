@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { testConfig } from './config.fixture.ts';
-import { hasThinking, invokePhrase, markerLabel, responseText } from './derive.ts';
+import { markerLabel, responseText, structuralPrefix } from './derive.ts';
 import { toolPhrases } from './tool-intent.ts';
 
 describe('toolPhrases (config-driven)', () => {
@@ -24,13 +24,13 @@ describe('toolPhrases (config-driven)', () => {
     ).toEqual(['edit derive.ts (business logic)']);
   });
 
-  it('splits WebFetch into fetch + summarize when the prompt asks to summarize', () => {
+  it('fetches + notes weak-model processing when WebFetch carries a prompt', () => {
     expect(
       toolPhrases(testConfig, 'WebFetch', {
         url: 'https://www.ynet.co.il',
         prompt: 'Summarize the headlines',
       }),
-    ).toEqual(['fetch ynet.co.il', 'summarize content']);
+    ).toEqual(['fetch ynet.co.il', 'process result with weak model']);
   });
 
   it('reads the selected tool out of a ToolSearch query via the extract regex', () => {
@@ -39,9 +39,9 @@ describe('toolPhrases (config-driven)', () => {
     ).toEqual(['load WebFetch tool schema']);
   });
 
-  it('applies the Skill override to name the skill intent', () => {
+  it('names the skill intent from the skill field', () => {
     expect(toolPhrases(testConfig, 'Skill', { skill: 'update-config', args: '...' })).toEqual([
-      'update claude code config',
+      'use update-config skill',
     ]);
   });
 
@@ -50,20 +50,24 @@ describe('toolPhrases (config-driven)', () => {
   });
 });
 
-describe('invokePhrase (config-driven)', () => {
-  it('uses the Skill structural-role override', () => {
-    expect(invokePhrase(testConfig, { name: 'Skill', input: { skill: 'update-config' } })).toBe(
-      'decide on skill use',
-    );
+describe('structuralPrefix (config-driven roles)', () => {
+  it('uses the tool_use rule override for a Skill call', () => {
+    expect(
+      structuralPrefix(testConfig, [{ type: 'tool_use', name: 'Skill', input: { skill: 'x' } }]),
+    ).toEqual(['decide on skill use']);
   });
 
-  it('prefixes the derived tool intent with "invoke"', () => {
+  it('emits thinking → plan then the derived tool intent for a trailing tool call', () => {
     expect(
-      invokePhrase(testConfig, {
-        name: 'Read',
-        input: { file_path: '/Users/x/.claude/settings.json' },
-      }),
-    ).toBe('invoke read claude code user settings');
+      structuralPrefix(testConfig, [
+        { type: 'thinking', thinking: '<REDACTED>' },
+        { type: 'tool_use', name: 'Read', input: { file_path: '/Users/x/.claude/settings.json' } },
+      ]),
+    ).toEqual(['plan next steps', 'invoke read claude code user settings']);
+  });
+
+  it('emits nothing for a plain terminal text message', () => {
+    expect(structuralPrefix(testConfig, [{ type: 'text', text: 'all done' }])).toEqual([]);
   });
 });
 
@@ -87,12 +91,7 @@ describe('markerLabel (config-driven harness markers)', () => {
   });
 });
 
-describe('structural detectors (content-shape, not config-driven)', () => {
-  it('flags a thinking block', () => {
-    expect(hasThinking([{ type: 'thinking', thinking: '<REDACTED>' }])).toBe(true);
-    expect(hasThinking([{ type: 'text', text: 'hi' }])).toBe(false);
-  });
-
+describe('responseText (content-shape, not config-driven)', () => {
   it('returns the first non-empty text block, skipping thinking', () => {
     expect(
       responseText([

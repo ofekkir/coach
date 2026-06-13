@@ -3,16 +3,26 @@ import { actionLabel, isRecord, type SemanticsConfig } from './config.ts';
 import { toolPhrases } from './tool-intent.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
-// Deterministic label derivation, driven by the injected SemanticsConfig. The
-// structural message helpers below are content-shape only (not config-driven);
-// the harness markers and structural roles are read from config.agent. Tool
-// intent lives in tool-intent.ts. The model is reserved for classifying the act
-// of a genuine final assistant message.
+// derive.ts — turns a raw llm_request node into deterministic label phrases,
+// reading all harness-specific knowledge from the injected SemanticsConfig. It is
+// HARNESS-AGNOSTIC: the only thing baked in is the pipeline's normalized message
+// shape (a ResponseMessage has a `type`; text blocks have `text`; tool-call blocks
+// have `name`/`input`). Every string that means something to a particular agent —
+// tool names, which block types map to which role, the session-title/suggestion
+// markers — comes from config, not from this file.
+//
+// Three deterministic signals, in the order the stage applies them:
+//   1. markerLabel()      harness-internal calls (session title, suggestion mode)
+//                         that fully determine the label — no model needed.
+//   2. structuralPrefix() roles read from the response shape: a thinking block →
+//                         "plan…", a trailing tool call → "invoke <tool intent>".
+//   3. toolPhrases()      (tool-intent.ts) the tool/command intent itself.
+// What is left — the act of a genuine final text message — is the model's job.
 //
 // Pure module (no node:* imports), like the stage that consumes it.
 // ════════════════════════════════════════════════════════════════════════════
 
-// ── Message-block extraction (structural — not config-driven) ──────────────────
+// ── Message-block extraction (the normalized content shape, not agent-specific) ─
 
 function textFromContent(content: unknown): string {
   if (typeof content === 'string') return content;
@@ -36,14 +46,24 @@ export interface ToolCall {
   input: Record<string, unknown>;
 }
 
-export function responseToolCall(messages: readonly ResponseMessage[]): ToolCall | undefined {
-  const block = messages.find((m) => m.type === 'tool_use' && typeof m.name === 'string');
+/** A tool-call block of the given content type (the type string comes from a
+ *  structural-role rule, never hardcoded). */
+function toolCallOfType(messages: readonly ResponseMessage[], type: string): ToolCall | undefined {
+  const block = messages.find((m) => m.type === type && typeof m.name === 'string');
   if (block == null) return undefined;
   return { name: String(block.name), input: isRecord(block.input) ? block.input : {} };
 }
 
-export function hasThinking(messages: readonly ResponseMessage[]): boolean {
-  return messages.some((m) => m.type === 'thinking');
+/** Whether any response block has the given content type. */
+function responseHasBlockType(messages: readonly ResponseMessage[], type: string): boolean {
+  return messages.some((m) => m.type === type);
+}
+
+/** Does the turn end in a tool call rather than a final message? Used by the
+ *  stage to decide whether a node's text is terminal or mere tool preamble. The
+ *  `tool_use` content type is the normalized shape, not an agent label. */
+export function responseToolCall(messages: readonly ResponseMessage[]): ToolCall | undefined {
+  return toolCallOfType(messages, 'tool_use');
 }
 
 export function parseToolInput(input: string | undefined): Record<string, unknown> {
@@ -56,32 +76,40 @@ export function parseToolInput(input: string | undefined): Record<string, unknow
   }
 }
 
-// ── Structural roles (thinking → plan, tool_use → invoke) ──────────────────────
+// ── Structural roles — driven by the block-type strings declared in config ─────
 
-/** The action of the inference that *decided* to make this tool call. */
-export function invokePhrase(config: SemanticsConfig, call: ToolCall): string {
-  const rule = config.agent.structuralRoles.rules.find(
-    (r) => r.when.responseEndsWithBlockType === 'tool_use',
-  );
-  const override = rule?.overrides?.find((o) => o.when.toolName === call.name);
+type StructuralRole = SemanticsConfig['agent']['structuralRoles']['rules'][number];
+
+function invokePhrase(config: SemanticsConfig, rule: StructuralRole, call: ToolCall): string {
+  const override = rule.overrides?.find((o) => o.when.toolName === call.name);
   if (override != null) return override.phrase;
   const toolPhrase = toolPhrases(config, call.name, call.input)[0] ?? 'tool';
-  return (rule?.phrase ?? 'invoke {toolPhrase}').replace('{toolPhrase}', toolPhrase);
+  return rule.phrase.replace('{toolPhrase}', toolPhrase);
 }
 
-/** Deterministic prefix phrases derived from response-message structure. */
+function rolePhrase(
+  config: SemanticsConfig,
+  rule: StructuralRole,
+  response: readonly ResponseMessage[],
+): string | undefined {
+  const { responseHasBlockType: hasType, responseEndsWithBlockType: endsType } = rule.when;
+  if (hasType != null && responseHasBlockType(response, hasType)) return rule.phrase;
+  if (endsType != null) {
+    const call = toolCallOfType(response, endsType);
+    if (call != null) return invokePhrase(config, rule, call);
+  }
+  return undefined;
+}
+
+/** Deterministic prefix phrases for an inference — one per matching structural
+ *  role (e.g. ["plan next steps", "invoke read package.json"]). */
 export function structuralPrefix(
   config: SemanticsConfig,
   response: readonly ResponseMessage[],
 ): string[] {
-  const prefix: string[] = [];
-  const thinkingRule = config.agent.structuralRoles.rules.find(
-    (r) => r.when.responseHasBlockType === 'thinking',
-  );
-  if (thinkingRule != null && hasThinking(response)) prefix.push(thinkingRule.phrase);
-  const call = responseToolCall(response);
-  if (call != null) prefix.push(invokePhrase(config, call));
-  return prefix;
+  return config.agent.structuralRoles.rules
+    .map((rule) => rolePhrase(config, rule, response))
+    .filter((phrase): phrase is string => phrase != null);
 }
 
 // ── Harness markers (session-title, suggestion-mode) ───────────────────────────

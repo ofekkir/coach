@@ -1,17 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  assembleSemanticsConfig,
-  type AgentSemantics,
-  type Ontology,
-  type ProjectGrounding,
-  type SemanticsConfig,
-} from '@coach/pipeline';
+import { assembleSemanticsConfig, type SemanticsConfig } from '@coach/pipeline';
 
 // The file-system seam: the pure pipeline never reads config from disk. This CLI
-// loader parses the config/ artifacts (ontology + agent + project) and assembles
-// the validated SemanticsConfig that runPipelineAsync's enrichment requires.
+// loader reads the config/ artifacts (ontology + agent + project) and hands the
+// raw JSON to assembleSemanticsConfig, which Zod-validates each file and assembles
+// the SemanticsConfig that runPipelineAsync's enrichment requires.
 
 const CONFIG_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'config');
 
@@ -22,17 +17,17 @@ function readJson(relativePath: string): unknown {
 /**
  * Loads and validates the semantics config for a given domain/agent/project.
  * Defaults match the only triple currently authored: coding × claude-code × coach.
- * `assembleSemanticsConfig` throws if the agent/project files reference any
- * action/object id absent from the ontology.
+ * `assembleSemanticsConfig` throws (Zod or referential-integrity error) on any
+ * invalid file or any action/object id absent from the ontology.
  */
 export function loadSemanticsConfig(
   domain = 'coding',
   agent = 'claude-code',
   project: string | null = 'coach',
 ): SemanticsConfig {
-  const ontology = readJson(`ontology/${domain}.json`) as Ontology;
-  const agentSemantics = readJson(`agents/${agent}.json`) as AgentSemantics;
-  const grounding =
-    project != null ? (readJson(`projects/${project}.json`) as ProjectGrounding) : undefined;
-  return assembleSemanticsConfig(ontology, agentSemantics, grounding);
+  return assembleSemanticsConfig(
+    readJson(`ontology/${domain}.json`),
+    readJson(`agents/${agent}.json`),
+    project != null ? readJson(`projects/${project}.json`) : undefined,
+  );
 }

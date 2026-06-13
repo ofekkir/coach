@@ -61,10 +61,8 @@ single **agent** (multi-agent is out of scope). Use the staging UI to mix files 
 Pass `--enrich` to also run the semantic enrichment stage and write
 `06-enriched-graph.json`. By default this labels batches via a **local Ollama**
 model (`OLLAMA_MODEL`, default `llama3.2:3b`, at `OLLAMA_HOST`, default
-`http://localhost:11434`) using JSON-schema-constrained output. Set
-`COACH_LABELER=claude` to use the cloud Claude CLI (`claude -p`,
-`claude-haiku-4-5`) instead. The enriched graph is loadable by the app's
-"Load pipeline output" button.
+`http://localhost:11434`) using JSON-schema-constrained output. The enriched
+graph is loadable by the app's "Load pipeline output" button.
 
 ### Local enrichment setup (Ollama)
 
@@ -79,8 +77,7 @@ pnpm enrich:setup            # verifies the daemon is up and pulls OLLAMA_MODEL
 ```
 
 `pnpm enrich:setup` is idempotent. Override the model or host via env, e.g.
-`OLLAMA_MODEL=llama3.2:3b-instruct-q8_0 pnpm enrich:setup`. No local model? Set
-`COACH_LABELER=claude` to fall back to the cloud Claude CLI (no Ollama needed).
+`OLLAMA_MODEL=llama3.2:3b-instruct-q8_0 pnpm enrich:setup`.
 
 ## Quick start
 

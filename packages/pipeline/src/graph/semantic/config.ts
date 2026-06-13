@@ -1,145 +1,154 @@
+import { z } from 'zod';
+
 // ════════════════════════════════════════════════════════════════════════════
-// Semantics configuration — the typed, injected form of the config/ artifacts
-// (ontology/coding.json, agents/<agent>.json, projects/<project>.json). The
-// pipeline stays pure: it never reads these from disk. The Node CLI parses the
-// JSON and calls assembleSemanticsConfig(); the browser would inject the same
-// shape. derive.ts interprets this config in place of the old hardcoded tables.
+// Semantics configuration — the typed, validated form of the config/ artifacts
+// (ontology/<domain>.json, agents/<agent>.json, projects/<project>.json). Zod
+// schemas are the source of truth for the shapes; the exported types are
+// inferred from them, and the data is validated when loaded from disk (unknown
+// keys such as `note`/`description`/`schemaVersion` are stripped, not errors).
+//
+// The pipeline stays pure: it never reads these from disk. A Node caller parses
+// the JSON and passes it to assembleSemanticsConfig(), which validates each file
+// and enforces that every action/object id resolves against the ontology.
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Domain ontology (the vocabulary source of truth) ───────────────────────────
 
-type ActionGroup = 'work' | 'meta' | 'harness' | 'escape';
+const OntologyActionSchema = z.object({
+  id: z.string(),
+  group: z.enum(['work', 'meta', 'harness', 'escape']),
+  label: z.string(),
+  aliases: z.array(z.string()).optional(),
+  description: z.string().optional(),
+});
 
-export interface OntologyAction {
-  id: string;
-  group: ActionGroup;
-  label: string;
-  aliases?: readonly string[];
-  description?: string;
-}
+const OntologyObjectSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  aliases: z.array(z.string()).optional(),
+  description: z.string().optional(),
+});
 
-interface OntologyObject {
-  id: string;
-  label: string;
-  aliases?: readonly string[];
-  description?: string;
-}
+const MessageActSchema = z.object({ verb: z.string(), hint: z.string().optional() });
 
-/** A terminal-message act verb — a distinct axis from leaf `actions`, used only
- *  by the model-residual prompt (label-batch), not the deterministic interpreter. */
-export interface MessageAct {
-  verb: string;
-  hint?: string;
-}
-
-export interface Ontology {
-  id: string;
-  actions: readonly OntologyAction[];
-  objects: readonly OntologyObject[];
-  escape: { action: string; object: string };
-  messageActs?: { verbs: readonly MessageAct[] };
-}
+const OntologySchema = z.object({
+  id: z.string(),
+  actions: z.array(OntologyActionSchema),
+  objects: z.array(OntologyObjectSchema),
+  escape: z.object({ action: z.string(), object: z.string() }),
+  messageActs: z.object({ verbs: z.array(MessageActSchema) }).optional(),
+});
 
 // ── Agent tool semantics ───────────────────────────────────────────────────────
 
-type TargetKind = 'path' | 'host' | 'literal' | 'none';
+const MatchClauseSchema = z.object({
+  field: z.string(),
+  equals: z.string().optional(),
+  matches: z.string().optional(),
+});
 
-interface TargetSpec {
-  field?: string;
-  kind: TargetKind;
-  extract?: string;
-}
+const TargetSpecSchema = z.object({
+  field: z.string().optional(),
+  kind: z.enum(['path', 'host', 'literal', 'none']),
+  extract: z.string().optional(),
+});
 
-export interface MatchClause {
-  field: string;
-  equals?: string;
-  matches?: string;
-}
+const ToolOverrideSchema = z.object({
+  when: MatchClauseSchema,
+  action: z.string().optional(),
+  object: z.string().optional(),
+  label: z.string().optional(),
+  phrase: z.string().optional(),
+});
 
-export interface ToolOverride {
-  when: MatchClause;
-  action?: string;
-  object?: string;
-  label?: string;
-  phrase?: string;
-}
+const ToolModifierSchema = z.object({
+  when: MatchClauseSchema,
+  append: z.object({ action: z.string().optional(), label: z.string() }),
+});
 
-export interface ToolModifier {
-  when: MatchClause;
-  append: { action?: string; label: string };
-}
-
-export interface ToolSemantics {
-  action?: string;
-  object?: string;
-  target?: TargetSpec;
-  phrase?: string;
-  fallbackPhrase?: string;
-  escapeHatch?: boolean;
-  grammarRef?: string;
-  overrides?: readonly ToolOverride[];
-  modifiers?: readonly ToolModifier[];
+const ToolSemanticsSchema = z.object({
+  action: z.string().optional(),
+  object: z.string().optional(),
+  target: TargetSpecSchema.optional(),
+  phrase: z.string().optional(),
+  fallbackPhrase: z.string().optional(),
+  escapeHatch: z.boolean().optional(),
+  overrides: z.array(ToolOverrideSchema).optional(),
+  modifiers: z.array(ToolModifierSchema).optional(),
   /** Input field carrying the agent's own intent annotation (e.g. Bash
    *  `description`), surfaced verbatim as the node's `comment`. Display only. */
-  commentField?: string;
-}
+  commentField: z.string().optional(),
+});
 
-/** A well-known path the *agent* owns (e.g. ~/.claude/settings.json). First
- *  regex match wins; the label is the full semantic name (no grounded suffix). */
-interface WellKnownPath {
-  match: string;
-  label: string;
-}
+const WellKnownPathSchema = z.object({ match: z.string(), label: z.string() });
 
-export interface CommandRule {
-  match: string;
-  action: string;
-  object?: string;
-  label?: string;
-}
+const MarkerRuleSchema = z.object({
+  id: z.string(),
+  when: z.object({
+    responseJsonHasStringKey: z.string().optional(),
+    requestTextStartsWith: z.string().optional(),
+  }),
+  action: z.string(),
+  object: z.string().optional(),
+});
 
-interface MarkerRule {
-  id: string;
-  when: { responseJsonHasStringKey?: string; requestTextStartsWith?: string };
-  action: string;
-  object?: string;
-}
+const StructuralRoleRuleSchema = z.object({
+  id: z.string(),
+  when: z.object({
+    responseHasBlockType: z.string().optional(),
+    responseEndsWithBlockType: z.string().optional(),
+  }),
+  action: z.string(),
+  phrase: z.string(),
+  overrides: z
+    .array(z.object({ when: z.object({ toolName: z.string() }), phrase: z.string() }))
+    .optional(),
+});
 
-interface StructuralRoleRule {
-  id: string;
-  when: { responseHasBlockType?: string; responseEndsWithBlockType?: string };
-  action: string;
-  phrase: string;
-  overrides?: readonly { when: { toolName: string }; phrase: string }[];
-}
-
-export interface AgentSemantics {
-  id: string;
-  ontology: string;
-  tools: Record<string, ToolSemantics>;
-  wellKnownPaths?: { rules: readonly WellKnownPath[] };
-  bashCommandGrammar: { rules: readonly CommandRule[] };
-  markers: { rules: readonly MarkerRule[] };
-  structuralRoles: { rules: readonly StructuralRoleRule[] };
-}
+const AgentSemanticsSchema = z.object({
+  id: z.string(),
+  ontology: z.string(),
+  tools: z.record(z.string(), ToolSemanticsSchema),
+  wellKnownPaths: z.object({ rules: z.array(WellKnownPathSchema) }).optional(),
+  markers: z.object({ rules: z.array(MarkerRuleSchema) }),
+  structuralRoles: z.object({ rules: z.array(StructuralRoleRuleSchema) }),
+});
 
 // ── Project grounding ───────────────────────────────────────────────────────────
 
-interface PathRule {
-  glob: string;
-  object: string;
-  label?: string;
-  component?: string;
-}
+const PathRuleSchema = z.object({
+  glob: z.string(),
+  object: z.string(),
+  label: z.string().optional(),
+  component: z.string().optional(),
+});
 
-export interface ProjectGrounding {
-  id: string;
-  ontology: string;
-  architecture: { pathRules: readonly PathRule[] };
-  commands: { rules: readonly CommandRule[] };
-}
+const CommandRuleSchema = z.object({
+  match: z.string(),
+  action: z.string(),
+  object: z.string().optional(),
+  label: z.string().optional(),
+});
 
-// ── Assembled, validated config injected into the pipeline ─────────────────────
+const ProjectGroundingSchema = z.object({
+  id: z.string(),
+  ontology: z.string(),
+  architecture: z.object({ pathRules: z.array(PathRuleSchema) }),
+  commands: z.object({ rules: z.array(CommandRuleSchema) }),
+});
+
+// ── Inferred types ──────────────────────────────────────────────────────────--
+
+export type Ontology = z.infer<typeof OntologySchema>;
+export type OntologyAction = z.infer<typeof OntologyActionSchema>;
+export type MessageAct = z.infer<typeof MessageActSchema>;
+export type AgentSemantics = z.infer<typeof AgentSemanticsSchema>;
+export type ProjectGrounding = z.infer<typeof ProjectGroundingSchema>;
+export type MatchClause = z.infer<typeof MatchClauseSchema>;
+export type ToolOverride = z.infer<typeof ToolOverrideSchema>;
+export type ToolModifier = z.infer<typeof ToolModifierSchema>;
+export type ToolSemantics = z.infer<typeof ToolSemanticsSchema>;
+export type CommandRule = z.infer<typeof CommandRuleSchema>;
 
 export interface SemanticsConfig {
   ontology: Ontology;
@@ -168,28 +177,24 @@ export function objectLabel(config: SemanticsConfig, id: string | undefined): st
   return config.ontology.objects.find((o) => o.id === id)?.label ?? id;
 }
 
-// ── Assembly + referential-integrity validation (config/README.md, artifact 5) ──
+// ── Assembly + referential-integrity validation ────────────────────────────────
 
 function collectRefs(value: unknown, kind: 'action' | 'object', out: string[]): void {
   if (Array.isArray(value)) {
     for (const item of value) collectRefs(item, kind, out);
     return;
   }
-  if (typeof value !== 'object' || value === null) return;
-  const record = value as Record<string, unknown>;
-  const ref = record[kind];
+  if (!isRecord(value)) return;
+  const ref = value[kind];
   if (typeof ref === 'string') out.push(ref);
-  for (const key of Object.keys(record)) collectRefs(record[key], kind, out);
+  for (const key of Object.keys(value)) collectRefs(value[key], kind, out);
 }
 
-/** Throws when an agent/project file references an action or object id that the
- *  ontology does not define — the contract that keeps the three files from
- *  drifting into unaggregatable labels. */
-export function assembleSemanticsConfig(
+function assertRefsResolve(
   ontology: Ontology,
   agent: AgentSemantics,
   project?: ProjectGrounding,
-): SemanticsConfig {
+): void {
   const actions = new Set(ontology.actions.map((a) => a.id));
   const objects = new Set(ontology.objects.map((o) => o.id));
   const actionRefs: string[] = [];
@@ -204,5 +209,22 @@ export function assembleSemanticsConfig(
         `actions=[${unknownActions.join(', ')}] objects=[${unknownObjects.join(', ')}]`,
     );
   }
+}
+
+/**
+ * Validates the raw ontology / agent / project JSON against their schemas and
+ * enforces that every action/object id they reference is defined in the ontology
+ * — the contract that keeps the files from drifting into unaggregatable labels.
+ * Throws (Zod or referential-integrity error) on any violation.
+ */
+export function assembleSemanticsConfig(
+  rawOntology: unknown,
+  rawAgent: unknown,
+  rawProject?: unknown,
+): SemanticsConfig {
+  const ontology = OntologySchema.parse(rawOntology);
+  const agent = AgentSemanticsSchema.parse(rawAgent);
+  const project = rawProject != null ? ProjectGroundingSchema.parse(rawProject) : undefined;
+  assertRefsResolve(ontology, agent, project);
   return project != null ? { ontology, agent, project } : { ontology, agent };
 }

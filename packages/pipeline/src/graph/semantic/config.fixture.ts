@@ -69,8 +69,12 @@ export const testConfig: SemanticsConfig = {
         action: 'fetch',
         target: { field: 'url', kind: 'host' },
         phrase: 'fetch {target}',
+        commentField: 'prompt',
         modifiers: [
-          { when: { field: 'prompt', matches: 'summar' }, append: { label: 'summarize content' } },
+          {
+            when: { field: 'prompt', matches: '.+' },
+            append: { label: 'process result with weak model' },
+          },
         ],
       },
       ToolSearch: {
@@ -84,25 +88,13 @@ export const testConfig: SemanticsConfig = {
         action: 'use-skill',
         target: { field: 'skill', kind: 'literal' },
         phrase: 'use {target} skill',
-        overrides: [
-          {
-            when: { field: 'skill', equals: 'update-config' },
-            action: 'configure',
-            object: 'agent-config',
-            label: 'update claude code config',
-          },
-        ],
       },
       Bash: {
         escapeHatch: true,
         target: { field: 'command', kind: 'literal' },
         commentField: 'description',
-        grammarRef: 'bashCommandGrammar',
       },
       _unknownTool: { action: 'act', object: 'unknown', phrase: '{toolNameLower}' },
-    },
-    bashCommandGrammar: {
-      rules: [{ match: '.*', action: 'run', object: 'shell', label: 'run command' }],
     },
     markers: {
       rules: [
@@ -148,7 +140,10 @@ export const testConfig: SemanticsConfig = {
       ],
     },
     commands: {
-      rules: [{ match: '^pnpm\\s+test\\b', action: 'test', object: 'test-code' }],
+      rules: [
+        { match: '^pnpm\\s+test\\b', action: 'test', object: 'test-code' },
+        { match: '.*', action: 'run', object: 'shell', label: 'run command' },
+      ],
     },
   },
 };

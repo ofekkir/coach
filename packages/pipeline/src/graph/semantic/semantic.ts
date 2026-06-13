@@ -21,9 +21,9 @@ import { toolComment, toolPhrases } from './tool-intent.ts';
 // Semantic enrichment stage — converts mechanical tool/llm_request nodes into
 // semantically-labeled action/inference nodes using an injected LLM callback.
 //
-// Architecture constraint: this module is pure (no node:* imports). The claude
-// subprocess adapter lives in scripts/claude-labeler.ts and is wired up only
-// by the e2e script when --enrich is passed.
+// Architecture constraint: this module is pure (no node:* imports). The model
+// adapter (Ollama) lives in scripts/ and is wired up only by the e2e script when
+// --enrich is passed.
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Public types ──────────────────────────────────────────────────────────────
