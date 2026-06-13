@@ -14,11 +14,11 @@ is **agent-agnostic**: swapping in another agent/project triple needs no pipelin
 
 ## The three artifacts (by scope)
 
-| File                      | Scope       | Owns                                                                                   | How it's produced                                    |
-| ------------------------- | ----------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `ontology/coding.json`    | **domain**  | The closed vocabulary: `actions` + `objects` + `messageActs`. Source of truth.         | Hand-authored, slow-changing.                        |
-| `agents/claude-code.json` | **agent**   | tool name + input → (action, target); well-known paths; harness markers + roles.       | Hand-authored per harness.                           |
-| `projects/coach.json`     | **project** | `tech` (stack) + `architecture` (path → object) + `commands` (command→action grammar). | **Generate once with a strong model**, cache/commit. |
+| File                      | Scope       | Owns                                                                                                                                                  | How it's produced                                    |
+| ------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `ontology/coding.json`    | **domain**  | Closed vocabulary (`actions` + `objects` + `messageActs`) + universal `commands` grammar (git, shell builtins, common tool runners). Source of truth. | Hand-authored, slow-changing.                        |
+| `agents/claude-code.json` | **agent**   | tool name + input → (action, target); well-known paths; harness markers + roles.                                                                      | Hand-authored per harness.                           |
+| `projects/coach.json`     | **project** | `tech` (stack) + `architecture` (path → object) + `commands` (this project's own scripts).                                                            | **Generate once with a strong model**, cache/commit. |
 
 A domain ontology is shared across agents in that domain; what is genuinely per-agent is the
 _tool vocabulary_, not the action set. Agents reference the ontology by id (`"ontology": "coding"`).
@@ -34,7 +34,7 @@ node (tool | llm_request)
   ├─ tool → tool semantics     (agent.tools[name])        ── action + target field            │
   │            │                                                                               │
   │            ├─ target.kind == path → project.architecture pathRules → object + label        │
-  │            ├─ escape-hatch (Bash) → project.commands grammar (first match wins, .* escape)  │
+  │            ├─ escape-hatch (Bash) → project.commands then ontology.commands (.* escape)     │
   │            └─ unknown tool → agent.tools._unknownTool (act / unknown, low-confidence)        │
   │                                                                                            │
   ├─ llm_request structural prefix (agent.structuralRoles)── thinking→plan, tool_use→invoke    │

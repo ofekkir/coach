@@ -100,7 +100,7 @@
   },
 
   "commands": {
-    "note": "Command grounding for this project's tech/environment. Command interpretation is project/tech-specific (which test runner, linter, scripts), so it lives here, not in the agent. Ordered; first regex (matched case-insensitively against the trimmed command) wins. Most-specific project scripts first, then the generic tech/shell grammar, ending in the `.*` catch-all escape.",
+    "note": "Coach's own package.json scripts — project-specific commands with project-meaningful labels/objects. Checked BEFORE the domain ontology's universal command grammar (git, shell builtins, common tool runners), which handles everything else and provides the `.*` escape. No catch-all here by design.",
     "rules": [
       {
         "match": "^pnpm\\s+check:structure",
@@ -143,50 +143,7 @@
         "object": "test-code",
         "label": "run pipeline e2e"
       },
-      { "match": "^pnpm\\s+build\\b", "action": "build", "object": "repo" },
-      {
-        "match": "^pnpm\\s+install\\b",
-        "action": "configure",
-        "object": "dependency",
-        "label": "install dependencies"
-      },
-
-      { "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?lint", "action": "lint" },
-      { "match": "\\beslint\\b", "action": "lint" },
-      { "match": "\\bprettier\\b", "action": "format" },
-      { "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?format", "action": "format" },
-      { "match": "\\b(tsc|tsgo)\\b|typecheck", "action": "typecheck" },
-      {
-        "match": "\\b(vitest|jest|mocha|pytest|go\\s+test|cargo\\s+test|rspec)\\b",
-        "action": "test",
-        "object": "test-code"
-      },
-      {
-        "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?test",
-        "action": "test",
-        "object": "test-code"
-      },
-      {
-        "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?build|\\btsup\\b|\\bvite build\\b|\\bwebpack\\b",
-        "action": "build"
-      },
-      {
-        "match": "^(pnpm|npm|yarn|bun)\\s+(install|add|remove|i)\\b",
-        "action": "configure",
-        "object": "dependency"
-      },
-      { "match": "^git\\s+commit\\b", "action": "vcs", "label": "commit changes" },
-      {
-        "match": "^git\\s+(push|pull|fetch|merge|rebase|checkout|switch|branch|stash|tag)\\b",
-        "action": "vcs"
-      },
-      { "match": "^gh\\s+pr\\b", "action": "vcs", "label": "manage pull request" },
-      { "match": "^git\\s+(status|log|diff|show|blame)\\b", "action": "read", "object": "repo" },
-      { "match": "^(ls|cat|head|tail|find|rg|grep|tree|pwd|wc|stat)\\b", "action": "read" },
-      { "match": "^(mkdir|touch|cp|mv)\\b", "action": "write" },
-      { "match": "^rm\\b", "action": "delete" },
-      { "match": "^(curl|wget)\\b", "action": "fetch", "object": "web-resource" },
-      { "match": ".*", "action": "run", "object": "shell", "label": "run command" }
+      { "match": "^pnpm\\s+build\\b", "action": "build", "object": "repo" }
     ]
   }
 }

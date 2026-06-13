@@ -39,6 +39,9 @@ export const testConfig: SemanticsConfig = {
       { id: 'shell', label: 'shell command' },
       { id: 'unknown', label: 'unknown' },
     ],
+    commands: {
+      rules: [{ match: '.*', action: 'run', object: 'shell', label: 'run command' }],
+    },
   },
   agent: {
     id: 'claude-code',
@@ -140,10 +143,7 @@ export const testConfig: SemanticsConfig = {
       ],
     },
     commands: {
-      rules: [
-        { match: '^pnpm\\s+test\\b', action: 'test', object: 'test-code' },
-        { match: '.*', action: 'run', object: 'shell', label: 'run command' },
-      ],
+      rules: [{ match: '^pnpm\\s+test\\b', action: 'test', object: 'test-code' }],
     },
   },
 };

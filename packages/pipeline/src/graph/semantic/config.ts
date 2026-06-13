@@ -31,12 +31,22 @@ const OntologyObjectSchema = z.object({
 
 const MessageActSchema = z.object({ verb: z.string(), hint: z.string().optional() });
 
+// A command→action rule, shared by the domain ontology (universal commands) and
+// project grounding (this project's own scripts). First match wins.
+const CommandRuleSchema = z.object({
+  match: z.string(),
+  action: z.string(),
+  object: z.string().optional(),
+  label: z.string().optional(),
+});
+
 const OntologySchema = z.object({
   id: z.string(),
   actions: z.array(OntologyActionSchema),
   objects: z.array(OntologyObjectSchema),
   escape: z.object({ action: z.string(), object: z.string() }),
   messageActs: z.object({ verbs: z.array(MessageActSchema) }).optional(),
+  commands: z.object({ rules: z.array(CommandRuleSchema) }).optional(),
 });
 
 // ── Agent tool semantics ───────────────────────────────────────────────────────
@@ -121,13 +131,6 @@ const PathRuleSchema = z.object({
   object: z.string(),
   label: z.string().optional(),
   component: z.string().optional(),
-});
-
-const CommandRuleSchema = z.object({
-  match: z.string(),
-  action: z.string(),
-  object: z.string().optional(),
-  label: z.string().optional(),
 });
 
 const ProjectGroundingSchema = z.object({
