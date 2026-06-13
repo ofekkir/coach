@@ -1,34 +1,18 @@
 import type { RequestMessage, ResponseMessage } from '../../types.ts';
+import { actionLabel, isRecord, type SemanticsConfig } from './config.ts';
+import { toolPhrases } from './tool-intent.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
-// Deterministic label derivation — everything the labeler model is bad at, done
-// in code. Tool intent (verb from the tool name, object from the input), the
-// structural inference roles (thinking → plan, tool_use → invoke), and the
-// harness's own calls (session-title, suggestion-mode). The model is reserved
-// for the one thing it can do: classifying the act of a final assistant message.
+// Deterministic label derivation, driven by the injected SemanticsConfig. The
+// structural message helpers below are content-shape only (not config-driven);
+// the harness markers and structural roles are read from config.agent. Tool
+// intent lives in tool-intent.ts. The model is reserved for classifying the act
+// of a genuine final assistant message.
 //
 // Pure module (no node:* imports), like the stage that consumes it.
 // ════════════════════════════════════════════════════════════════════════════
 
-export const SESSION_TITLE_LABEL = 'generate session title';
-export const PREDICT_PROMPT_LABEL = 'predict next user prompt';
-export const PLAN_LABEL = 'plan next steps';
-
-// Stable harness signature: Claude Code's "suggest the user's next input" call
-// injects this marker as the user turn. The response is a *fabricated* prompt, so
-// the node's action is "predict", regardless of what the predicted text says.
-const SUGGESTION_MARKER = '[SUGGESTION MODE';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function strField(obj: Record<string, unknown>, key: string): string {
-  const value = obj[key];
-  return typeof value === 'string' ? value : '';
-}
-
-// ── Message-block extraction ────────────────────────────────────────────────--
+// ── Message-block extraction (structural — not config-driven) ──────────────────
 
 function textFromContent(content: unknown): string {
   if (typeof content === 'string') return content;
@@ -62,26 +46,6 @@ export function hasThinking(messages: readonly ResponseMessage[]): boolean {
   return messages.some((m) => m.type === 'thinking');
 }
 
-export function isSuggestionMode(messages: readonly RequestMessage[]): boolean {
-  return messages.some((m) => textFromContent(m.content).trimStart().startsWith(SUGGESTION_MARKER));
-}
-
-/** A session-title call returns a JSON object whose only meaningful key is `title`. */
-export function isSessionTitleResponse(text: string): boolean {
-  if (!text.startsWith('{')) return false;
-  try {
-    const parsed: unknown = JSON.parse(text);
-    return isRecord(parsed) && typeof parsed.title === 'string';
-  } catch {
-    return false;
-  }
-}
-
-// ── Tool intent — heuristic and deliberately small ─────────────────────────────
-// Object-generalization (`~/.claude/settings.json` → "claude code user settings")
-// needs world knowledge a small model applies inconsistently, so it lives here as
-// rules. Extend the handler map and path/url heuristics as new tools appear.
-
 export function parseToolInput(input: string | undefined): Record<string, unknown> {
   if (input == null) return {};
   try {
@@ -92,64 +56,64 @@ export function parseToolInput(input: string | undefined): Record<string, unknow
   }
 }
 
-function describePath(path: string): string {
-  if (path.includes('/.claude/')) {
-    return path.endsWith('settings.json') ? 'claude code user settings' : 'claude code config';
-  }
-  return path.split('/').pop() ?? path;
-}
-
-function hostOf(url: string): string {
-  const host = url
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
-    .split('/')[0];
-  return host != null && host !== '' ? host : url;
-}
-
-function webFetchPhrases(input: Record<string, unknown>): readonly string[] {
-  const phrases = [`fetch ${hostOf(strField(input, 'url'))}`];
-  if (/summar/i.test(strField(input, 'prompt'))) phrases.push('summarize content');
-  return phrases;
-}
-
-function toolSearchPhrases(input: Record<string, unknown>): readonly string[] {
-  const match = /select:([A-Za-z0-9_]+)/.exec(strField(input, 'query'));
-  const tool = match?.[1];
-  return [tool != null ? `load ${tool} tool schema` : 'load tool schema'];
-}
-
-function skillPhrases(input: Record<string, unknown>): readonly string[] {
-  const skill = strField(input, 'skill');
-  if (skill === 'update-config') return ['update claude code config'];
-  return skill !== '' ? [`use ${skill.replace(/-/g, ' ')} skill`] : ['use skill'];
-}
-
-type ToolHandler = (input: Record<string, unknown>) => readonly string[];
-
-const TOOL_HANDLERS: Record<string, ToolHandler> = {
-  Read: (input) => [`read ${describePath(strField(input, 'file_path'))}`],
-  Edit: (input) => [`edit ${describePath(strField(input, 'file_path'))}`],
-  Write: (input) => [`edit ${describePath(strField(input, 'file_path'))}`],
-  NotebookEdit: (input) => [`edit ${describePath(strField(input, 'file_path'))}`],
-  WebFetch: webFetchPhrases,
-  ToolSearch: toolSearchPhrases,
-  Skill: skillPhrases,
-  Bash: () => ['run command'],
-  Task: () => ['delegate to subagent'],
-};
-
-export function toolPhrases(
-  name: string | undefined,
-  input: Record<string, unknown>,
-): readonly string[] {
-  const handler = name != null ? TOOL_HANDLERS[name] : undefined;
-  if (handler != null) return handler(input);
-  return [name != null && name !== '' ? name.toLowerCase() : 'tool'];
-}
+// ── Structural roles (thinking → plan, tool_use → invoke) ──────────────────────
 
 /** The action of the inference that *decided* to make this tool call. */
-export function invokePhrase(call: ToolCall): string {
-  if (call.name === 'Skill') return 'decide on skill use';
-  return `invoke ${toolPhrases(call.name, call.input)[0] ?? 'tool'}`;
+export function invokePhrase(config: SemanticsConfig, call: ToolCall): string {
+  const rule = config.agent.structuralRoles.rules.find(
+    (r) => r.when.responseEndsWithBlockType === 'tool_use',
+  );
+  const override = rule?.overrides?.find((o) => o.when.toolName === call.name);
+  if (override != null) return override.phrase;
+  const toolPhrase = toolPhrases(config, call.name, call.input)[0] ?? 'tool';
+  return (rule?.phrase ?? 'invoke {toolPhrase}').replace('{toolPhrase}', toolPhrase);
+}
+
+/** Deterministic prefix phrases derived from response-message structure. */
+export function structuralPrefix(
+  config: SemanticsConfig,
+  response: readonly ResponseMessage[],
+): string[] {
+  const prefix: string[] = [];
+  const thinkingRule = config.agent.structuralRoles.rules.find(
+    (r) => r.when.responseHasBlockType === 'thinking',
+  );
+  if (thinkingRule != null && hasThinking(response)) prefix.push(thinkingRule.phrase);
+  const call = responseToolCall(response);
+  if (call != null) prefix.push(invokePhrase(config, call));
+  return prefix;
+}
+
+// ── Harness markers (session-title, suggestion-mode) ───────────────────────────
+
+function jsonHasStringKey(text: string, key: string): boolean {
+  if (!text.startsWith('{')) return false;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return isRecord(parsed) && typeof parsed[key] === 'string';
+  } catch {
+    return false;
+  }
+}
+
+function requestStartsWith(request: readonly RequestMessage[], prefix: string): boolean {
+  return request.some((m) => textFromContent(m.content).trimStart().startsWith(prefix));
+}
+
+/** The deterministic label for a harness-internal call (session title,
+ *  suggestion mode, …), or undefined when no marker matches. */
+export function markerLabel(
+  config: SemanticsConfig,
+  request: readonly RequestMessage[],
+  response: readonly ResponseMessage[],
+): readonly string[] | undefined {
+  const respText = responseText(response) ?? '';
+  const matched = config.agent.markers.rules.find((marker) => {
+    const { responseJsonHasStringKey, requestTextStartsWith } = marker.when;
+    if (responseJsonHasStringKey != null)
+      return jsonHasStringKey(respText, responseJsonHasStringKey);
+    if (requestTextStartsWith != null) return requestStartsWith(request, requestTextStartsWith);
+    return false;
+  });
+  return matched != null ? [actionLabel(config, matched.action)] : undefined;
 }

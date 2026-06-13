@@ -4,6 +4,7 @@ import { classifyInputs } from './classify/classify.ts';
 import { buildExecutionGraph } from './graph/execution/execution.ts';
 import { startNs } from './graph/execution/thread.ts';
 import type { ExecutionGraph, VizResult } from './graph/types.ts';
+import type { SemanticsConfig } from './graph/semantic/config.ts';
 import { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 import type { LabelBatchFn } from './graph/semantic/semantic.ts';
 import { routeToSessions } from './route/route.ts';
@@ -78,15 +79,18 @@ export function runPipeline(files: readonly UploadedFile[]): PipelineResult {
  * enrichment). Pass `labelBatch` to convert tool/llm_request nodes into
  * semantically-labeled action/inference nodes; omit it to skip enrichment
  * entirely (no LLM calls). When enrichment runs, the result includes
- * `enrichedGraph`; otherwise that field is absent.
+ * `enrichedGraph`; otherwise that field is absent. Enrichment requires the
+ * injected `config` (the typed config/ artifacts) — the caller loads it.
  */
 export async function runPipelineAsync(
   files: readonly UploadedFile[],
   labelBatch?: LabelBatchFn,
+  config?: SemanticsConfig,
 ): Promise<PipelineResult> {
   const base = runPipeline(files);
   if (labelBatch == null) return base;
-  const enrichedGraph = await enrichExecutionGraph(base.executionGraph, labelBatch);
+  if (config == null) throw new Error('runPipelineAsync: enrichment requires a SemanticsConfig');
+  const enrichedGraph = await enrichExecutionGraph(base.executionGraph, labelBatch, config);
   return { ...base, enrichedGraph };
 }
 

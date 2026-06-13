@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "kind": "project-grounding",
+  "id": "coach",
+  "ontology": "coding",
+  "description": "Per-project layer for the coach repo. Two sub-layers: `tech` (deterministic stack detection) and `architecture` (path -> ontology object type). This is the layer to GENERATE once with a strong model and cache/commit, not recompute per run. Every `object` and `action` value MUST be an id defined in ontology/coding.json. Object labels for paths come from here so display reads 'edit pipeline business logic' rather than 'edit canonical.ts'.",
+
+  "tech": {
+    "languages": ["typescript"],
+    "module": "esm",
+    "strict": true,
+    "packageManager": "pnpm",
+    "monorepo": {
+      "tool": "pnpm-workspace",
+      "packagesGlob": ["packages/*"],
+      "rootScripts": "scripts/"
+    },
+    "frameworks": ["react"],
+    "testRunner": "vitest",
+    "linter": "eslint",
+    "formatter": "prettier",
+    "typechecker": "tsc",
+    "bundler": "tsup",
+    "deadCodeChecker": "knip",
+    "ci": "github-actions",
+    "vcsHooks": "husky",
+    "signals": [
+      { "file": "pnpm-lock.yaml", "implies": "pnpm" },
+      { "file": "pnpm-workspace.yaml", "implies": "pnpm-monorepo" },
+      { "fileGlob": "**/tsconfig*.json", "implies": "typescript" },
+      { "fileGlob": "**/vitest.config.*", "implies": "vitest" },
+      { "fileGlob": "**/eslint.config.*", "implies": "eslint" },
+      { "fileGlob": "**/tsup.config.*", "implies": "tsup" },
+      { "file": ".github/workflows", "implies": "github-actions" }
+    ]
+  },
+
+  "architecture": {
+    "note": "First matching glob wins — ordered most-specific to least-specific. `component` is the human-readable place in the architecture; `object` is the ontology type. Paths are matched against UploadedFile.path (repo-relative).",
+    "pathRules": [
+      { "glob": "**/*.test.ts", "object": "unit-test", "label": "{stem} test" },
+      { "glob": "**/*.e2e.test.ts", "object": "e2e-test", "label": "{stem} e2e test" },
+      {
+        "glob": "packages/pipeline/fixtures/**",
+        "object": "fixture",
+        "component": "pipeline fixtures"
+      },
+      {
+        "glob": "packages/pipeline/src/graph/semantic/**",
+        "object": "business-logic",
+        "component": "semantic enrichment stage"
+      },
+      {
+        "glob": "packages/pipeline/src/canonical/**",
+        "object": "business-logic",
+        "component": "canonical stage"
+      },
+      { "glob": "packages/pipeline/src/**", "object": "business-logic", "component": "pipeline" },
+      {
+        "glob": "packages/app/src/viz/**",
+        "object": "business-logic",
+        "component": "app graph renderer"
+      },
+      {
+        "glob": "packages/app/src/upload/**",
+        "object": "business-logic",
+        "component": "app upload UI"
+      },
+      { "glob": "packages/app/**", "object": "business-logic", "component": "app (React SPA)" },
+      { "glob": "packages/logger/**", "object": "business-logic", "component": "logger" },
+      { "glob": "scripts/**", "object": "business-logic", "component": "Node CLI" },
+      { "glob": ".github/workflows/**", "object": "ci-cd", "component": "CI workflows" },
+      { "glob": ".husky/**", "object": "vcs-artifact", "component": "git hooks" },
+      { "glob": ".claude/hooks/**", "object": "agent-config", "component": "Claude Code hooks" },
+      { "glob": ".claude/**", "object": "agent-config", "component": "Claude Code config" },
+      { "glob": "CLAUDE.md", "object": "agent-config", "component": "project instructions" },
+      {
+        "glob": "ARCHITECTURE.md",
+        "object": "documentation",
+        "component": "architecture doc",
+        "confidence": "high"
+      },
+      { "glob": "**/pnpm-lock.yaml", "object": "lockfile" },
+      { "glob": "**/package.json", "object": "manifest" },
+      { "glob": "pnpm-workspace.yaml", "object": "build-config", "component": "workspace config" },
+      { "glob": "**/tsconfig*.json", "object": "build-config" },
+      { "glob": "**/tsup.config.*", "object": "build-config" },
+      { "glob": "**/vitest.config.*", "object": "build-config" },
+      { "glob": "knip.{json,ts,jsonc}", "object": "build-config", "component": "dead-code config" },
+      { "glob": "**/eslint.config.*", "object": "linter-config" },
+      { "glob": ".prettierrc*", "object": "formatter-config" },
+      { "glob": "prettier.config.*", "object": "formatter-config" },
+      { "glob": "vercel.json", "object": "infra", "component": "Vercel deploy config" },
+      { "glob": ".env*", "object": "secret" },
+      { "glob": ".gitignore", "object": "vcs-artifact" },
+      { "glob": "**/*.md", "object": "documentation" },
+      { "glob": "**/*.ts", "object": "source-code" },
+      { "glob": "**/*", "object": "unknown", "confidence": "low" }
+    ]
+  },
+
+  "commands": {
+    "note": "Project-specific command grounding. Applied BEFORE the agent's generic bashCommandGrammar (first match wins) so coach's pnpm scripts resolve to precise (action, object) pairs. Matched case-insensitively against the trimmed command. No catch-all here BY DESIGN: a non-match falls through to the agent's bashCommandGrammar, whose own `.*` rule is the escape — do not add a redundant catch-all here.",
+    "rules": [
+      {
+        "match": "^pnpm\\s+check:structure",
+        "action": "lint",
+        "object": "repo",
+        "label": "check module structure conventions"
+      },
+      {
+        "match": "^pnpm\\s+check\\b",
+        "action": "verify",
+        "object": "repo",
+        "label": "run full CI gate"
+      },
+      { "match": "^pnpm\\s+typecheck\\b", "action": "typecheck", "object": "repo" },
+      {
+        "match": "^pnpm\\s+lint:fix\\b",
+        "action": "lint",
+        "object": "repo",
+        "label": "auto-fix lint"
+      },
+      { "match": "^pnpm\\s+lint\\b", "action": "lint", "object": "repo" },
+      {
+        "match": "^pnpm\\s+format:check\\b",
+        "action": "lint",
+        "object": "repo",
+        "label": "check formatting"
+      },
+      { "match": "^pnpm\\s+format\\b", "action": "format", "object": "repo" },
+      { "match": "^pnpm\\s+test:watch\\b", "action": "test", "object": "test-code" },
+      { "match": "^pnpm\\s+test\\b", "action": "test", "object": "test-code" },
+      {
+        "match": "^pnpm\\s+knip\\b",
+        "action": "lint",
+        "object": "repo",
+        "label": "check for dead code"
+      },
+      {
+        "match": "^pnpm\\s+e2e\\b",
+        "action": "test",
+        "object": "test-code",
+        "label": "run pipeline e2e"
+      },
+      { "match": "^pnpm\\s+build\\b", "action": "build", "object": "repo" },
+      {
+        "match": "^pnpm\\s+install\\b",
+        "action": "configure",
+        "object": "dependency",
+        "label": "install dependencies"
+      }
+    ]
+  }
+}

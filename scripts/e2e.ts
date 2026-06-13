@@ -3,8 +3,9 @@ import { basename, join, resolve } from 'node:path';
 import { log } from '@coach/logger';
 import { runPipelineAsync } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
-import { claudeLabelBatch } from './claude-labeler.ts';
-import { ollamaLabelBatch } from './ollama-labeler.ts';
+import { makeClaudeLabelBatch } from './claude-labeler.ts';
+import { loadSemanticsConfig } from './load-semantics-config.ts';
+import { makeOllamaLabelBatch } from './ollama-labeler.ts';
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -66,8 +67,13 @@ const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
 // Local Ollama by default; set COACH_LABELER=claude to use the cloud Claude CLI.
-const labelBatch = process.env.COACH_LABELER === 'claude' ? claudeLabelBatch : ollamaLabelBatch;
-const result = await runPipelineAsync(files, enrichFlag ? labelBatch : undefined);
+// The labeler's allowed verbs come from the ontology's messageActs (injected, not hardcoded).
+const config = enrichFlag ? loadSemanticsConfig() : undefined;
+const makeLabeler =
+  process.env.COACH_LABELER === 'claude' ? makeClaudeLabelBatch : makeOllamaLabelBatch;
+const labelBatch =
+  enrichFlag && config != null ? makeLabeler(config.ontology.messageActs?.verbs ?? []) : undefined;
+const result = await runPipelineAsync(files, labelBatch, config);
 
 // Input-bearing members are projected to names/types so the dumps stay readable;
 // the graph members are dumped in full — they are the point of inspection.

@@ -37,12 +37,13 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Package layout
 
-| Package / dir       | Purpose                                                                                                                                                                                                           |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/logger`   | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                     |
-| `packages/pipeline` | Pure staged pipeline: classify → route → canonical → aggregate → execution graph, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike. |
-| `packages/app`      | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                            |
-| `scripts/`          | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                    |
+| Package / dir       | Purpose                                                                                                                                                                                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/logger`   | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                             |
+| `packages/pipeline` | Pure staged pipeline: classify → route → canonical → aggregate → execution graph, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                                         |
+| `packages/app`      | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                                    |
+| `scripts/`          | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output. `load-semantics-config.ts` is the disk seam that injects the semantics config into stage 6.                |
+| `config/`           | Semantics config artifacts (data, not code): `ontology/` (domain vocabulary, source of truth), `agents/` (per-agent tool semantics), `projects/` (per-project grounding). Injected into stage 6; never read by the pure pipeline. See `config/README.md`. |
 
 ## Data flow
 
@@ -93,12 +94,14 @@ Input files (accumulating — user stages N files/folders before submitting)
                             vs. the previous request in the same thread
         │
         ▼  Stage 6 (opt-in) — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
-   enrichExecutionGraph()  converts tool → action and llm_request → inference nodes.
-                            derive.ts builds each node's deterministic prefix (tool
-                            intent, thinking→plan, tool_use→invoke, session-title,
-                            suggestion-mode); the injected LabelBatchFn only classifies
-                            the act of a genuine final message. Final `what` = prefix ++
-                            model phrases. Runs only when --enrich is passed.
+   enrichExecutionGraph(graph, labelBatch, config)  converts tool → action and
+                            llm_request → inference nodes. tool-intent.ts + derive.ts
+                            build each node's deterministic prefix (tool intent, path
+                            grounding, thinking→plan, tool_use→invoke, session-title,
+                            suggestion-mode) by interpreting the injected SemanticsConfig
+                            — no hardcoded tool tables. The injected LabelBatchFn only
+                            classifies the act of a genuine final message. Final `what`
+                            = prefix ++ model phrases. Runs only when --enrich is passed.
         │
         ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)
@@ -106,6 +109,18 @@ Input files (accumulating — user stages N files/folders before submitting)
 
 `agentGraph` is itself a visualisable graph (the canonical node forest). The execution graph is the
 deterministic skeleton from the trace. `VizResult.data` is the `ExecutionGraph` directly.
+
+**Semantics config is injected, never read by the pipeline.** Stage 6's deterministic labels come
+from a `SemanticsConfig` — the typed form of the `config/` artifacts: a domain **ontology**
+(`config/ontology/coding.json`, the closed action/object vocabulary and source of truth), per-agent
+**tool semantics** (`config/agents/claude-code.json`), and per-project **grounding**
+(`config/projects/coach.json`, path → object type). `graph/semantic/config.ts` defines the shape and
+`assembleSemanticsConfig` (which throws on any action/object id absent from the ontology — the
+referential-integrity contract). The pipeline stays file-system-free: the Node CLI seam
+`scripts/load-semantics-config.ts` parses the JSON and injects the assembled config into
+`runPipelineAsync`. The interpreter is agent-agnostic, so a different agent/project triple is a
+config swap, not a code change. See `config/README.md` for the resolution order and what is
+deliberately out of scope (composition/inference roll-up).
 
 All sessions roll up under one agent; `buildVizResults` emits exactly one `VizResult` carrying the
 execution graph, and sessions are navigated by expand/collapse inside the graph. Unsupported files

@@ -1,5 +1,5 @@
 import { log } from '@coach/logger';
-import type { LabelBatchFn, LabelRequest } from '@coach/pipeline';
+import type { LabelBatchFn, LabelRequest, MessageAct } from '@coach/pipeline';
 
 // Transport-agnostic labeling: prompt construction, batching, retry, and parsing
 // live here so each model adapter only implements "prompt in → raw text out".
@@ -11,7 +11,13 @@ const MAX_ATTEMPTS = 2;
 
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
-export function buildPrompt(batch: readonly LabelRequest[]): string {
+function verbList(acts: readonly MessageAct[]): string {
+  return acts.map((a) => (a.hint != null ? `- ${a.verb}: ${a.hint}` : `- ${a.verb}`)).join('\n');
+}
+
+/** The model-residual prompt. The allowed verbs are the ontology's `messageActs`
+ *  (injected, not hardcoded) — add a verb to the ontology, not to this string. */
+export function buildPrompt(batch: readonly LabelRequest[], acts: readonly MessageAct[]): string {
   const items = batch.map((r) => ({ id: r.id, text: r.response_text }));
 
   return `You are given the final messages an AI agent sent to its user. For each item, output a
@@ -19,7 +25,8 @@ JSON array naming the ACT(s) the message performed — never quote, summarize, o
 content itself, and never output a model name. Each phrase is "<verb> <generic object>",
 ≤5 words, lowercase. Emit one phrase per distinct act, in order.
 
-Use verbs from: answer, summarize, confirm, suggest, translate, explain, acknowledge.
+Use only these verbs:
+${verbList(acts)}
 Pair each with a generic object (e.g. "session", "edit", "next steps", "question", "text").
 
   "Done. The Grafana server is configured. Next: replace the token and test it."
@@ -80,7 +87,7 @@ async function callWithRetry(
 
 // ── Public factory ──────────────────────────────────────────────────────────--
 
-export function makeLabelBatch(callModel: CallModel): LabelBatchFn {
+export function makeLabelBatch(callModel: CallModel, acts: readonly MessageAct[]): LabelBatchFn {
   return async (requests) => {
     const results = new Map<string, readonly string[]>();
 
@@ -89,7 +96,7 @@ export function makeLabelBatch(callModel: CallModel): LabelBatchFn {
     for (let i = 0; i < requests.length; i += BATCH_SIZE) {
       const batch = requests.slice(i, i + BATCH_SIZE);
       const batchIds = batch.map((r) => r.id);
-      const labels = await callWithRetry(callModel, buildPrompt(batch), batchIds);
+      const labels = await callWithRetry(callModel, buildPrompt(batch, acts), batchIds);
       for (const [id, what] of labels) results.set(id, what);
     }
 

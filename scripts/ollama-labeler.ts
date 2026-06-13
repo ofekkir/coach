@@ -1,4 +1,4 @@
-import type { LabelBatchFn } from '@coach/pipeline';
+import type { LabelBatchFn, MessageAct } from '@coach/pipeline';
 import { makeLabelBatch } from './label-batch.ts';
 
 // Local inference via Ollama's HTTP API. Override host/model with env vars.
@@ -44,4 +44,5 @@ const callOllama = async (prompt: string): Promise<string> => {
   return data.message?.content ?? '';
 };
 
-export const ollamaLabelBatch: LabelBatchFn = makeLabelBatch(callOllama);
+export const makeOllamaLabelBatch = (acts: readonly MessageAct[]): LabelBatchFn =>
+  makeLabelBatch(callOllama, acts);

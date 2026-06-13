@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { LabelBatchFn } from '@coach/pipeline';
+import type { LabelBatchFn, MessageAct } from '@coach/pipeline';
 import { makeLabelBatch } from './label-batch.ts';
 
 const BYTES_PER_KIB = 1024;
@@ -57,4 +57,5 @@ const callClaude = async (prompt: string): Promise<string> =>
 
 // ── Public export ─────────────────────────────────────────────────────────────
 
-export const claudeLabelBatch: LabelBatchFn = makeLabelBatch(callClaude);
+export const makeClaudeLabelBatch = (acts: readonly MessageAct[]): LabelBatchFn =>
+  makeLabelBatch(callClaude, acts);

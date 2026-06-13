@@ -1,4 +1,4 @@
-import type { GraphNode, LlmRequestNode, ResponseMessage } from '../../types.ts';
+import type { GraphNode, LlmRequestNode } from '../../types.ts';
 import type {
   AgentExecution,
   ExecutionGraph,
@@ -7,19 +7,15 @@ import type {
   SessionExecution,
   Thread,
 } from '../types.ts';
+import type { SemanticsConfig } from './config.ts';
 import {
-  PLAN_LABEL,
-  PREDICT_PROMPT_LABEL,
-  SESSION_TITLE_LABEL,
-  hasThinking,
-  invokePhrase,
-  isSessionTitleResponse,
-  isSuggestionMode,
+  markerLabel,
   parseToolInput,
   responseText,
   responseToolCall,
-  toolPhrases,
+  structuralPrefix,
 } from './derive.ts';
+import { toolPhrases } from './tool-intent.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Semantic enrichment stage — converts mechanical tool/llm_request nodes into
@@ -65,26 +61,20 @@ interface LabelPlan {
   prefixes: Map<string, readonly string[]>;
 }
 
-function structuralPrefix(response: readonly ResponseMessage[]): string[] {
-  const prefix: string[] = [];
-  if (hasThinking(response)) prefix.push(PLAN_LABEL);
-  const call = responseToolCall(response);
-  if (call != null) prefix.push(invokePhrase(call));
-  return prefix;
-}
-
-function planLlmRequest(node: ExecutionNode, canonical: LlmRequestNode, plan: LabelPlan): void {
+function planLlmRequest(
+  node: ExecutionNode,
+  canonical: LlmRequestNode,
+  plan: LabelPlan,
+  config: SemanticsConfig,
+): void {
   const response = node.responseMessagesDelta ?? [];
+  const marker = markerLabel(config, node.requestMessagesDelta ?? [], response);
+  if (marker != null) {
+    plan.prefixes.set(canonical.id, marker);
+    return;
+  }
   const respText = responseText(response);
-  if (respText != null && isSessionTitleResponse(respText)) {
-    plan.prefixes.set(canonical.id, [SESSION_TITLE_LABEL]);
-    return;
-  }
-  if (isSuggestionMode(node.requestMessagesDelta ?? [])) {
-    plan.prefixes.set(canonical.id, [PREDICT_PROMPT_LABEL]);
-    return;
-  }
-  const prefix = structuralPrefix(response);
+  const prefix = structuralPrefix(config, response);
   // Text that precedes a tool call is preamble to the action, not a terminal
   // message — only classify the act when the turn actually ends in text.
   const isTerminalMessage = respText != null && responseToolCall(response) == null;
@@ -93,39 +83,39 @@ function planLlmRequest(node: ExecutionNode, canonical: LlmRequestNode, plan: La
   else if (!isTerminalMessage) plan.prefixes.set(canonical.id, mechanicalLabel(canonical));
 }
 
-function planNode(node: ExecutionNode, plan: LabelPlan): void {
+function planNode(node: ExecutionNode, plan: LabelPlan, config: SemanticsConfig): void {
   const canonical = node.canonical;
   if (canonical.type === 'tool') {
     plan.prefixes.set(
       canonical.id,
-      toolPhrases(canonical.name, parseToolInput(canonical.tool_input)),
+      toolPhrases(config, canonical.name, parseToolInput(canonical.tool_input)),
     );
   } else if (canonical.type === 'llm_request') {
-    planLlmRequest(node, canonical, plan);
+    planLlmRequest(node, canonical, plan, config);
   }
-  for (const child of node.children) planNode(child, plan);
+  for (const child of node.children) planNode(child, plan, config);
 }
 
-function planThread(thread: Thread, plan: LabelPlan): void {
-  for (const member of thread.members) planNode(member, plan);
+function planThread(thread: Thread, plan: LabelPlan, config: SemanticsConfig): void {
+  for (const member of thread.members) planNode(member, plan, config);
 }
 
-function planInteraction(ix: InteractionExecution, plan: LabelPlan): void {
-  for (const thread of ix.threads) planThread(thread, plan);
+function planInteraction(ix: InteractionExecution, plan: LabelPlan, config: SemanticsConfig): void {
+  for (const thread of ix.threads) planThread(thread, plan, config);
 }
 
-function planSession(session: SessionExecution, plan: LabelPlan): void {
-  for (const ix of session.interactions) planInteraction(ix, plan);
+function planSession(session: SessionExecution, plan: LabelPlan, config: SemanticsConfig): void {
+  for (const ix of session.interactions) planInteraction(ix, plan, config);
 }
 
-function planLabels(graph: ExecutionGraph): LabelPlan {
+function planLabels(graph: ExecutionGraph, config: SemanticsConfig): LabelPlan {
   const plan: LabelPlan = { requests: [], prefixes: new Map() };
   if (graph.kind === 'agent') {
-    for (const session of graph.data.sessions) planSession(session, plan);
+    for (const session of graph.data.sessions) planSession(session, plan, config);
   } else if (graph.kind === 'session') {
-    planSession(graph.data, plan);
+    planSession(graph.data, plan, config);
   } else if (graph.data != null) {
-    planInteraction(graph.data, plan);
+    planInteraction(graph.data, plan, config);
   }
   return plan;
 }
@@ -220,8 +210,9 @@ function mergeLabels(
 export async function enrichExecutionGraph(
   graph: ExecutionGraph,
   labelBatch: LabelBatchFn,
+  config: SemanticsConfig,
 ): Promise<ExecutionGraph> {
-  const plan = planLabels(graph);
+  const plan = planLabels(graph, config);
   if (plan.requests.length === 0 && plan.prefixes.size === 0) return graph;
   const modelLabels =
     plan.requests.length > 0
