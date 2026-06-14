@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CanonicalNode } from '../../types.ts';
 import type { ExecutionGraph } from '../types.ts';
-import { testConfig } from './config.fixture.ts';
+import { defaultSemanticsConfig } from '@coach/semantics';
 import type { LabelBatchFn, LabelRequest } from './semantic.ts';
 import { enrichExecutionGraph } from './semantic.ts';
 
@@ -100,7 +100,7 @@ describe('enrichExecutionGraph', () => {
     const labelBatch: LabelBatchFn = (requests) =>
       Promise.resolve(new Map(requests.map((r) => [r.id, ['answer question']])));
 
-    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch, testConfig);
+    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch, defaultSemanticsConfig);
     if (enriched.kind !== 'agent') throw new Error('expected agent');
 
     const thread = enriched.data.sessions[0]?.interactions[0]?.threads[0];
@@ -118,7 +118,7 @@ describe('enrichExecutionGraph', () => {
 
   it('falls back to the model id when the llm message is left unclassified', async () => {
     const labelBatch: LabelBatchFn = () => Promise.resolve(new Map<string, readonly string[]>()); // empty — no labels
-    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch, testConfig);
+    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch, defaultSemanticsConfig);
     if (enriched.kind !== 'agent') throw new Error('expected agent');
 
     const thread = enriched.data.sessions[0]?.interactions[0]?.threads[0];
@@ -132,7 +132,7 @@ describe('enrichExecutionGraph', () => {
   it('preserves graph structure: ids, edges, hierarchy, and non-tool nodes', async () => {
     const labelBatch: LabelBatchFn = (requests) =>
       Promise.resolve(new Map(requests.map((r) => [r.id, ['label']])));
-    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch, testConfig);
+    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch, defaultSemanticsConfig);
     if (enriched.kind !== 'agent') throw new Error('expected agent');
 
     const data = enriched.data;
@@ -154,7 +154,7 @@ describe('enrichExecutionGraph', () => {
   it('preserves existing canonical fields on converted nodes', async () => {
     const labelBatch: LabelBatchFn = (requests) =>
       Promise.resolve(new Map(requests.map((r) => [r.id, ['label']])));
-    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch, testConfig);
+    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch, defaultSemanticsConfig);
     if (enriched.kind !== 'agent') throw new Error('expected agent');
 
     const thread = enriched.data.sessions[0]?.interactions[0]?.threads[0];
@@ -171,7 +171,7 @@ describe('enrichExecutionGraph', () => {
     const labelBatch = vi.fn((requests: readonly LabelRequest[]) =>
       Promise.resolve(new Map(requests.map((r) => [r.id, ['x']]))),
     );
-    await enrichExecutionGraph(makeGraph(), labelBatch, testConfig);
+    await enrichExecutionGraph(makeGraph(), labelBatch, defaultSemanticsConfig);
     expect(labelBatch).toHaveBeenCalledTimes(1);
     expect(labelBatch.mock.calls[0]?.[0]).toHaveLength(1); // llm1 only — tool1 is deterministic
   });
@@ -179,7 +179,7 @@ describe('enrichExecutionGraph', () => {
   it('returns the graph unchanged when there are no tool or llm_request nodes', async () => {
     const emptyGraph: ExecutionGraph = { kind: 'interaction', data: null };
     const labelBatch = vi.fn(() => Promise.resolve(new Map<string, readonly string[]>()));
-    const result = await enrichExecutionGraph(emptyGraph, labelBatch, testConfig);
+    const result = await enrichExecutionGraph(emptyGraph, labelBatch, defaultSemanticsConfig);
     expect(result).toBe(emptyGraph); // same reference — nothing to enrich
     expect(labelBatch).not.toHaveBeenCalled();
   });
@@ -216,7 +216,7 @@ describe('enrichExecutionGraph', () => {
       },
     };
     const labelBatch = vi.fn(() => Promise.resolve(new Map<string, readonly string[]>()));
-    const enriched = await enrichExecutionGraph(graph, labelBatch, testConfig);
+    const enriched = await enrichExecutionGraph(graph, labelBatch, defaultSemanticsConfig);
     if (enriched.kind !== 'interaction' || enriched.data == null) throw new Error('expected ix');
 
     const node = enriched.data.threads[0]?.members[0];
@@ -244,7 +244,7 @@ describe('enrichExecutionGraph', () => {
       },
     };
     const labelBatch = vi.fn(() => Promise.resolve(new Map<string, readonly string[]>()));
-    const enriched = await enrichExecutionGraph(graph, labelBatch, testConfig);
+    const enriched = await enrichExecutionGraph(graph, labelBatch, defaultSemanticsConfig);
     if (enriched.kind !== 'interaction' || enriched.data == null) throw new Error('expected ix');
 
     const node = enriched.data.threads[0]?.members[0];
