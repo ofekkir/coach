@@ -395,6 +395,10 @@
           "match": "(^|/)(tsconfig[^/]*\\.json|(tsup|vite|vitest|jest|babel|webpack|rollup)\\.config\\.[a-z]+)$",
           "object": "build-config"
         },
+        {
+          "match": "(^|/)(pnpm-workspace\\.yaml|turbo\\.json|nx\\.json|lerna\\.json|renovate\\.json|knip\\.(json|jsonc|ts)|\\.npmrc|\\.nvmrc)$",
+          "object": "build-config"
+        },
         { "match": "(^|/)(eslint\\.config\\.[a-z]+|\\.eslintrc[^/]*)$", "object": "linter-config" },
         {
           "match": "(^|/)(prettier\\.config\\.[a-z]+|\\.prettierrc[^/]*)$",
