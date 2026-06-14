@@ -1,15 +1,16 @@
 import { z } from 'zod';
 
 // ════════════════════════════════════════════════════════════════════════════
-// Semantics configuration — the typed, validated form of the config/ artifacts
-// (ontology/<domain>.json, agents/<agent>.json, projects/<project>.json). Zod
-// schemas are the source of truth for the shapes; the exported types are
-// inferred from them, and the data is validated when loaded from disk (unknown
-// keys such as `note`/`description`/`schemaVersion` are stripped, not errors).
+// Semantics configuration — the typed, validated form of the bundled artifacts
+// in ./data (ontology/<domain>.json, agents/<agent>.json, projects/<project>.json).
+// Zod schemas are the source of truth for the shapes; the exported types are
+// inferred from them, and the data is validated on assembly (unknown keys such as
+// `note`/`description`/`schemaVersion` are stripped, not errors).
 //
-// The pipeline stays pure: it never reads these from disk. A Node caller parses
-// the JSON and passes it to assembleSemanticsConfig(), which validates each file
-// and enforces that every action/object id resolves against the ontology.
+// This module is pure: the JSON is imported (bundled), never read from disk.
+// `defaults.ts` passes the bundled JSON to assembleSemanticsConfig(), which
+// validates each artifact and enforces that every action/object id resolves
+// against the ontology. The pipeline consumes the assembled SemanticsConfig.
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Domain ontology (the vocabulary source of truth) ───────────────────────────

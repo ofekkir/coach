@@ -42,18 +42,10 @@ export type {
   VizResult,
 } from './graph/types.ts';
 
-// Semantic enrichment stage (opt-in; LLM adapter + config injected by caller)
+// Semantic enrichment stage (opt-in; LLM adapter injected by caller, semantic
+// vocabulary supplied by @coach/semantics — import config types from there).
 export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 export type { LabelBatchFn, LabelRequest } from './graph/semantic/semantic.ts';
-export { assembleSemanticsConfig } from './graph/semantic/config.ts';
-export type {
-  AgentSemantics,
-  MessageAct,
-  Ontology,
-  OntologyAction,
-  ProjectGrounding,
-  SemanticsConfig,
-} from './graph/semantic/config.ts';
 
 // Orchestration
 export {

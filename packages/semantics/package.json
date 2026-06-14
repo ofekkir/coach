@@ -1,5 +1,5 @@
 {
-  "name": "@coach/pipeline",
+  "name": "@coach/semantics",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,11 +12,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@coach/semantics": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
   }

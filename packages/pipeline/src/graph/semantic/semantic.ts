@@ -7,7 +7,7 @@ import type {
   SessionExecution,
   Thread,
 } from '../types.ts';
-import type { SemanticsConfig } from './config.ts';
+import type { SemanticsConfig } from '@coach/semantics';
 import {
   markerLabel,
   parseToolInput,

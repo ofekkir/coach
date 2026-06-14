@@ -1,0 +1,20 @@
+// @coach/semantics — the typed, validated vocabulary contract consumed by the
+// pipeline's enrichment stage. Pure (no node:*): the JSON artifacts are bundled
+// and imported, never read from disk, so the same assembled config serves the
+// Node CLI and the browser app.
+
+export { defaultSemanticsConfig } from './defaults.ts';
+export { assembleSemanticsConfig, actionLabel, objectLabel, strField, isRecord } from './config.ts';
+export type {
+  AgentSemantics,
+  CommandRule,
+  MatchClause,
+  MessageAct,
+  Ontology,
+  OntologyAction,
+  ProjectGrounding,
+  SemanticsConfig,
+  ToolModifier,
+  ToolOverride,
+  ToolSemantics,
+} from './config.ts';

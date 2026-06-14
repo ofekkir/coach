@@ -1,0 +1,80 @@
+# @coach/semantics
+
+The typed, validated vocabulary contract consumed by the pipeline's enrichment stage (stage 6).
+Turns mechanical execution-graph nodes into ontology-grounded semantic labels. The JSON artifacts
+under `src/data` are **data, not code** — everything the interpreter used to hardcode (tool→verb
+maps, the `.claude/` path special-casing, the suggestion-mode and session-title markers, the
+thinking/tool_use structural roles) lives here, so a weak model only ever picks from a known, small
+vocabulary.
+
+**Pure package, no disk seam.** `src/config.ts` defines the Zod schemas, the inferred types, and
+`assembleSemanticsConfig` (validate + referential-integrity check). `src/defaults.ts` **imports** the
+three bundled JSON artifacts and assembles `defaultSemanticsConfig` — the JSON is inlined by the
+bundler, never read from the file system, so the same assembled config serves both the Node CLI and
+the browser app. The pipeline's `graph/semantic` interpreter consumes the assembled `SemanticsConfig`
+and is **agent-agnostic**: swapping in another agent/project triple needs no pipeline change.
+`runPipelineAsync` defaults its `config` to `defaultSemanticsConfig`.
+
+## The three artifacts (by scope)
+
+| File                           | Scope       | Owns                                                                                                                                                  | How it's produced                                    |
+| ------------------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `data/ontology/coding.json`    | **domain**  | Closed vocabulary (`actions` + `objects` + `messageActs`) + universal `commands` grammar (git, shell builtins, common tool runners). Source of truth. | Hand-authored, slow-changing.                        |
+| `data/agents/claude-code.json` | **agent**   | tool name + input → (action, target); well-known paths; harness markers + roles.                                                                      | Hand-authored per harness.                           |
+| `data/projects/coach.json`     | **project** | `tech` (stack) + `architecture` (path → object) + `commands` (this project's own scripts).                                                            | **Generate once with a strong model**, cache/commit. |
+
+A domain ontology is shared across agents in that domain; what is genuinely per-agent is the
+_tool vocabulary_, not the action set. Agents reference the ontology by id (`"ontology": "coding"`).
+
+## Resolution order (how a node gets labeled)
+
+```
+node (tool | llm_request)
+  │
+  ├─ llm_request → markers     (agent.markers)            ── session-title? suggestion-mode?  ─┐ fully
+  │                                                                                            │ determined,
+  │                                                                                            │ no model
+  ├─ tool → tool semantics     (agent.tools[name])        ── action + target field            │
+  │            │                                                                               │
+  │            ├─ target.kind == path → project.architecture pathRules → object + label        │
+  │            ├─ escape-hatch (Bash) → project.commands then ontology.commands (.* escape)     │
+  │            └─ unknown tool → agent.tools._unknownTool (act / unknown, low-confidence)        │
+  │                                                                                            │
+  ├─ llm_request structural prefix (agent.structuralRoles)── thinking→plan, tool_use→invoke    │
+  │                                                                                            │
+  └─ genuine terminal message  → agent.modelResidual      ── WEAK MODEL classifies the act ────┘
+                                                              (verbs = ontology.messageActs)
+final `what` = deterministic prefix ++ model phrases
+```
+
+The model is the **last resort**, invoked only for a real terminal assistant message
+(`response_text` present and the turn does not end in a `tool_use`). Everything above it is a
+lookup.
+
+## The binding contract (referential integrity)
+
+`data/ontology/coding.json` is the **single source of truth for the vocabulary**. Every `action`
+and `object` value in the agent and project files MUST be an id defined there. This is the rule that
+keeps three independently-edited files from drifting into unaggregatable labels.
+`assembleSemanticsConfig` (in `src/config.ts`) **enforces this** — it throws if any agent/project
+file references an action or object id absent from the ontology. Because `defaultSemanticsConfig` is
+assembled at module import, a typo or stray id fails fast (at import, and in `config.test.ts`)
+instead of silently mislabeling.
+
+```bash
+pnpm --filter @coach/semantics test   # asserts the bundled triple assembles + refs resolve
+```
+
+## Escape hatches (open-world safety)
+
+Both axes have an explicit unknown (`action: act`, `object: unknown`). Unmatched tools, commands,
+and paths resolve to these rather than being forced into a wrong bucket — so coverage gaps surface
+as low-confidence "unknown" labels instead of confident mislabels. Treat a rising rate of `unknown`
+as the signal that the ontology or a grounding file is missing a concept.
+
+## Deliberately out of scope
+
+**Composition / inference nodes.** Rolling leaf labels up into higher intent ("implemented feature
+X" from 6 edits + 1 test run + 1 lint) is a separate problem with no artifact here yet. The leaf
+representation deliberately preserves the `(action, object, target)` tuple plus the causal-graph
+edges so composition stays reconstructable later.

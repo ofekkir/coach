@@ -1,4 +1,5 @@
-import type { LabelBatchFn, MessageAct } from '@coach/pipeline';
+import type { LabelBatchFn } from '@coach/pipeline';
+import type { MessageAct } from '@coach/semantics';
 import { makeLabelBatch } from './label-batch.ts';
 
 // Local inference via Ollama's HTTP API. Override host/model with env vars.

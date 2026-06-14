@@ -8,7 +8,7 @@ import {
   type ToolModifier,
   type ToolOverride,
   type ToolSemantics,
-} from './config.ts';
+} from '@coach/semantics';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Tool & command intent — resolved entirely from config.agent.tools, the Bash

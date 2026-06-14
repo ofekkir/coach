@@ -38,7 +38,8 @@
   },
   "dependencies": {
     "@coach/logger": "workspace:*",
-    "@coach/pipeline": "workspace:*"
+    "@coach/pipeline": "workspace:*",
+    "@coach/semantics": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

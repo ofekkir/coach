@@ -3,7 +3,7 @@ import { basename, join, resolve } from 'node:path';
 import { log } from '@coach/logger';
 import { runPipelineAsync } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
-import { loadSemanticsConfig } from './load-semantics-config.ts';
+import { defaultSemanticsConfig } from '@coach/semantics';
 import { makeOllamaLabelBatch } from './ollama-labeler.ts';
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ log.info({ files: files.length }, 'gathered input files');
 
 // Enrichment runs a local Ollama model (override with OLLAMA_MODEL). The labeler's
 // allowed verbs come from the ontology's messageActs (injected, not hardcoded).
-const config = enrichFlag ? loadSemanticsConfig() : undefined;
+const config = enrichFlag ? defaultSemanticsConfig : undefined;
 const labelBatch =
   enrichFlag && config != null
     ? makeOllamaLabelBatch(config.ontology.messageActs?.verbs ?? [])

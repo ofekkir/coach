@@ -1,5 +1,6 @@
 import { log } from '@coach/logger';
-import type { LabelBatchFn, LabelRequest, MessageAct } from '@coach/pipeline';
+import type { LabelBatchFn, LabelRequest } from '@coach/pipeline';
+import type { MessageAct } from '@coach/semantics';
 
 // Transport-agnostic labeling: prompt construction, batching, retry, and parsing
 // live here so each model adapter only implements "prompt in → raw text out".

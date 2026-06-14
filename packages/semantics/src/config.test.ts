@@ -1,0 +1,45 @@
+import { describe, expect, it } from 'vitest';
+import { assembleSemanticsConfig } from './config.ts';
+import { defaultSemanticsConfig } from './defaults.ts';
+
+describe('defaultSemanticsConfig', () => {
+  it('assembles the bundled coding × claude-code × coach triple', () => {
+    expect(defaultSemanticsConfig.ontology.id).toBe('coding');
+    expect(defaultSemanticsConfig.agent.id).toBe('claude-code');
+    expect(defaultSemanticsConfig.project?.id).toBe('coach');
+  });
+
+  it('resolves the agent/project ontology reference to the bundled ontology id', () => {
+    expect(defaultSemanticsConfig.agent.ontology).toBe(defaultSemanticsConfig.ontology.id);
+  });
+});
+
+describe('assembleSemanticsConfig', () => {
+  const ontology = {
+    id: 'coding',
+    actions: [{ id: 'read', group: 'work', label: 'read' }],
+    objects: [{ id: 'unknown', label: 'unknown' }],
+    escape: { action: 'read', object: 'unknown' },
+  };
+  const agent = {
+    id: 'a',
+    ontology: 'coding',
+    tools: { Read: { action: 'read', object: 'unknown' } },
+    markers: { rules: [] },
+    structuralRoles: { rules: [] },
+  };
+
+  it('accepts a config whose ids all resolve against the ontology', () => {
+    expect(() => assembleSemanticsConfig(ontology, agent)).not.toThrow();
+  });
+
+  it('throws when an agent references an action id absent from the ontology', () => {
+    const bad = { ...agent, tools: { Read: { action: 'fly', object: 'unknown' } } };
+    expect(() => assembleSemanticsConfig(ontology, bad)).toThrow(/fly/);
+  });
+
+  it('throws when an agent references an object id absent from the ontology', () => {
+    const bad = { ...agent, tools: { Read: { action: 'read', object: 'spaceship' } } };
+    expect(() => assembleSemanticsConfig(ontology, bad)).toThrow(/spaceship/);
+  });
+});

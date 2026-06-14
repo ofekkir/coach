@@ -1,9 +1,9 @@
-import type { SemanticsConfig } from './config.ts';
+import type { SemanticsConfig } from '@coach/semantics';
 
-// A compact SemanticsConfig fixture mirroring the real config/ artifacts for the
-// rules the interpreter tests exercise. Kept in-package so the pure pipeline and
-// its tests stay self-contained; the real JSON artifacts are validated by the
-// CLI loader (assembleSemanticsConfig) when `pnpm e2e --enrich` runs.
+// A compact SemanticsConfig fixture mirroring the real artifacts for the rules the
+// interpreter tests exercise. Kept in-package so the pipeline tests stay
+// self-contained; the real bundled artifacts are validated by assembleSemanticsConfig
+// (in @coach/semantics) when defaultSemanticsConfig is assembled at import.
 
 export const testConfig: SemanticsConfig = {
   ontology: {
