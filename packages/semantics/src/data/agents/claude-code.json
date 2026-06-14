@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "kind": "agent-tool-semantics",
+  "id": "claude-code",
+  "ontology": "coding",
+  "description": "Per-agent layer for Claude Code. Maps each tool name + input to an ontology action and a target field, declares the harness-internal markers (session-title, suggestion-mode) and structural roles (thinking, tool_use), and names agent-owned well-known paths. Command→action interpretation is NOT here — it is project/tech-specific and lives in project grounding's `commands`. Every `action` and `object` value here MUST be an id defined in ontology/coding.json.",
+
+  "targetKinds": {
+    "path": "Take the named input field as a filesystem path; hand it to project grounding to resolve an object type and label.",
+    "host": "Reduce a URL field to its host for display.",
+    "literal": "Use the field value verbatim as the display target.",
+    "none": "Tool has no meaningful target."
+  },
+
+  "wellKnownPaths": {
+    "note": "Paths the AGENT owns, wherever they live on disk (not project-relative). First regex match wins; the label is the full semantic name and suppresses the grounded-type suffix. This is Claude Code's own config layout, so it belongs here, not in project grounding.",
+    "rules": [
+      { "match": "/\\.claude/settings\\.json$", "label": "claude code user settings" },
+      { "match": "/\\.claude/", "label": "claude code config" }
+    ]
+  },
+
+  "tools": {
+    "Read": {
+      "action": "read",
+      "target": { "field": "file_path", "kind": "path" },
+      "phrase": "read {object}"
+    },
+    "Edit": {
+      "action": "edit",
+      "target": { "field": "file_path", "kind": "path" },
+      "phrase": "edit {object}"
+    },
+    "MultiEdit": {
+      "action": "edit",
+      "target": { "field": "file_path", "kind": "path" },
+      "phrase": "edit {object}",
+      "note": "deprecated alias of Edit"
+    },
+    "Write": {
+      "action": "write",
+      "target": { "field": "file_path", "kind": "path" },
+      "phrase": "write {object}"
+    },
+    "NotebookEdit": {
+      "action": "edit",
+      "target": { "field": "notebook_path", "kind": "path" },
+      "phrase": "edit {object}",
+      "note": "edit_mode disambiguates the semantic action deterministically from the input — no model needed.",
+      "overrides": [
+        {
+          "when": { "field": "edit_mode", "equals": "insert" },
+          "action": "write",
+          "phrase": "add cell to {object}"
+        },
+        {
+          "when": { "field": "edit_mode", "equals": "delete" },
+          "action": "delete",
+          "phrase": "delete cell from {object}"
+        }
+      ]
+    },
+    "Glob": {
+      "action": "search",
+      "target": { "field": "pattern", "kind": "literal" },
+      "phrase": "find files matching {target}"
+    },
+    "Grep": {
+      "action": "search",
+      "target": { "field": "pattern", "kind": "literal" },
+      "phrase": "search files for {target}"
+    },
+    "WebFetch": {
+      "action": "fetch",
+      "target": { "field": "url", "kind": "host" },
+      "phrase": "fetch {target}",
+      "commentField": "prompt",
+      "modifiers": [
+        {
+          "when": { "field": "prompt", "matches": ".+" },
+          "append": { "action": "respond", "label": "process result with weak model" }
+        }
+      ]
+    },
+    "WebSearch": {
+      "action": "search-web",
+      "target": { "field": "query", "kind": "literal" },
+      "phrase": "search the web for {target}"
+    },
+    "Task": {
+      "action": "delegate",
+      "target": { "field": "subagent_type", "kind": "literal" },
+      "phrase": "delegate to {target} subagent"
+    },
+    "Agent": {
+      "action": "delegate",
+      "target": { "field": "subagent_type", "kind": "literal" },
+      "phrase": "delegate to {target} subagent",
+      "note": "current name for Task"
+    },
+    "TodoWrite": {
+      "action": "plan",
+      "object": "task-list",
+      "target": { "kind": "none" },
+      "phrase": "update task list"
+    },
+    "ExitPlanMode": {
+      "action": "plan",
+      "object": "repo",
+      "target": { "kind": "none" },
+      "phrase": "present plan for approval"
+    },
+    "AskUserQuestion": {
+      "action": "clarify",
+      "object": "user",
+      "target": { "kind": "none" },
+      "phrase": "ask the user"
+    },
+    "Skill": {
+      "action": "use-skill",
+      "target": { "field": "skill", "kind": "literal" },
+      "phrase": "use {target} skill"
+    },
+    "SlashCommand": {
+      "action": "run",
+      "target": { "field": "command", "kind": "literal", "extract": "^/?([A-Za-z0-9_-]+)" },
+      "phrase": "run {target} command",
+      "note": "A user/project-defined command whose effect is arbitrary (it expands to a prompt), so it is `run`, not `use-skill`. Field is `command` (e.g. '/review-pr 123')."
+    },
+    "ToolSearch": {
+      "action": "load-schema",
+      "object": "tool",
+      "target": { "field": "query", "kind": "literal", "extract": "select:([A-Za-z0-9_]+)" },
+      "phrase": "load {target} tool schema",
+      "fallbackPhrase": "load tool schema"
+    },
+    "BashOutput": {
+      "action": "read",
+      "object": "shell",
+      "target": { "kind": "none" },
+      "phrase": "read command output"
+    },
+    "KillShell": {
+      "action": "run",
+      "object": "shell",
+      "target": { "kind": "none" },
+      "phrase": "kill background command"
+    },
+    "Bash": {
+      "escapeHatch": true,
+      "target": { "field": "command", "kind": "literal" },
+      "commentField": "description",
+      "note": "Freeform command. The agent only knows this is an escape-hatch command tool; the command→(action, object) grammar is project/tech-specific and lives in project grounding's `commands`. `commentField` surfaces the agent's own 5-10 word `description` verbatim as the node's `comment` (display only, never part of `what`)."
+    },
+
+    "_unknownTool": {
+      "note": "Any tool not listed (including mcp__* and project slash commands) falls back to: action `act`, object `unknown`, phrase = lowercased tool name. Surfaced as low-confidence so the gap is visible.",
+      "action": "act",
+      "object": "unknown",
+      "phrase": "{toolNameLower}"
+    }
+  },
+
+  "markers": {
+    "note": "Deterministic short-circuits at the llm_request level — when a rule matches, it fully determines the label and pre-empts any model call.",
+    "rules": [
+      {
+        "id": "session-title",
+        "when": { "responseJsonHasStringKey": "title" },
+        "action": "generate-title",
+        "object": "repo"
+      },
+      {
+        "id": "suggestion-mode",
+        "when": { "requestTextStartsWith": "[SUGGESTION MODE" },
+        "action": "predict",
+        "object": "user"
+      }
+    ]
+  },
+
+  "structuralRoles": {
+    "note": "Deterministic prefix phrases derived from the shape of the response (a thinking block, a trailing tool call). Prepended to — not replacing — any model classification of a final message.",
+    "rules": [
+      {
+        "id": "thinking",
+        "when": { "responseHasBlockType": "thinking" },
+        "action": "plan",
+        "phrase": "plan next steps"
+      },
+      {
+        "id": "tool_use",
+        "when": { "responseEndsWithBlockType": "tool_use" },
+        "action": "invoke",
+        "phrase": "invoke {toolPhrase}",
+        "overrides": [{ "when": { "toolName": "Skill" }, "phrase": "decide on skill use" }]
+      }
+    ]
+  },
+
+  "modelResidual": {
+    "note": "What is LEFT for the weak model after all of the above. Only fires for a genuine terminal assistant message (a final message that does not end in a tool call). The model classifies the ACT into an ordered list of phrases, each a verb from the ontology's `messageActs` paired with a generic object (e.g. ['confirm edit','suggest next steps']); it never quotes the message. Everything else is deterministic. messageActs is a distinct axis from the leaf `actions` (which are derived, not modeled); the model prompt is generated from that list, so add a verb to the ontology rather than editing any prompt.",
+    "constrainTo": "ontology.messageActs verbs",
+    "outputShape": "ordered string[] of '<verb> <generic object>' phrases"
+  }
+}

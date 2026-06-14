@@ -98,10 +98,15 @@ packages/
       route/          # stage 2 — group supported inputs by session id
       canonical/      # stage 3 — inputs → CanonicalNode[] (enrich/native/transform internals)
       aggregate/      # stage 4 — sessions → single-agent forest
-      graph/          # stage 5 — view-model (CausalGraphView, VizData)
+      graph/          # stage 5 view-model + stage 6 semantic/ (interpreter; consumes @coach/semantics)
       orchestrate.ts  # runPipeline + buildVizResults — file-system-free orchestration
       index.ts        # public exports
     fixtures/         # test fixtures (native .jsonl + OTEL sets)
+  semantics/          # @coach/semantics — pure config package (schema + assembler + bundled JSON)
+    src/
+      config.ts       # Zod schemas + types + assembleSemanticsConfig + accessors
+      defaults.ts     # imports bundled JSON → defaultSemanticsConfig (no disk read)
+      data/           # ontology/ + agents/ JSON artifacts (data, not code; no project layer)
   app/                # @coach/app — React SPA (upload UI + graph renderer)
     src/
       upload/         # UploadPage.tsx — landing page + file intake

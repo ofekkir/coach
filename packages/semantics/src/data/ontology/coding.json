@@ -1,0 +1,484 @@
+{
+  "schemaVersion": 1,
+  "kind": "domain-ontology",
+  "id": "coding",
+  "description": "Closed vocabulary for the software-engineering / coding-agent domain. This file is the SINGLE SOURCE OF TRUTH for action and object ids. Agent tool-semantics files and project-grounding files reference these ids; they must not invent new ones. The vocabulary is intentionally small so a weak model only ever picks from a known set. Add to it deliberately, not per-node.",
+
+  "actions": [
+    {
+      "id": "read",
+      "group": "work",
+      "label": "read",
+      "aliases": ["view", "inspect", "open", "cat"],
+      "description": "Look at the content of a file or resource without changing it."
+    },
+    {
+      "id": "search",
+      "group": "work",
+      "label": "search",
+      "aliases": ["find", "grep", "glob", "locate"],
+      "description": "Locate files or matches by name/pattern/content."
+    },
+    {
+      "id": "write",
+      "group": "work",
+      "label": "write",
+      "aliases": ["create", "add"],
+      "description": "Create new file content."
+    },
+    {
+      "id": "edit",
+      "group": "work",
+      "label": "edit",
+      "aliases": ["modify", "update", "patch"],
+      "description": "Change existing file content."
+    },
+    {
+      "id": "delete",
+      "group": "work",
+      "label": "delete",
+      "aliases": ["remove", "rm"],
+      "description": "Remove a file or block of content."
+    },
+    {
+      "id": "refactor",
+      "group": "work",
+      "label": "refactor",
+      "aliases": ["restructure", "rename", "extract"],
+      "description": "Restructure code without intended behavior change. A model classification — not deterministically distinguishable from edit."
+    },
+    {
+      "id": "run",
+      "group": "work",
+      "label": "run",
+      "aliases": ["execute", "invoke-command"],
+      "description": "Execute a command, script, or program."
+    },
+    {
+      "id": "build",
+      "group": "work",
+      "label": "build",
+      "aliases": ["compile", "bundle", "emit"],
+      "description": "Produce build artifacts."
+    },
+    {
+      "id": "test",
+      "group": "work",
+      "label": "run tests",
+      "aliases": ["test"],
+      "description": "Execute a test suite. (Authoring tests is write × test-code, not this.)"
+    },
+    {
+      "id": "lint",
+      "group": "work",
+      "label": "lint",
+      "aliases": ["check"],
+      "description": "Run a linter / static-analysis / dead-code check."
+    },
+    {
+      "id": "format",
+      "group": "work",
+      "label": "format",
+      "aliases": ["prettify"],
+      "description": "Run a code formatter."
+    },
+    {
+      "id": "typecheck",
+      "group": "work",
+      "label": "typecheck",
+      "aliases": ["tsc"],
+      "description": "Run a type checker."
+    },
+    {
+      "id": "verify",
+      "group": "work",
+      "label": "verify",
+      "aliases": ["validate", "ci"],
+      "description": "Run a composite quality gate (e.g. the full CI check)."
+    },
+    {
+      "id": "vcs",
+      "group": "work",
+      "label": "version control",
+      "aliases": ["git", "commit", "push", "branch"],
+      "description": "Source-control operations (commit, push, branch, rebase, …)."
+    },
+    {
+      "id": "debug",
+      "group": "work",
+      "label": "debug",
+      "aliases": ["diagnose", "investigate"],
+      "description": "Diagnose a failure or unexpected behavior."
+    },
+    {
+      "id": "review",
+      "group": "work",
+      "label": "review",
+      "aliases": ["audit"],
+      "description": "Review code for correctness/quality."
+    },
+    {
+      "id": "fetch",
+      "group": "work",
+      "label": "fetch",
+      "aliases": ["download", "curl"],
+      "description": "Retrieve a remote resource (URL)."
+    },
+    {
+      "id": "search-web",
+      "group": "work",
+      "label": "search the web",
+      "aliases": ["web-search"],
+      "description": "Query a web search engine."
+    },
+    {
+      "id": "configure",
+      "group": "work",
+      "label": "configure",
+      "aliases": ["setup", "set"],
+      "description": "Change configuration or settings."
+    },
+
+    {
+      "id": "plan",
+      "group": "meta",
+      "label": "plan next steps",
+      "aliases": ["think", "reason"],
+      "description": "Internal reasoning / planning before acting (e.g. a thinking block)."
+    },
+    {
+      "id": "invoke",
+      "group": "meta",
+      "label": "invoke",
+      "aliases": ["call-tool"],
+      "description": "The inference act of deciding to call a tool."
+    },
+    {
+      "id": "delegate",
+      "group": "meta",
+      "label": "delegate",
+      "aliases": ["spawn-subagent"],
+      "description": "Hand work to a subagent."
+    },
+    {
+      "id": "respond",
+      "group": "meta",
+      "label": "respond",
+      "aliases": ["answer", "report", "converse"],
+      "description": "Emit a final assistant message to the user. The act within it is what the model classifies."
+    },
+    {
+      "id": "clarify",
+      "group": "meta",
+      "label": "ask the user",
+      "aliases": ["ask", "question"],
+      "description": "Ask the user a question / request a decision."
+    },
+    {
+      "id": "use-skill",
+      "group": "meta",
+      "label": "use skill",
+      "aliases": ["skill"],
+      "description": "Invoke a named skill / slash command."
+    },
+
+    {
+      "id": "generate-title",
+      "group": "harness",
+      "label": "generate session title",
+      "aliases": [],
+      "description": "Harness-internal call that names the session."
+    },
+    {
+      "id": "predict",
+      "group": "harness",
+      "label": "predict next user prompt",
+      "aliases": ["suggest"],
+      "description": "Harness-internal call that fabricates a likely next user input (suggestion mode)."
+    },
+    {
+      "id": "load-schema",
+      "group": "harness",
+      "label": "load tool schema",
+      "aliases": [],
+      "description": "Harness-internal deferred-tool schema load."
+    },
+
+    {
+      "id": "act",
+      "group": "escape",
+      "label": "act",
+      "aliases": [],
+      "description": "ESCAPE HATCH action. Use when no known action fits, so mislabeling is visible as 'unknown' rather than forced into a wrong bucket."
+    }
+  ],
+
+  "objects": [
+    {
+      "id": "business-logic",
+      "label": "business logic",
+      "aliases": ["app code", "source"],
+      "description": "Application source code that carries product behavior."
+    },
+    {
+      "id": "source-code",
+      "label": "source code",
+      "aliases": ["code"],
+      "description": "Generic source code when a finer object type is unknown."
+    },
+    {
+      "id": "test-code",
+      "label": "tests",
+      "aliases": ["test"],
+      "description": "Test code of any kind when the level is unknown."
+    },
+    { "id": "unit-test", "label": "unit test", "aliases": [], "description": "Unit-level test." },
+    {
+      "id": "e2e-test",
+      "label": "e2e test",
+      "aliases": ["integration test"],
+      "description": "End-to-end / integration test."
+    },
+    {
+      "id": "fixture",
+      "label": "fixture",
+      "aliases": ["test data", "sample"],
+      "description": "Test fixture / sample input data."
+    },
+    {
+      "id": "manifest",
+      "label": "manifest",
+      "aliases": ["package descriptor"],
+      "description": "Package/project manifest (package.json, pyproject.toml, Cargo.toml, go.mod, …)."
+    },
+    { "id": "lockfile", "label": "lockfile", "aliases": [], "description": "Dependency lockfile." },
+    {
+      "id": "build-config",
+      "label": "build config",
+      "aliases": ["compiler config"],
+      "description": "Build/compiler/test-runner config (tsconfig, bundler config, Makefile, …)."
+    },
+    {
+      "id": "linter-config",
+      "label": "linter config",
+      "aliases": [],
+      "description": "Linter / static-analysis config."
+    },
+    {
+      "id": "formatter-config",
+      "label": "formatter config",
+      "aliases": [],
+      "description": "Code-formatter config."
+    },
+    {
+      "id": "ci-cd",
+      "label": "CI/CD config",
+      "aliases": ["pipeline config", "workflow"],
+      "description": "CI/CD pipeline definition (GitHub Actions workflow, etc.)."
+    },
+    {
+      "id": "documentation",
+      "label": "documentation",
+      "aliases": ["docs", "readme"],
+      "description": "Human-facing docs (README, design docs, comments-as-docs)."
+    },
+    {
+      "id": "agent-config",
+      "label": "agent config",
+      "aliases": ["claude config"],
+      "description": "Coding-agent configuration (.claude/, CLAUDE.md, settings.json, hooks)."
+    },
+    {
+      "id": "vcs-artifact",
+      "label": "VCS artifact",
+      "aliases": ["git", "hook", "gitignore"],
+      "description": "Version-control plumbing (.gitignore, git hooks, .husky)."
+    },
+    {
+      "id": "type-schema",
+      "label": "types / schema",
+      "aliases": ["types", "schema", "interface"],
+      "description": "Type definitions or data schema."
+    },
+    {
+      "id": "dependency",
+      "label": "dependency",
+      "aliases": ["package", "library"],
+      "description": "A third-party package/dependency as a subject."
+    },
+    {
+      "id": "infra",
+      "label": "infrastructure",
+      "aliases": ["docker", "terraform", "deploy"],
+      "description": "Infra-as-code / deployment config."
+    },
+    {
+      "id": "secret",
+      "label": "secret / env",
+      "aliases": ["env", "credentials"],
+      "description": "Secrets, env files, credentials."
+    },
+    {
+      "id": "web-resource",
+      "label": "web resource",
+      "aliases": ["url", "page"],
+      "description": "A remote URL / web page."
+    },
+    {
+      "id": "shell",
+      "label": "shell command",
+      "aliases": ["command", "terminal"],
+      "description": "An ad-hoc shell command with no more specific object."
+    },
+    {
+      "id": "task-list",
+      "label": "task list",
+      "aliases": ["todos", "plan"],
+      "description": "The agent's own todo/task list."
+    },
+    {
+      "id": "tool",
+      "label": "tool",
+      "aliases": [],
+      "description": "A tool/capability as the subject (e.g. loading its schema)."
+    },
+    {
+      "id": "repo",
+      "label": "repository",
+      "aliases": ["codebase", "project", "whole project"],
+      "description": "The codebase as a whole."
+    },
+    {
+      "id": "user",
+      "label": "user",
+      "aliases": [],
+      "description": "The human user (target of respond/clarify)."
+    },
+
+    {
+      "id": "unknown",
+      "label": "unknown",
+      "aliases": [],
+      "description": "ESCAPE HATCH object. Use when no known object type fits."
+    }
+  ],
+
+  "pairings": {
+    "policy": "advisory",
+    "note": "Unlisted (action, object) pairs are ALLOWED but should be surfaced as low-confidence. This map only records the common, expected pairings used to sanity-check grounding output. It is not a hard whitelist.",
+    "common": {
+      "test": ["unit-test", "e2e-test", "test-code", "repo"],
+      "lint": ["linter-config", "source-code", "repo"],
+      "format": ["source-code", "repo"],
+      "typecheck": ["source-code", "repo"],
+      "build": ["repo", "business-logic"],
+      "configure": ["agent-config", "build-config", "linter-config", "formatter-config", "ci-cd"],
+      "fetch": ["web-resource"],
+      "delegate": ["repo", "business-logic", "test-code"],
+      "respond": ["user"]
+    }
+  },
+
+  "escape": { "action": "act", "object": "unknown" },
+
+  "conventions": {
+    "note": "Generic, transferable coding conventions — how files and project layout map to ontology objects regardless of which project. `paths` types a file by role from its name/path (first match wins, case-insensitive); `structure` extracts a structural qualifier (e.g. the monorepo workspace) from generic layout patterns. This deliberately replaces per-project file-organization mapping: anything that is truly project-specific (which dir is which feature, a project's own component names) is NOT encoded here.",
+    "paths": {
+      "rules": [
+        { "match": "\\.e2e\\.test\\.[tj]sx?$", "object": "e2e-test" },
+        { "match": "\\.(test|spec)\\.[tj]sx?$", "object": "unit-test" },
+        { "match": "(^|/)\\.github/workflows/", "object": "ci-cd" },
+        { "match": "(^|/)(\\.husky/|\\.git/hooks/)", "object": "vcs-artifact" },
+        { "match": "(^|/)\\.gitignore$", "object": "vcs-artifact" },
+        { "match": "(^|/)(\\.claude/|claude\\.md$|agents\\.md$)", "object": "agent-config" },
+        {
+          "match": "(^|/)(tsconfig[^/]*\\.json|(tsup|vite|vitest|jest|babel|webpack|rollup)\\.config\\.[a-z]+)$",
+          "object": "build-config"
+        },
+        {
+          "match": "(^|/)(pnpm-workspace\\.yaml|turbo\\.json|nx\\.json|lerna\\.json|renovate\\.json|knip\\.(json|jsonc|ts)|\\.npmrc|\\.nvmrc)$",
+          "object": "build-config"
+        },
+        { "match": "(^|/)(eslint\\.config\\.[a-z]+|\\.eslintrc[^/]*)$", "object": "linter-config" },
+        {
+          "match": "(^|/)(prettier\\.config\\.[a-z]+|\\.prettierrc[^/]*)$",
+          "object": "formatter-config"
+        },
+        {
+          "match": "(^|/)(pnpm-lock\\.yaml|yarn\\.lock|package-lock\\.json|bun\\.lockb|cargo\\.lock|go\\.sum|poetry\\.lock)$",
+          "object": "lockfile"
+        },
+        {
+          "match": "(^|/)(package\\.json|cargo\\.toml|go\\.mod|pyproject\\.toml|pom\\.xml)$",
+          "object": "manifest"
+        },
+        { "match": "(^|/)\\.env", "object": "secret" },
+        { "match": "\\.(md|mdx|rst)$", "object": "documentation" },
+        {
+          "match": "\\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|kt|swift|c|cc|cpp|h|hpp)$",
+          "object": "source-code"
+        },
+        { "match": ".*", "object": "unknown" }
+      ]
+    },
+    "structure": {
+      "note": "Ordered; first capture wins. Group 1 is the qualifier value. Generic monorepo workspace layouts (pnpm/yarn/npm/nx/turborepo).",
+      "rules": [{ "match": "(?:^|/)(?:packages|apps|libs)/([^/]+)/", "qualifier": "package" }]
+    }
+  },
+
+  "commands": {
+    "note": "Universal command→action grammar for the coding domain — git, shell builtins, and common tool/test-runner names that mean the same thing in any project. A project's own named scripts live in its grounding file and are matched first; these are the fallback, ending in the `.*` catch-all escape. Ordered; first match (case-insensitive, trimmed) wins.",
+    "rules": [
+      { "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?lint", "action": "lint" },
+      { "match": "\\beslint\\b", "action": "lint" },
+      { "match": "\\bprettier\\b", "action": "format" },
+      { "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?format", "action": "format" },
+      { "match": "\\b(tsc|tsgo)\\b|typecheck", "action": "typecheck" },
+      {
+        "match": "\\b(vitest|jest|mocha|pytest|go\\s+test|cargo\\s+test|rspec)\\b",
+        "action": "test",
+        "object": "test-code"
+      },
+      {
+        "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?test",
+        "action": "test",
+        "object": "test-code"
+      },
+      {
+        "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?build|\\btsup\\b|\\bvite build\\b|\\bwebpack\\b",
+        "action": "build"
+      },
+      {
+        "match": "^(pnpm|npm|yarn|bun)\\s+(install|add|remove|i)\\b",
+        "action": "configure",
+        "object": "dependency"
+      },
+      { "match": "^git\\s+commit\\b", "action": "vcs", "label": "commit changes" },
+      {
+        "match": "^git\\s+(push|pull|fetch|merge|rebase|checkout|switch|branch|stash|tag)\\b",
+        "action": "vcs"
+      },
+      { "match": "^gh\\s+pr\\b", "action": "vcs", "label": "manage pull request" },
+      { "match": "^git\\s+(status|log|diff|show|blame)\\b", "action": "read", "object": "repo" },
+      { "match": "^(ls|cat|head|tail|find|rg|grep|tree|pwd|wc|stat)\\b", "action": "read" },
+      { "match": "^(mkdir|touch|cp|mv)\\b", "action": "write" },
+      { "match": "^rm\\b", "action": "delete" },
+      { "match": "^(curl|wget)\\b", "action": "fetch", "object": "web-resource" },
+      { "match": ".*", "action": "run", "object": "shell", "label": "run command" }
+    ]
+  },
+
+  "messageActs": {
+    "note": "Closed verb set for the model-residual: the weak model classifies the ACT of a genuine terminal assistant message into one or more of these, pairing each verb with a generic object to form a phrase like 'confirm edit' or 'suggest next steps'. This is a distinct axis from the leaf `actions` above (which are derived deterministically). The model prompt is built from this list — add a verb here rather than editing any prompt.",
+    "verbs": [
+      { "verb": "answer", "hint": "directly answers the user's question" },
+      { "verb": "summarize", "hint": "recaps what was done or found" },
+      { "verb": "confirm", "hint": "reports an action completed" },
+      { "verb": "suggest", "hint": "proposes a next step or option" },
+      { "verb": "explain", "hint": "clarifies how or why something works" },
+      { "verb": "acknowledge", "hint": "accepts or agrees, adding no new content" },
+      { "verb": "translate", "hint": "renders text in another language" }
+    ]
+  }
+}

@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { CanonicalNode } from '../../types.ts';
 import type { ExecutionGraph } from '../types.ts';
-import type { LabelBatchFn, LabelRequest } from './semantic.ts';
+import { defaultSemanticsConfig } from '@coach/semantics';
 import { enrichExecutionGraph } from './semantic.ts';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -45,7 +45,8 @@ const tool1: CanonicalNode = {
   type: 'tool',
   parent: 'inter',
   name: 'Bash',
-  tool_input: 'pnpm test',
+  // real traces carry JSON tool_input; `description` is the agent's own intent annotation
+  tool_input: '{"command":"pnpm test","description":"Run the test suite"}',
   start_time_ns: '210000000',
   end_time_ns: '300000000',
   duration_ms: 90,
@@ -93,43 +94,27 @@ function makeGraph(): ExecutionGraph {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('enrichExecutionGraph', () => {
-  it('converts tool → action and llm_request → inference with provided labels', async () => {
-    const labelBatch: LabelBatchFn = (requests) => {
-      const map = new Map<string, string>();
-      for (const r of requests) {
-        map.set(r.id, r.kind === 'tool' ? 'run tests' : 'plan next steps');
-      }
-      return Promise.resolve(map);
-    };
-
-    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch);
+  it('derives tool intent and labels a terminal assistant message as respond', () => {
+    const enriched = enrichExecutionGraph(makeGraph(), defaultSemanticsConfig);
     if (enriched.kind !== 'agent') throw new Error('expected agent');
 
     const thread = enriched.data.sessions[0]?.interactions[0]?.threads[0];
     const llmNode = thread?.members.find((m) => m.id === 'llm1');
     const toolNode = thread?.members.find((m) => m.id === 'tool1');
 
-    expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: 'plan next steps' });
-    expect(toolNode?.canonical).toMatchObject({ type: 'action', what: 'run tests' });
+    // The final text turn (no trailing tool call) gets the generic deterministic
+    // respond act — no model classifies it more finely.
+    expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: ['respond'] });
+    // `what` is the derived label; `comment` is the agent's verbatim description (display only)
+    expect(toolNode?.canonical).toMatchObject({
+      type: 'action',
+      what: ['run tests'],
+      comment: 'Run the test suite',
+    });
   });
 
-  it('falls back to tool name when label is missing', async () => {
-    const labelBatch: LabelBatchFn = () => Promise.resolve(new Map<string, string>()); // empty — no labels
-    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch);
-    if (enriched.kind !== 'agent') throw new Error('expected agent');
-
-    const thread = enriched.data.sessions[0]?.interactions[0]?.threads[0];
-    const toolNode = thread?.members.find((m) => m.id === 'tool1');
-    const llmNode = thread?.members.find((m) => m.id === 'llm1');
-
-    expect(toolNode?.canonical).toMatchObject({ type: 'action', what: 'Bash' }); // tool.name fallback
-    expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: 'claude-haiku' }); // model fallback
-  });
-
-  it('preserves graph structure: ids, edges, hierarchy, and non-tool nodes', async () => {
-    const labelBatch: LabelBatchFn = (requests) =>
-      Promise.resolve(new Map(requests.map((r) => [r.id, 'label'])));
-    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch);
+  it('preserves graph structure: ids, edges, hierarchy, and non-tool nodes', () => {
+    const enriched = enrichExecutionGraph(makeGraph(), defaultSemanticsConfig);
     if (enriched.kind !== 'agent') throw new Error('expected agent');
 
     const data = enriched.data;
@@ -148,10 +133,8 @@ describe('enrichExecutionGraph', () => {
     expect(thread?.edges[0]).toEqual({ fromId: 'llm1', toId: 'tool1', gapMs: 10 });
   });
 
-  it('preserves existing canonical fields on converted nodes', async () => {
-    const labelBatch: LabelBatchFn = (requests) =>
-      Promise.resolve(new Map(requests.map((r) => [r.id, 'label'])));
-    const enriched = await enrichExecutionGraph(makeGraph(), labelBatch);
+  it('preserves existing canonical fields on converted nodes', () => {
+    const enriched = enrichExecutionGraph(makeGraph(), defaultSemanticsConfig);
     if (enriched.kind !== 'agent') throw new Error('expected agent');
 
     const thread = enriched.data.sessions[0]?.interactions[0]?.threads[0];
@@ -164,20 +147,73 @@ describe('enrichExecutionGraph', () => {
     });
   });
 
-  it('only calls labelBatch once for all nodes in the graph', async () => {
-    const labelBatch = vi.fn((requests: readonly LabelRequest[]) =>
-      Promise.resolve(new Map(requests.map((r) => [r.id, 'x']))),
-    );
-    await enrichExecutionGraph(makeGraph(), labelBatch);
-    expect(labelBatch).toHaveBeenCalledTimes(1);
-    expect(labelBatch.mock.calls[0]?.[0]).toHaveLength(2); // llm1 + tool1
+  it('returns the graph unchanged when there are no tool or llm_request nodes', () => {
+    const emptyGraph: ExecutionGraph = { kind: 'interaction', data: null };
+    const result = enrichExecutionGraph(emptyGraph, defaultSemanticsConfig);
+    expect(result).toBe(emptyGraph); // same reference — nothing to enrich
   });
 
-  it('returns the graph unchanged when there are no tool or llm_request nodes', async () => {
-    const emptyGraph: ExecutionGraph = { kind: 'interaction', data: null };
-    const labelBatch = vi.fn(() => Promise.resolve(new Map<string, string>()));
-    const result = await enrichExecutionGraph(emptyGraph, labelBatch);
-    expect(result).toBe(emptyGraph); // same reference — nothing to enrich
-    expect(labelBatch).not.toHaveBeenCalled();
+  it('labels session-title calls deterministically (marker short-circuit)', () => {
+    const titleLlm: CanonicalNode = { ...llm1, id: 'title1' };
+    const graph: ExecutionGraph = {
+      kind: 'interaction',
+      data: {
+        root: { id: 'inter', canonical: interaction, children: [], innerEdges: [] },
+        userPrompt: null,
+        rootToThreadIds: ['t'],
+        threads: [
+          {
+            id: 't',
+            source: 'repl_main_thread',
+            members: [
+              {
+                id: 'title1',
+                canonical: titleLlm,
+                children: [],
+                innerEdges: [],
+                requestMessagesDelta: [
+                  { role: 'user', content: '<session>\nadd an mcp\n</session>' },
+                ],
+                responseMessagesDelta: [
+                  { type: 'text', text: '{"title": "Add Grafana MCP server"}' },
+                ],
+              },
+            ],
+            edges: [],
+          },
+        ],
+      },
+    };
+    const enriched = enrichExecutionGraph(graph, defaultSemanticsConfig);
+    if (enriched.kind !== 'interaction' || enriched.data == null) throw new Error('expected ix');
+
+    const node = enriched.data.threads[0]?.members[0];
+    expect(node?.canonical).toMatchObject({ type: 'inference', what: ['generate session title'] });
+  });
+
+  it('labels nodes with no message delta with the model-id fallback', () => {
+    const emptyLlm: CanonicalNode = { ...llm1, id: 'empty1' };
+    const graph: ExecutionGraph = {
+      kind: 'interaction',
+      data: {
+        root: { id: 'inter', canonical: interaction, children: [], innerEdges: [] },
+        userPrompt: null,
+        rootToThreadIds: ['t'],
+        threads: [
+          {
+            id: 't',
+            source: 'repl_main_thread',
+            // no requestMessagesDelta / responseMessagesDelta — nothing to read
+            members: [{ id: 'empty1', canonical: emptyLlm, children: [], innerEdges: [] }],
+            edges: [],
+          },
+        ],
+      },
+    };
+    const enriched = enrichExecutionGraph(graph, defaultSemanticsConfig);
+    if (enriched.kind !== 'interaction' || enriched.data == null) throw new Error('expected ix');
+
+    const node = enriched.data.threads[0]?.members[0];
+    expect(node?.canonical).toMatchObject({ type: 'inference', what: ['claude-haiku'] });
   });
 });

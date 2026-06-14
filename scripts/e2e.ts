@@ -1,10 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { log } from '@coach/logger';
-import { runPipelineAsync } from '@coach/pipeline';
+import { runPipeline } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
-import { claudeLabelBatch } from './claude-labeler.ts';
-import { ollamaLabelBatch } from './ollama-labeler.ts';
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -13,7 +11,6 @@ const ARGV_USER_START = 2;
 const JSON_INDENT = 2;
 
 const cliArgs = process.argv.slice(ARGV_USER_START);
-const enrichFlag = cliArgs.includes('--enrich');
 const debugFlag = cliArgs.includes('--debug');
 const positionals = cliArgs.filter((a) => !a.startsWith('--'));
 const arg = positionals[0];
@@ -22,8 +19,7 @@ if (debugFlag) log.level = 'debug';
 
 if (!arg) {
   log.error(
-    'Usage: pnpm e2e <path> [--enrich] [--debug]  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website --enrich)\n' +
-      '  --enrich labels nodes via a local model (Ollama, OLLAMA_MODEL=llama3.2:3b). Set COACH_LABELER=claude for the cloud Claude CLI.',
+    'Usage: pnpm e2e <path> [--debug]  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website)',
   );
   process.exit(1);
 }
@@ -65,9 +61,8 @@ function dump(stepLabel: string, data: unknown): void {
 const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
-// Local Ollama by default; set COACH_LABELER=claude to use the cloud Claude CLI.
-const labelBatch = process.env.COACH_LABELER === 'claude' ? claudeLabelBatch : ollamaLabelBatch;
-const result = await runPipelineAsync(files, enrichFlag ? labelBatch : undefined);
+// runPipeline runs all six stages, including deterministic semantic enrichment.
+const result = runPipeline(files);
 
 // Input-bearing members are projected to names/types so the dumps stay readable;
 // the graph members are dumped in full — they are the point of inspection.
@@ -86,9 +81,7 @@ dump(
 dump('03-canonical-by-session', result.canonicalBySession);
 dump('04-agent-graph', result.agentGraph);
 dump('05-execution-graph', result.executionGraph);
-if (result.enrichedGraph != null) {
-  dump('06-enriched-graph', { executionGraph: result.enrichedGraph });
-}
+dump('06-enriched-graph', { executionGraph: result.enrichedGraph });
 
 const unsupported = result.classified.filter((c) => c.type === 'unsupported');
 if (unsupported.length > 0) {

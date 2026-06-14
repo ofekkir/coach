@@ -6,6 +6,7 @@
     },
     "packages/logger": {},
     "packages/pipeline": {},
+    "packages/semantics": {},
     "packages/app": {}
   }
 }

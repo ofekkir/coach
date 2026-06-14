@@ -10,7 +10,7 @@ Coach processes agent execution traces and renders them as an interactive causal
 The core thesis: harness-agnostic OTEL traces feed a pure data pipeline whose output can
 be reflected back to the agent (or its engineer) for improvement.
 
-The system is split into three packages plus a Node CLI layer:
+The system is split into four packages plus a Node CLI layer:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -37,19 +37,22 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Package layout
 
-| Package / dir       | Purpose                                                                                                                                                                                                           |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/logger`   | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                     |
-| `packages/pipeline` | Pure staged pipeline: classify → route → canonical → aggregate → execution graph, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike. |
-| `packages/app`      | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                            |
-| `scripts/`          | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                    |
+| Package / dir        | Purpose                                                                                                                                                                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                          |
+| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                      |
+| `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                 |
+| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README. |
+| `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                         |
 
 ## Data flow
 
-`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files): PipelineResult` — five
+`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — six
 named stages, each surfaced as a member: `classified`, `sessions`, `canonicalBySession`,
-`agentGraph`, `executionGraph`. It is pure and file-system-free; the CLI and the app both
-call it. `buildVizResults` is a thin adapter that wraps the execution graph for the renderer.
+`agentGraph`, `executionGraph`, `enrichedGraph`. It is pure and file-system-free; the CLI and the app
+both call it. Stage 6 enrichment is deterministic and always runs (using `config`, defaulting to the
+bundled `defaultSemanticsConfig`). `buildVizResults` is a thin adapter that wraps the execution graph
+for the renderer.
 
 The pipeline **organizes** data; it does not decide how to render it. Graph nodes are **lossless**
 (each carries its full `CanonicalNode`) and carry **no formatted presentation** — no `labelLines`,
@@ -92,10 +95,15 @@ Input files (accumulating — user stages N files/folders before submitting)
                             responseMessagesDelta — the messages new to that step
                             vs. the previous request in the same thread
         │
-        ▼  Stage 6 (opt-in) — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
-   enrichExecutionGraph()  converts tool → action and llm_request → inference nodes
-                            using an injected LabelBatchFn callback; only runs when
-                            --enrich is passed to the e2e script (no LLM calls otherwise)
+        ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
+   enrichExecutionGraph(graph, config)  converts tool → action and llm_request →
+                            inference nodes. tool-intent.ts + derive.ts label each
+                            node deterministically (tool intent, path conventions,
+                            thinking→plan, tool_use→invoke, session-title,
+                            suggestion-mode) by interpreting the injected SemanticsConfig
+                            — no hardcoded tool tables, no model. A genuine terminal
+                            assistant message is labeled with the generic `respond`
+                            act. Always runs as the final stage of runPipeline.
         │
         ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)
@@ -103,6 +111,25 @@ Input files (accumulating — user stages N files/folders before submitting)
 
 `agentGraph` is itself a visualisable graph (the canonical node forest). The execution graph is the
 deterministic skeleton from the trace. `VizResult.data` is the `ExecutionGraph` directly.
+
+**Semantics config lives in `@coach/semantics`, injected into the pipeline.** Stage 6's
+deterministic labels come from a `SemanticsConfig` — the typed form of two bundled artifacts under
+`packages/semantics/src/data`: a domain **ontology** (`ontology/coding.json`, the closed
+action/object vocabulary and source of truth, plus the universal command grammar and transferable
+file/structure **conventions**) and per-agent **tool semantics** (`agents/claude-code.json`).
+There is deliberately **no project layer** — path → object grounding is derived from the ontology's
+generic conventions (file role + monorepo workspace qualifier), not per-repo directory maps, so any
+coding project is grounded with zero per-project authoring. `assembleSemanticsConfig` validates both
+and throws on any action/object id absent from the ontology (the referential-integrity contract);
+`defaultSemanticsConfig` is the assembled coding × claude-code pair. The package is pure — the JSON is
+**imported (bundled), never read from disk** — so the same assembled config serves the Node CLI and
+the browser app. Enrichment is **fully deterministic**: `enrichExecutionGraph(graph, config)` derives
+every label from config, with no model in the loop. A genuine terminal assistant message gets the
+generic `respond` act; a weak-model labeler that classified that act more finely (from
+`ontology.messageActs`) was removed for now — the vocabulary stays in the ontology, reserved for
+reintroducing it. The interpreter (`graph/semantic`) is agent-agnostic, so a different domain/agent is
+a config swap, not a code change. See `packages/semantics/README.md` for the resolution order and
+what is deliberately out of scope (composition/inference roll-up).
 
 All sessions roll up under one agent; `buildVizResults` emits exactly one `VizResult` carrying the
 execution graph, and sessions are navigated by expand/collapse inside the graph. Unsupported files
@@ -168,14 +195,14 @@ pipeline output format being reworked.
 `scripts/viz.ts`, `scripts/enrich.ts`, `scripts/etl.ts` — were removed; `e2e` covers the full
 pipeline.)
 
-| Member file                    | Stage    | Contents                                                           |
-| ------------------------------ | -------- | ------------------------------------------------------------------ |
-| `01-classified.json`           | 1        | each file's name/path/type                                         |
-| `02-sessions.json`             | 2        | session id, kind, and member filenames per session                 |
-| `03-canonical-by-session.json` | 3        | `CanonicalNode[]` per session                                      |
-| `04-agent-graph.json`          | 4        | the single-agent `CanonicalNode[]` forest                          |
-| `05-execution-graph.json`      | 5        | `ExecutionGraph` (the mechanical skeleton)                         |
-| `06-enriched-graph.json`       | 6 opt-in | `ExecutionGraph` with action/inference nodes (requires `--enrich`) |
+| Member file                    | Stage | Contents                                                    |
+| ------------------------------ | ----- | ----------------------------------------------------------- |
+| `01-classified.json`           | 1     | each file's name/path/type                                  |
+| `02-sessions.json`             | 2     | session id, kind, and member filenames per session          |
+| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session                               |
+| `04-agent-graph.json`          | 4     | the single-agent `CanonicalNode[]` forest                   |
+| `05-execution-graph.json`      | 5     | `ExecutionGraph` (the mechanical skeleton)                  |
+| `06-enriched-graph.json`       | 6     | `ExecutionGraph` with deterministic action/inference labels |
 
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one upload all flow through
 the same five stages. The CLI populates `UploadedFile.path` relative to the gather root so the

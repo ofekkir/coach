@@ -222,12 +222,29 @@ export type CanonicalNode =
 
 // ── Semantic nodes — produced by the semantic stage, NOT canonical ────────────
 // A canonical step relabeled by an LLM: a `tool` becomes an `action`, an
-// `llm_request` becomes an `inference`, each carrying a generated `what`. These
-// only exist after enrichment, so they are a distinct type from CanonicalNode.
+// `llm_request` becomes an `inference`, each carrying a generated `what`. `what`
+// is an ordered list of atomic action phrases (a node often does several things
+// in sequence — e.g. ["fetch ynet.co.il", "summarize headlines"]); a single-
+// action node carries a one-element array. These only exist after enrichment, so
+// they are a distinct type from CanonicalNode.
+//
+// `comment` is an OPTIONAL agent-authored annotation harvested verbatim from a
+// per-agent-configured input field (e.g. Claude Code's Bash `description`). It is
+// free text — a display/explanation signal only, never part of the closed `what`
+// vocabulary, so it is kept separate and never feeds aggregation. The gap between
+// the agent's stated `comment` and the derived `what` is itself a coach signal.
 
-export type InferenceNode = Omit<LlmRequestNode, 'type'> & { type: 'inference'; what: string };
+export type InferenceNode = Omit<LlmRequestNode, 'type'> & {
+  type: 'inference';
+  what: readonly string[];
+  comment?: string;
+};
 
-export type ActionNode = Omit<ToolNode, 'type'> & { type: 'action'; what: string };
+export type ActionNode = Omit<ToolNode, 'type'> & {
+  type: 'action';
+  what: readonly string[];
+  comment?: string;
+};
 
 export type SemanticNode = ActionNode | InferenceNode;
 
