@@ -1,10 +1,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { log } from '@coach/logger';
-import { runPipelineAsync } from '@coach/pipeline';
+import { enrichExecutionGraph, runPipeline } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
 import { defaultSemanticsConfig } from '@coach/semantics';
-import { makeOllamaLabelBatch } from './ollama-labeler.ts';
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -13,7 +12,6 @@ const ARGV_USER_START = 2;
 const JSON_INDENT = 2;
 
 const cliArgs = process.argv.slice(ARGV_USER_START);
-const enrichFlag = cliArgs.includes('--enrich');
 const debugFlag = cliArgs.includes('--debug');
 const positionals = cliArgs.filter((a) => !a.startsWith('--'));
 const arg = positionals[0];
@@ -22,8 +20,7 @@ if (debugFlag) log.level = 'debug';
 
 if (!arg) {
   log.error(
-    'Usage: pnpm e2e <path> [--enrich] [--debug]  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website --enrich)\n' +
-      '  --enrich labels nodes via a local Ollama model (override with OLLAMA_MODEL, default llama3.2:3b).',
+    'Usage: pnpm e2e <path> [--debug]  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website)',
   );
   process.exit(1);
 }
@@ -65,14 +62,10 @@ function dump(stepLabel: string, data: unknown): void {
 const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
-// Enrichment runs a local Ollama model (override with OLLAMA_MODEL). The labeler's
-// allowed verbs come from the ontology's messageActs (injected, not hardcoded).
-const config = enrichFlag ? defaultSemanticsConfig : undefined;
-const labelBatch =
-  enrichFlag && config != null
-    ? makeOllamaLabelBatch(config.ontology.messageActs?.verbs ?? [])
-    : undefined;
-const result = await runPipelineAsync(files, labelBatch, config);
+const result = runPipeline(files);
+// Stage 6 — semantic enrichment is deterministic; the labels come entirely from
+// the bundled SemanticsConfig (no model).
+const enrichedGraph = enrichExecutionGraph(result.executionGraph, defaultSemanticsConfig);
 
 // Input-bearing members are projected to names/types so the dumps stay readable;
 // the graph members are dumped in full — they are the point of inspection.
@@ -91,9 +84,7 @@ dump(
 dump('03-canonical-by-session', result.canonicalBySession);
 dump('04-agent-graph', result.agentGraph);
 dump('05-execution-graph', result.executionGraph);
-if (result.enrichedGraph != null) {
-  dump('06-enriched-graph', { executionGraph: result.enrichedGraph });
-}
+dump('06-enriched-graph', { executionGraph: enrichedGraph });
 
 const unsupported = result.classified.filter((c) => c.type === 'unsupported');
 if (unsupported.length > 0) {

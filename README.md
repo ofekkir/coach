@@ -32,9 +32,9 @@ UploadedFile[]   (*.jsonl · logs.json + trace*.json)
         ▼ 4. aggregate       all sessions under one agent → agentGraph (CanonicalNode[])
         ▼ 5. execution graph buildExecutionGraph → executionGraph (ExecutionGraph)
                                the mechanical skeleton: agent ▸ session ▸ interaction ▸ thread ▸ step
-        ▼ 6. semantic graph  enrichExecutionGraph → ExecutionGraph (opt-in, requires --enrich)
-                               tool → action  ·  llm_request → inference  (LLM-labeled one-liners)
-                               pure stage; LLM adapter (local Ollama, claude CLI opt-in) injected by e2e only
+        ▼ 6. semantic graph  enrichExecutionGraph → ExecutionGraph
+                               tool → action  ·  llm_request → inference
+                               pure & deterministic; labels come from @coach/semantics (no model)
         │
         ▼ React Flow graph   (@coach/app, via the buildVizResults adapter)
 ```
@@ -56,28 +56,15 @@ single **agent** (multi-agent is out of scope). Use the staging UI to mix files 
 `pnpm e2e` accepts a path (relative to cwd) or a fixture name under
 `packages/pipeline/fixtures/`. It dumps each stage member to `out/<name>/`:
 `01-classified.json`, `02-sessions.json`, `03-canonical-by-session.json`,
-`04-agent-graph.json`, `05-execution-graph.json`.
+`04-agent-graph.json`, `05-execution-graph.json`, and the semantically-enriched
+`06-enriched-graph.json`.
 
-Pass `--enrich` to also run the semantic enrichment stage and write
-`06-enriched-graph.json`. By default this labels batches via a **local Ollama**
-model (`OLLAMA_MODEL`, default `llama3.2:3b`, at `OLLAMA_HOST`, default
-`http://localhost:11434`) using JSON-schema-constrained output. The enriched
-graph is loadable by the app's "Load pipeline output" button.
-
-### Local enrichment setup (Ollama)
-
-Enrichment is the only stage that calls a model. By default it runs **locally
-via [Ollama](https://ollama.com)** — a native binary and model, **not** an npm
-dependency, so `pnpm install` does not provision it. One-time setup:
-
-```bash
-brew install --cask ollama   # macOS — install the app bundle, then launch it
-                             # (the `ollama` formula ships without llama-server)
-pnpm enrich:setup            # verifies the daemon is up and pulls OLLAMA_MODEL
-```
-
-`pnpm enrich:setup` is idempotent. Override the model or host via env, e.g.
-`OLLAMA_MODEL=llama3.2:3b-instruct-q8_0 pnpm enrich:setup`.
+Stage 6 is **deterministic** — every label comes from the bundled `@coach/semantics`
+config (tool intent, path conventions, structural roles, harness markers); no model
+is involved. A model-based labeler that classified the _act_ of terminal assistant
+messages more finely (answer / confirm / suggest …) was removed for now; such turns
+are labeled with the generic `respond` act. The enriched graph is loadable by the
+app's "Load pipeline output" button.
 
 ## Quick start
 
@@ -89,15 +76,13 @@ pnpm --filter @coach/app dev   # upload landing page at http://localhost:5173
 
 ## Development
 
-| Command                                    | What it does                                    |
-| ------------------------------------------ | ----------------------------------------------- |
-| `pnpm check`                               | Full gate: typecheck, lint, format, test, knip  |
-| `pnpm lint:fix`                            | Auto-fix lint issues                            |
-| `pnpm format`                              | Auto-format with Prettier                       |
-| `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                            |
-| `pnpm enrich:setup`                        | Pull the local Ollama labeling model (one-time) |
-| `pnpm e2e <fixture>`                       | Run pipeline on a fixture, write `out/`         |
-| `pnpm e2e <fixture> --enrich`              | Also run semantic enrichment (local Ollama)     |
+| Command                                    | What it does                                          |
+| ------------------------------------------ | ----------------------------------------------------- |
+| `pnpm check`                               | Full gate: typecheck, lint, format, test, knip        |
+| `pnpm lint:fix`                            | Auto-fix lint issues                                  |
+| `pnpm format`                              | Auto-format with Prettier                             |
+| `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                                  |
+| `pnpm e2e <fixture>`                       | Run pipeline + deterministic enrichment, write `out/` |
 
 ## Contributing workflow
 

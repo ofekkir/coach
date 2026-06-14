@@ -93,15 +93,15 @@ Input files (accumulating — user stages N files/folders before submitting)
                             responseMessagesDelta — the messages new to that step
                             vs. the previous request in the same thread
         │
-        ▼  Stage 6 (opt-in) — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
-   enrichExecutionGraph(graph, labelBatch, config)  converts tool → action and
-                            llm_request → inference nodes. tool-intent.ts + derive.ts
-                            build each node's deterministic prefix (tool intent, path
-                            grounding, thinking→plan, tool_use→invoke, session-title,
+        ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
+   enrichExecutionGraph(graph, config)  converts tool → action and llm_request →
+                            inference nodes. tool-intent.ts + derive.ts label each
+                            node deterministically (tool intent, path conventions,
+                            thinking→plan, tool_use→invoke, session-title,
                             suggestion-mode) by interpreting the injected SemanticsConfig
-                            — no hardcoded tool tables. The injected LabelBatchFn only
-                            classifies the act of a genuine final message. Final `what`
-                            = prefix ++ model phrases. Runs only when --enrich is passed.
+                            — no hardcoded tool tables, no model. A genuine terminal
+                            assistant message is labeled with the generic `respond`
+                            act. Applied by the CLI; not part of runPipeline.
         │
         ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)
@@ -121,10 +121,13 @@ coding project is grounded with zero per-project authoring. `assembleSemanticsCo
 and throws on any action/object id absent from the ontology (the referential-integrity contract);
 `defaultSemanticsConfig` is the assembled coding × claude-code pair. The package is pure — the JSON is
 **imported (bundled), never read from disk** — so the same assembled config serves the Node CLI and
-the browser app. `runPipelineAsync` defaults its `config` to `defaultSemanticsConfig`; pass a
-different assembled pair to override. The interpreter (`graph/semantic`) is agent-agnostic, so a
-different domain/agent is a config swap, not a code change. See `packages/semantics/README.md` for
-the resolution order and what is deliberately out of scope (composition/inference roll-up).
+the browser app. Enrichment is **fully deterministic**: `enrichExecutionGraph(graph, config)` derives
+every label from config, with no model in the loop. A genuine terminal assistant message gets the
+generic `respond` act; a weak-model labeler that classified that act more finely (from
+`ontology.messageActs`) was removed for now — the vocabulary stays in the ontology, reserved for
+reintroducing it. The interpreter (`graph/semantic`) is agent-agnostic, so a different domain/agent is
+a config swap, not a code change. See `packages/semantics/README.md` for the resolution order and
+what is deliberately out of scope (composition/inference roll-up).
 
 All sessions roll up under one agent; `buildVizResults` emits exactly one `VizResult` carrying the
 execution graph, and sessions are navigated by expand/collapse inside the graph. Unsupported files
@@ -190,14 +193,14 @@ pipeline output format being reworked.
 `scripts/viz.ts`, `scripts/enrich.ts`, `scripts/etl.ts` — were removed; `e2e` covers the full
 pipeline.)
 
-| Member file                    | Stage    | Contents                                                           |
-| ------------------------------ | -------- | ------------------------------------------------------------------ |
-| `01-classified.json`           | 1        | each file's name/path/type                                         |
-| `02-sessions.json`             | 2        | session id, kind, and member filenames per session                 |
-| `03-canonical-by-session.json` | 3        | `CanonicalNode[]` per session                                      |
-| `04-agent-graph.json`          | 4        | the single-agent `CanonicalNode[]` forest                          |
-| `05-execution-graph.json`      | 5        | `ExecutionGraph` (the mechanical skeleton)                         |
-| `06-enriched-graph.json`       | 6 opt-in | `ExecutionGraph` with action/inference nodes (requires `--enrich`) |
+| Member file                    | Stage | Contents                                                    |
+| ------------------------------ | ----- | ----------------------------------------------------------- |
+| `01-classified.json`           | 1     | each file's name/path/type                                  |
+| `02-sessions.json`             | 2     | session id, kind, and member filenames per session          |
+| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session                               |
+| `04-agent-graph.json`          | 4     | the single-agent `CanonicalNode[]` forest                   |
+| `05-execution-graph.json`      | 5     | `ExecutionGraph` (the mechanical skeleton)                  |
+| `06-enriched-graph.json`       | 6     | `ExecutionGraph` with deterministic action/inference labels |
 
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one upload all flow through
 the same five stages. The CLI populates `UploadedFile.path` relative to the gather root so the

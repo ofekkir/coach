@@ -4,8 +4,8 @@ The typed, validated vocabulary contract consumed by the pipeline's enrichment s
 Turns mechanical execution-graph nodes into ontology-grounded semantic labels. The JSON artifacts
 under `src/data` are **data, not code** — everything the interpreter used to hardcode (tool→verb
 maps, the `.claude/` path special-casing, the suggestion-mode and session-title markers, the
-thinking/tool_use structural roles) lives here, so a weak model only ever picks from a known, small
-vocabulary.
+thinking/tool_use structural roles) lives here, so labels are drawn from a known, small vocabulary.
+Enrichment is **fully deterministic**; there is no model in the loop (see "model labeler" below).
 
 **Pure package, no disk seam.** `src/config.ts` defines the Zod schemas, the inferred types, and
 `assembleSemanticsConfig` (validate + referential-integrity check). `src/defaults.ts` **imports** the
@@ -13,7 +13,7 @@ two bundled JSON artifacts and assembles `defaultSemanticsConfig` — the JSON i
 bundler, never read from the file system, so the same assembled config serves both the Node CLI and
 the browser app. The pipeline's `graph/semantic` interpreter consumes the assembled `SemanticsConfig`
 and is **agent-agnostic**: swapping in another domain/agent pair needs no pipeline change.
-`runPipelineAsync` defaults its `config` to `defaultSemanticsConfig`.
+`enrichExecutionGraph(graph, config)` is the entry point; the CLI passes `defaultSemanticsConfig`.
 
 ## The two artifacts (by scope)
 
@@ -53,14 +53,21 @@ node (tool | llm_request)
   │                                                                                            │
   ├─ llm_request structural prefix (agent.structuralRoles)── thinking→plan, tool_use→invoke    │
   │                                                                                            │
-  └─ genuine terminal message  → agent.modelResidual      ── WEAK MODEL classifies the act ────┘
-                                                              (verbs = ontology.messageActs)
-final `what` = deterministic prefix ++ model phrases
+  └─ genuine terminal message  → ontology `respond` action ── deterministic, generic ──────────┘
+final `what` = structural prefix ++ (respond, for a terminal message)
 ```
 
-The model is the **last resort**, invoked only for a real terminal assistant message
-(`response_text` present and the turn does not end in a `tool_use`). Everything above it is a
-lookup.
+A genuine terminal assistant message (`response_text` present and the turn does not end in a
+`tool_use`) is labeled with the generic `respond` act. Everything is a deterministic lookup.
+
+### Model labeler (removed for now)
+
+A weak-model labeler used to classify the _act_ of a terminal message into a finer verb from
+`ontology.messageActs` (answer / confirm / suggest / summarize …). It was removed until the tool
+proves the finer granularity is needed. The `messageActs` vocabulary is **kept in the ontology**,
+reserved so reintroducing the labeler is a re-wiring, not a re-authoring. Until then, every terminal
+message collapses to `respond` — and a high `respond` rate is itself the signal that the labeler may
+be worth bringing back.
 
 ## The binding contract (referential integrity)
 

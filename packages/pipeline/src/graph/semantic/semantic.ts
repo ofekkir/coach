@@ -7,7 +7,7 @@ import type {
   SessionExecution,
   Thread,
 } from '../types.ts';
-import type { SemanticsConfig } from '@coach/semantics';
+import { actionLabel, type SemanticsConfig } from '@coach/semantics';
 import {
   markerLabel,
   parseToolInput,
@@ -19,105 +19,91 @@ import { toolComment, toolPhrases } from './tool-intent.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Semantic enrichment stage — converts mechanical tool/llm_request nodes into
-// semantically-labeled action/inference nodes using an injected LLM callback.
+// semantically-labeled action/inference nodes. Fully deterministic: every label
+// is derived from the injected SemanticsConfig (tool intent, path conventions,
+// structural roles, harness markers). No model is involved.
 //
-// Architecture constraint: this module is pure (no node:* imports). The model
-// adapter (Ollama) lives in scripts/ and is wired up only by the e2e script when
-// --enrich is passed.
+// A genuine terminal assistant message (final text, turn does not end in a tool
+// call) is labeled with the generic `respond` act. Classifying that act more
+// finely (answer / confirm / suggest …) is what a weak-model labeler did; it was
+// removed for now. The `messageActs` vocabulary remains in the ontology, reserved
+// for reintroducing it.
+//
+// Architecture constraint: this module is pure (no node:* imports).
 // ════════════════════════════════════════════════════════════════════════════
 
-// ── Public types ──────────────────────────────────────────────────────────────
-
-/**
- * One node sent to the labeler. The model's only job is to classify the *act* of
- * a genuine final assistant message into an ordered list of short action phrases
- * (`["confirm edit", "suggest next steps"]`). Everything the model is bad at —
- * tool intent (derivable from the input), structural roles (thinking → plan,
- * tool_use → invoke), and harness calls (session-title, suggestion-mode) — is
- * derived deterministically in `planLabels` and never reaches here. `response_text`
- * is the assistant's final message; the model names what it did, never quotes it.
- */
-export interface LabelRequest {
-  id: string;
-  response_text: string;
-}
-
-/**
- * Injected async callback that classifies a batch of final-message nodes. Returns
- * a map from node id → ordered list of action phrases. Missing ids fall back to
- * their deterministic prefix or a mechanical label (tool name or model id).
- */
-export type LabelBatchFn = (
-  requests: readonly LabelRequest[],
-) => Promise<Map<string, readonly string[]>>;
+// The ontology action used to label a genuine terminal assistant message.
+const TERMINAL_MESSAGE_ACTION = 'respond';
 
 // ── Label planning ────────────────────────────────────────────────────────────
-// Each node gets a deterministic `prefix` (possibly empty) plus, when it ends in a
-// genuine assistant message, a `request` for the model to classify the act. The
-// final label is `prefix ++ modelResult`. All derivation lives in derive.ts.
+// Each tool/llm_request node is mapped to its ordered action phrases, entirely
+// from config. All derivation lives in derive.ts / tool-intent.ts.
 
-interface LabelPlan {
-  requests: LabelRequest[];
-  prefixes: Map<string, readonly string[]>;
-}
+type LabelMap = Map<string, readonly string[]>;
 
 function planLlmRequest(
   node: ExecutionNode,
   canonical: LlmRequestNode,
-  plan: LabelPlan,
+  labels: LabelMap,
   config: SemanticsConfig,
 ): void {
   const response = node.responseMessagesDelta ?? [];
   const marker = markerLabel(config, node.requestMessagesDelta ?? [], response);
   if (marker != null) {
-    plan.prefixes.set(canonical.id, marker);
+    labels.set(canonical.id, marker);
     return;
   }
-  const respText = responseText(response);
   const prefix = structuralPrefix(config, response);
-  // Text that precedes a tool call is preamble to the action, not a terminal
-  // message — only classify the act when the turn actually ends in text.
-  const isTerminalMessage = respText != null && responseToolCall(response) == null;
-  if (isTerminalMessage) plan.requests.push({ id: canonical.id, response_text: respText });
-  if (prefix.length > 0) plan.prefixes.set(canonical.id, prefix);
-  else if (!isTerminalMessage) plan.prefixes.set(canonical.id, mechanicalLabel(canonical));
+  // A terminal message is final text that does not precede a tool call. Text that
+  // precedes a tool call is preamble to the action, not a terminal message.
+  const isTerminalMessage = responseText(response) != null && responseToolCall(response) == null;
+  if (isTerminalMessage) {
+    labels.set(canonical.id, [...prefix, actionLabel(config, TERMINAL_MESSAGE_ACTION)]);
+    return;
+  }
+  if (prefix.length > 0) labels.set(canonical.id, prefix);
+  else labels.set(canonical.id, mechanicalLabel(canonical));
 }
 
-function planNode(node: ExecutionNode, plan: LabelPlan, config: SemanticsConfig): void {
+function planNode(node: ExecutionNode, labels: LabelMap, config: SemanticsConfig): void {
   const canonical = node.canonical;
   if (canonical.type === 'tool') {
-    plan.prefixes.set(
+    labels.set(
       canonical.id,
       toolPhrases(config, canonical.name, parseToolInput(canonical.tool_input)),
     );
   } else if (canonical.type === 'llm_request') {
-    planLlmRequest(node, canonical, plan, config);
+    planLlmRequest(node, canonical, labels, config);
   }
-  for (const child of node.children) planNode(child, plan, config);
+  for (const child of node.children) planNode(child, labels, config);
 }
 
-function planThread(thread: Thread, plan: LabelPlan, config: SemanticsConfig): void {
-  for (const member of thread.members) planNode(member, plan, config);
+function planThread(thread: Thread, labels: LabelMap, config: SemanticsConfig): void {
+  for (const member of thread.members) planNode(member, labels, config);
 }
 
-function planInteraction(ix: InteractionExecution, plan: LabelPlan, config: SemanticsConfig): void {
-  for (const thread of ix.threads) planThread(thread, plan, config);
+function planInteraction(
+  ix: InteractionExecution,
+  labels: LabelMap,
+  config: SemanticsConfig,
+): void {
+  for (const thread of ix.threads) planThread(thread, labels, config);
 }
 
-function planSession(session: SessionExecution, plan: LabelPlan, config: SemanticsConfig): void {
-  for (const ix of session.interactions) planInteraction(ix, plan, config);
+function planSession(session: SessionExecution, labels: LabelMap, config: SemanticsConfig): void {
+  for (const ix of session.interactions) planInteraction(ix, labels, config);
 }
 
-function planLabels(graph: ExecutionGraph, config: SemanticsConfig): LabelPlan {
-  const plan: LabelPlan = { requests: [], prefixes: new Map() };
+function planLabels(graph: ExecutionGraph, config: SemanticsConfig): LabelMap {
+  const labels: LabelMap = new Map();
   if (graph.kind === 'agent') {
-    for (const session of graph.data.sessions) planSession(session, plan, config);
+    for (const session of graph.data.sessions) planSession(session, labels, config);
   } else if (graph.kind === 'session') {
-    planSession(graph.data, plan, config);
+    planSession(graph.data, labels, config);
   } else if (graph.data != null) {
-    planInteraction(graph.data, plan, config);
+    planInteraction(graph.data, labels, config);
   }
-  return plan;
+  return labels;
 }
 
 // ── Node conversion ───────────────────────────────────────────────────────────
@@ -144,7 +130,7 @@ function convertCanonical(
 
 function convertNode(
   node: ExecutionNode,
-  labels: Map<string, readonly string[]>,
+  labels: LabelMap,
   config: SemanticsConfig,
 ): ExecutionNode {
   return {
@@ -154,17 +140,13 @@ function convertNode(
   };
 }
 
-function convertThread(
-  thread: Thread,
-  labels: Map<string, readonly string[]>,
-  config: SemanticsConfig,
-): Thread {
+function convertThread(thread: Thread, labels: LabelMap, config: SemanticsConfig): Thread {
   return { ...thread, members: thread.members.map((m) => convertNode(m, labels, config)) };
 }
 
 function convertInteraction(
   ix: InteractionExecution,
-  labels: Map<string, readonly string[]>,
+  labels: LabelMap,
   config: SemanticsConfig,
 ): InteractionExecution {
   return { ...ix, threads: ix.threads.map((t) => convertThread(t, labels, config)) };
@@ -172,7 +154,7 @@ function convertInteraction(
 
 function convertSession(
   session: SessionExecution,
-  labels: Map<string, readonly string[]>,
+  labels: LabelMap,
   config: SemanticsConfig,
 ): SessionExecution {
   return {
@@ -183,7 +165,7 @@ function convertSession(
 
 function applyLabels(
   graph: ExecutionGraph,
-  labels: Map<string, readonly string[]>,
+  labels: LabelMap,
   config: SemanticsConfig,
 ): ExecutionGraph {
   if (graph.kind === 'agent') {
@@ -203,38 +185,19 @@ function applyLabels(
 // ── Public entry point ────────────────────────────────────────────────────────
 
 /**
- * Enriches an ExecutionGraph by converting mechanical tool/llm_request nodes
- * into semantically-labeled action/inference nodes.
+ * Enriches an ExecutionGraph by converting mechanical tool/llm_request nodes into
+ * semantically-labeled action/inference nodes. Pure and deterministic — every
+ * label comes from the injected SemanticsConfig.
  *
  * The graph structure (hierarchy, ids, edges) is preserved exactly — only the
- * node payloads change. All other node types pass through unchanged. Each node's
- * final label is its deterministic prefix (tool intent, structural role, harness
- * call) concatenated with the model's act-classification of any final message.
- * Nodes with neither receive a mechanical fallback (tool name or model id).
+ * node payloads change; all other node types pass through unchanged. Returns the
+ * same graph reference when there is nothing to label.
  */
-function mergeLabels(
-  prefixes: Map<string, readonly string[]>,
-  modelLabels: Map<string, readonly string[]>,
-): Map<string, readonly string[]> {
-  const ids = new Set([...prefixes.keys(), ...modelLabels.keys()]);
-  const merged = new Map<string, readonly string[]>();
-  for (const id of ids) {
-    const phrases = [...(prefixes.get(id) ?? []), ...(modelLabels.get(id) ?? [])];
-    if (phrases.length > 0) merged.set(id, phrases);
-  }
-  return merged;
-}
-
-export async function enrichExecutionGraph(
+export function enrichExecutionGraph(
   graph: ExecutionGraph,
-  labelBatch: LabelBatchFn,
   config: SemanticsConfig,
-): Promise<ExecutionGraph> {
-  const plan = planLabels(graph, config);
-  if (plan.requests.length === 0 && plan.prefixes.size === 0) return graph;
-  const modelLabels =
-    plan.requests.length > 0
-      ? await labelBatch(plan.requests)
-      : new Map<string, readonly string[]>();
-  return applyLabels(graph, mergeLabels(plan.prefixes, modelLabels), config);
+): ExecutionGraph {
+  const labels = planLabels(graph, config);
+  if (labels.size === 0) return graph;
+  return applyLabels(graph, labels, config);
 }
