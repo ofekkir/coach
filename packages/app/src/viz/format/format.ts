@@ -46,6 +46,8 @@ const INTERACTION_TITLE_MAX = 40;
 const SESSION_TITLE_MAX = 24;
 const SUBMS_DECIMALS = 2;
 const COST_DECIMALS = 6;
+const MS_PER_SECOND = 1_000;
+const MS_PER_MINUTE = 60_000;
 
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + '…';
@@ -53,7 +55,9 @@ function truncate(text: string, max: number): string {
 
 function formatDuration(ms: number): string {
   if (ms < 1) return `${ms.toFixed(SUBMS_DECIMALS)}ms`;
-  return `${String(Math.round(ms))}ms`;
+  if (ms < MS_PER_SECOND) return `${String(Math.round(ms))}ms`;
+  if (ms < MS_PER_MINUTE) return `${(ms / MS_PER_SECOND).toFixed(1)}s`;
+  return `${(ms / MS_PER_MINUTE).toFixed(1)}min`;
 }
 
 /** Formats a signed millisecond gap from a `GraphEdge` into "+12ms" / "-3ms".

@@ -105,6 +105,12 @@ describe('formatMetrics', () => {
     });
   });
 
+  it('scales duration to seconds when >= 1000ms', () => {
+    expect(formatMetrics({ durationMs: 1122 }).duration).toBe('1.1s');
+    expect(formatMetrics({ durationMs: 1600 }).duration).toBe('1.6s');
+    expect(formatMetrics({ durationMs: 90_000 }).duration).toBe('1.5min');
+  });
+
   it('returns nulls when no metrics are present', () => {
     expect(formatMetrics({})).toEqual({ duration: null, secondary: null });
   });
@@ -116,5 +122,12 @@ describe('formatGap', () => {
     expect(formatGap(-3)).toBe('-3ms');
     expect(formatGap(0)).toBeNull();
     expect(formatGap(undefined)).toBeNull();
+  });
+
+  it('scales to seconds and minutes', () => {
+    expect(formatGap(1122)).toBe('+1.1s');
+    expect(formatGap(1600)).toBe('+1.6s');
+    expect(formatGap(60_000)).toBe('+1.0min');
+    expect(formatGap(90_000)).toBe('+1.5min');
   });
 });
