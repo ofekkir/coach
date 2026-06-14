@@ -1,9 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { log } from '@coach/logger';
-import { enrichExecutionGraph, runPipeline } from '@coach/pipeline';
+import { runPipeline } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
-import { defaultSemanticsConfig } from '@coach/semantics';
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -62,10 +61,8 @@ function dump(stepLabel: string, data: unknown): void {
 const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
+// runPipeline runs all six stages, including deterministic semantic enrichment.
 const result = runPipeline(files);
-// Stage 6 — semantic enrichment is deterministic; the labels come entirely from
-// the bundled SemanticsConfig (no model).
-const enrichedGraph = enrichExecutionGraph(result.executionGraph, defaultSemanticsConfig);
 
 // Input-bearing members are projected to names/types so the dumps stay readable;
 // the graph members are dumped in full — they are the point of inspection.
@@ -84,7 +81,7 @@ dump(
 dump('03-canonical-by-session', result.canonicalBySession);
 dump('04-agent-graph', result.agentGraph);
 dump('05-execution-graph', result.executionGraph);
-dump('06-enriched-graph', { executionGraph: enrichedGraph });
+dump('06-enriched-graph', { executionGraph: result.enrichedGraph });
 
 const unsupported = result.classified.filter((c) => c.type === 'unsupported');
 if (unsupported.length > 0) {

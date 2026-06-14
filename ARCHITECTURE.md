@@ -47,10 +47,12 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Data flow
 
-`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files): PipelineResult` — five
+`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — six
 named stages, each surfaced as a member: `classified`, `sessions`, `canonicalBySession`,
-`agentGraph`, `executionGraph`. It is pure and file-system-free; the CLI and the app both
-call it. `buildVizResults` is a thin adapter that wraps the execution graph for the renderer.
+`agentGraph`, `executionGraph`, `enrichedGraph`. It is pure and file-system-free; the CLI and the app
+both call it. Stage 6 enrichment is deterministic and always runs (using `config`, defaulting to the
+bundled `defaultSemanticsConfig`). `buildVizResults` is a thin adapter that wraps the execution graph
+for the renderer.
 
 The pipeline **organizes** data; it does not decide how to render it. Graph nodes are **lossless**
 (each carries its full `CanonicalNode`) and carry **no formatted presentation** — no `labelLines`,
@@ -101,7 +103,7 @@ Input files (accumulating — user stages N files/folders before submitting)
                             suggestion-mode) by interpreting the injected SemanticsConfig
                             — no hardcoded tool tables, no model. A genuine terminal
                             assistant message is labeled with the generic `respond`
-                            act. Applied by the CLI; not part of runPipeline.
+                            act. Always runs as the final stage of runPipeline.
         │
         ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)

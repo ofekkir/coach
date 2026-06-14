@@ -5,8 +5,7 @@
     "types": ["node"],
     "paths": {
       "@coach/logger": ["./packages/logger/src/index.ts"],
-      "@coach/pipeline": ["./packages/pipeline/src/index.ts"],
-      "@coach/semantics": ["./packages/semantics/src/index.ts"]
+      "@coach/pipeline": ["./packages/pipeline/src/index.ts"]
     }
   },
   "include": ["scripts"]

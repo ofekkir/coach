@@ -18,7 +18,7 @@ seam, and Vercel deployment.
 
 ## Pipeline
 
-`runPipeline(files)` (@coach/pipeline) runs five named stages, each exposed as a member of
+`runPipeline(files)` (@coach/pipeline) runs six named stages, each exposed as a member of
 the returned `PipelineResult`:
 
 ```
