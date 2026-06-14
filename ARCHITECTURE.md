@@ -37,13 +37,13 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Package layout
 
-| Package / dir        | Purpose                                                                                                                                                                                                                                            |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                      |
-| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                                  |
-| `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                             |
-| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`, `projects`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README. |
-| `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                                     |
+| Package / dir        | Purpose                                                                                                                                                                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                          |
+| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                      |
+| `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                 |
+| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README. |
+| `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                         |
 
 ## Data flow
 
@@ -111,18 +111,20 @@ Input files (accumulating — user stages N files/folders before submitting)
 deterministic skeleton from the trace. `VizResult.data` is the `ExecutionGraph` directly.
 
 **Semantics config lives in `@coach/semantics`, injected into the pipeline.** Stage 6's
-deterministic labels come from a `SemanticsConfig` — the typed form of the bundled artifacts: a
-domain **ontology** (`ontology/coding.json`, the closed action/object vocabulary and source of
-truth), per-agent **tool semantics** (`agents/claude-code.json`), and per-project **grounding**
-(`projects/coach.json`, path → object type), all under `packages/semantics/src/data`.
-`assembleSemanticsConfig` validates them and throws on any action/object id absent from the ontology
-(the referential-integrity contract); `defaultSemanticsConfig` is the assembled coding × claude-code
-× coach triple. The package is pure — the JSON is **imported (bundled), never read from disk** — so
-the same assembled config serves the Node CLI and the browser app. `runPipelineAsync` defaults its
-`config` to `defaultSemanticsConfig`; pass a different assembled triple to override. The interpreter
-(`graph/semantic`) is agent-agnostic, so a different triple is a config swap, not a code change. See
-`packages/semantics/README.md` for the resolution order and what is deliberately out of scope
-(composition/inference roll-up).
+deterministic labels come from a `SemanticsConfig` — the typed form of two bundled artifacts under
+`packages/semantics/src/data`: a domain **ontology** (`ontology/coding.json`, the closed
+action/object vocabulary and source of truth, plus the universal command grammar and transferable
+file/structure **conventions**) and per-agent **tool semantics** (`agents/claude-code.json`).
+There is deliberately **no project layer** — path → object grounding is derived from the ontology's
+generic conventions (file role + monorepo workspace qualifier), not per-repo directory maps, so any
+coding project is grounded with zero per-project authoring. `assembleSemanticsConfig` validates both
+and throws on any action/object id absent from the ontology (the referential-integrity contract);
+`defaultSemanticsConfig` is the assembled coding × claude-code pair. The package is pure — the JSON is
+**imported (bundled), never read from disk** — so the same assembled config serves the Node CLI and
+the browser app. `runPipelineAsync` defaults its `config` to `defaultSemanticsConfig`; pass a
+different assembled pair to override. The interpreter (`graph/semantic`) is agent-agnostic, so a
+different domain/agent is a config swap, not a code change. See `packages/semantics/README.md` for
+the resolution order and what is deliberately out of scope (composition/inference roll-up).
 
 All sessions roll up under one agent; `buildVizResults` emits exactly one `VizResult` carrying the
 execution graph, and sessions are navigated by expand/collapse inside the graph. Unsupported files

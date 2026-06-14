@@ -11,27 +11,11 @@ import {
 } from '@coach/semantics';
 
 // ════════════════════════════════════════════════════════════════════════════
-// Tool & command intent — resolved entirely from config.agent.tools, the Bash
-// command grammar, and config.project grounding. No hardcoded tool tables.
+// Tool & command intent — resolved entirely from config.agent.tools and the
+// ontology's command grammar + path/structure conventions. No hardcoded tool tables.
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Matching primitives ────────────────────────────────────────────────────────
-
-/** A minimal glob→RegExp (browser-safe, no dependency): `**` spans path
- *  separators, `*` does not, `?` is one non-separator char. */
-function globToRegExp(glob: string): RegExp {
-  const escapeLiteral = (s: string): string => s.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  const body = glob
-    .split('**')
-    .map((spanSeg) =>
-      spanSeg
-        .split('*')
-        .map((starSeg) => starSeg.split('?').map(escapeLiteral).join('[^/]'))
-        .join('[^/]*'),
-    )
-    .join('.*');
-  return new RegExp(`^${body}$`);
-}
 
 function matchClause(clause: MatchClause, input: Record<string, unknown>): boolean {
   const value = strField(input, clause.field);
@@ -44,7 +28,7 @@ function matchCommand(rules: readonly CommandRule[], command: string): CommandRu
   return rules.find((rule) => new RegExp(rule.match, 'i').test(command.trim()));
 }
 
-// ── Path grounding — basename + ontology object type ("Both" rendering) ────────
+// ── Path grounding — convention object type + structural qualifier ─────────────
 
 function basename(path: string): string {
   return path.split('/').pop() ?? path;
@@ -55,22 +39,38 @@ function wellKnownLabel(config: SemanticsConfig, path: string): string | undefin
   return rule?.label;
 }
 
+/** The ontology object label a path resolves to via the generic file-role
+ *  conventions (first match wins). Undefined when nothing matches or the match is
+ *  the escape object — caller falls back to the basename. */
 function groundedType(config: SemanticsConfig, path: string): string | undefined {
-  const rule = (config.project?.architecture.pathRules ?? []).find((r) =>
-    globToRegExp(r.glob).test(path),
-  );
+  const rules = config.ontology.conventions?.paths.rules ?? [];
+  const rule = rules.find((r) => new RegExp(r.match, 'i').test(path));
   if (rule == null || rule.object === config.ontology.escape.object) return undefined;
   return objectLabel(config, rule.object);
 }
 
-/** "Both" style: well-known agent paths keep their semantic name alone; any
- *  other path renders `basename (grounded object type)` when grounding resolves
- *  to a non-escape type, else just the basename. */
+/** A structural qualifier (e.g. `package=pipeline`) deduced from generic layout
+ *  conventions — the monorepo workspace a path lives in. Undefined when none match. */
+function structureQualifier(config: SemanticsConfig, path: string): string | undefined {
+  const rules = config.ontology.conventions?.structure?.rules ?? [];
+  for (const rule of rules) {
+    const captured = new RegExp(rule.match, 'i').exec(path)?.[1];
+    if (captured != null && captured !== '') return `${rule.qualifier}=${captured}`;
+  }
+  return undefined;
+}
+
+/** Convention-based rendering: well-known agent paths keep their semantic name;
+ *  otherwise render the convention object type plus any structural qualifier
+ *  (`source code (package=pipeline)`). Unknown type → just the basename (the full
+ *  path is preserved on the canonical node for detail display). */
 function renderPathObject(config: SemanticsConfig, path: string): string {
   const known = wellKnownLabel(config, path);
   if (known != null) return known;
   const type = groundedType(config, path);
-  return type != null ? `${basename(path)} (${type})` : basename(path);
+  if (type == null) return basename(path);
+  const qualifier = structureQualifier(config, path);
+  return qualifier != null ? `${type} (${qualifier})` : type;
 }
 
 function hostOf(url: string): string {
@@ -205,14 +205,11 @@ export function toolComment(
   return value !== '' ? value : undefined;
 }
 
-/** Deterministic label for a Bash/shell command. This project's own scripts
- *  (project.commands) are checked first, then the domain ontology's universal
- *  command grammar (git, shell builtins, common tool runners — ending in a `.*`
- *  catch-all). With neither, falls back to the command's first word. */
+/** Deterministic label for a Bash/shell command from the domain ontology's
+ *  universal command grammar (git, shell builtins, common tool runners — ending
+ *  in a `.*` catch-all). Falls back to the command's first word if none match. */
 function commandPhrase(config: SemanticsConfig, command: string): string {
-  const hit =
-    matchCommand(config.project?.commands.rules ?? [], command) ??
-    matchCommand(config.ontology.commands?.rules ?? [], command);
+  const hit = matchCommand(config.ontology.commands?.rules ?? [], command);
   if (hit == null) return command.trim().split(/\s+/)[0] ?? 'command';
   return hit.label ?? actionLabel(config, hit.action);
 }

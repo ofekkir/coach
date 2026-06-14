@@ -12,7 +12,6 @@ export type {
   MessageAct,
   Ontology,
   OntologyAction,
-  ProjectGrounding,
   SemanticsConfig,
   ToolModifier,
   ToolOverride,

@@ -3,10 +3,10 @@ import { assembleSemanticsConfig } from './config.ts';
 import { defaultSemanticsConfig } from './defaults.ts';
 
 describe('defaultSemanticsConfig', () => {
-  it('assembles the bundled coding × claude-code × coach triple', () => {
+  it('assembles the bundled coding × claude-code pair', () => {
     expect(defaultSemanticsConfig.ontology.id).toBe('coding');
     expect(defaultSemanticsConfig.agent.id).toBe('claude-code');
-    expect(defaultSemanticsConfig.project?.id).toBe('coach');
+    expect(defaultSemanticsConfig.ontology.conventions?.paths.rules.length).toBeGreaterThan(0);
   });
 
   it('resolves the agent/project ontology reference to the bundled ontology id', () => {

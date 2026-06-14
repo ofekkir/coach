@@ -41,11 +41,23 @@ const CommandRuleSchema = z.object({
   label: z.string().optional(),
 });
 
+// Transferable coding conventions (domain knowledge, not project-specific): a
+// file's role from its name/path, and a structural qualifier (e.g. the monorepo
+// workspace) from generic layout patterns. Both use regex `match`, first hit wins.
+const ConventionPathRuleSchema = z.object({ match: z.string(), object: z.string() });
+const ConventionStructureRuleSchema = z.object({ match: z.string(), qualifier: z.string() });
+
 const OntologySchema = z.object({
   id: z.string(),
   actions: z.array(OntologyActionSchema),
   objects: z.array(OntologyObjectSchema),
   escape: z.object({ action: z.string(), object: z.string() }),
+  conventions: z
+    .object({
+      paths: z.object({ rules: z.array(ConventionPathRuleSchema) }),
+      structure: z.object({ rules: z.array(ConventionStructureRuleSchema) }).optional(),
+    })
+    .optional(),
   messageActs: z.object({ verbs: z.array(MessageActSchema) }).optional(),
   commands: z.object({ rules: z.array(CommandRuleSchema) }).optional(),
 });
@@ -125,29 +137,12 @@ const AgentSemanticsSchema = z.object({
   structuralRoles: z.object({ rules: z.array(StructuralRoleRuleSchema) }),
 });
 
-// ── Project grounding ───────────────────────────────────────────────────────────
-
-const PathRuleSchema = z.object({
-  glob: z.string(),
-  object: z.string(),
-  label: z.string().optional(),
-  component: z.string().optional(),
-});
-
-const ProjectGroundingSchema = z.object({
-  id: z.string(),
-  ontology: z.string(),
-  architecture: z.object({ pathRules: z.array(PathRuleSchema) }),
-  commands: z.object({ rules: z.array(CommandRuleSchema) }),
-});
-
 // ── Inferred types ──────────────────────────────────────────────────────────--
 
 export type Ontology = z.infer<typeof OntologySchema>;
 export type OntologyAction = z.infer<typeof OntologyActionSchema>;
 export type MessageAct = z.infer<typeof MessageActSchema>;
 export type AgentSemantics = z.infer<typeof AgentSemanticsSchema>;
-export type ProjectGrounding = z.infer<typeof ProjectGroundingSchema>;
 export type MatchClause = z.infer<typeof MatchClauseSchema>;
 export type ToolOverride = z.infer<typeof ToolOverrideSchema>;
 export type ToolModifier = z.infer<typeof ToolModifierSchema>;
@@ -157,7 +152,6 @@ export type CommandRule = z.infer<typeof CommandRuleSchema>;
 export interface SemanticsConfig {
   ontology: Ontology;
   agent: AgentSemantics;
-  project?: ProjectGrounding;
 }
 
 // ── Shared pure helpers ─────────────────────────────────────────────────────--
@@ -194,17 +188,14 @@ function collectRefs(value: unknown, kind: 'action' | 'object', out: string[]): 
   for (const key of Object.keys(value)) collectRefs(value[key], kind, out);
 }
 
-function assertRefsResolve(
-  ontology: Ontology,
-  agent: AgentSemantics,
-  project?: ProjectGrounding,
-): void {
+function assertRefsResolve(ontology: Ontology, agent: AgentSemantics): void {
   const actions = new Set(ontology.actions.map((a) => a.id));
   const objects = new Set(ontology.objects.map((o) => o.id));
   const actionRefs: string[] = [];
   const objectRefs: string[] = [];
-  collectRefs([agent, project], 'action', actionRefs);
-  collectRefs([agent, project], 'object', objectRefs);
+  // Scan the agent and the ontology's own conventions (which reference object ids).
+  collectRefs([agent, ontology.conventions], 'action', actionRefs);
+  collectRefs([agent, ontology.conventions], 'object', objectRefs);
   const unknownActions = [...new Set(actionRefs)].filter((id) => !actions.has(id));
   const unknownObjects = [...new Set(objectRefs)].filter((id) => !objects.has(id));
   if (unknownActions.length > 0 || unknownObjects.length > 0) {
@@ -216,19 +207,15 @@ function assertRefsResolve(
 }
 
 /**
- * Validates the raw ontology / agent / project JSON against their schemas and
- * enforces that every action/object id they reference is defined in the ontology
- * — the contract that keeps the files from drifting into unaggregatable labels.
- * Throws (Zod or referential-integrity error) on any violation.
+ * Validates the raw ontology and agent JSON against their schemas and enforces
+ * that every action/object id the agent (and the ontology's own conventions)
+ * reference is defined in the ontology — the contract that keeps the files from
+ * drifting into unaggregatable labels. Throws (Zod or referential-integrity
+ * error) on any violation.
  */
-export function assembleSemanticsConfig(
-  rawOntology: unknown,
-  rawAgent: unknown,
-  rawProject?: unknown,
-): SemanticsConfig {
+export function assembleSemanticsConfig(rawOntology: unknown, rawAgent: unknown): SemanticsConfig {
   const ontology = OntologySchema.parse(rawOntology);
   const agent = AgentSemanticsSchema.parse(rawAgent);
-  const project = rawProject != null ? ProjectGroundingSchema.parse(rawProject) : undefined;
-  assertRefsResolve(ontology, agent, project);
-  return project != null ? { ontology, agent, project } : { ontology, agent };
+  assertRefsResolve(ontology, agent);
+  return { ontology, agent };
 }

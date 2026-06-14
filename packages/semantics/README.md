@@ -9,22 +9,33 @@ vocabulary.
 
 **Pure package, no disk seam.** `src/config.ts` defines the Zod schemas, the inferred types, and
 `assembleSemanticsConfig` (validate + referential-integrity check). `src/defaults.ts` **imports** the
-three bundled JSON artifacts and assembles `defaultSemanticsConfig` — the JSON is inlined by the
+two bundled JSON artifacts and assembles `defaultSemanticsConfig` — the JSON is inlined by the
 bundler, never read from the file system, so the same assembled config serves both the Node CLI and
 the browser app. The pipeline's `graph/semantic` interpreter consumes the assembled `SemanticsConfig`
-and is **agent-agnostic**: swapping in another agent/project triple needs no pipeline change.
+and is **agent-agnostic**: swapping in another domain/agent pair needs no pipeline change.
 `runPipelineAsync` defaults its `config` to `defaultSemanticsConfig`.
 
-## The three artifacts (by scope)
+## The two artifacts (by scope)
 
-| File                           | Scope       | Owns                                                                                                                                                  | How it's produced                                    |
-| ------------------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `data/ontology/coding.json`    | **domain**  | Closed vocabulary (`actions` + `objects` + `messageActs`) + universal `commands` grammar (git, shell builtins, common tool runners). Source of truth. | Hand-authored, slow-changing.                        |
-| `data/agents/claude-code.json` | **agent**   | tool name + input → (action, target); well-known paths; harness markers + roles.                                                                      | Hand-authored per harness.                           |
-| `data/projects/coach.json`     | **project** | `tech` (stack) + `architecture` (path → object) + `commands` (this project's own scripts).                                                            | **Generate once with a strong model**, cache/commit. |
+| File                           | Scope      | Owns                                                                                                                                                                                                                                                       | How it's produced             |
+| ------------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `data/ontology/coding.json`    | **domain** | Closed vocabulary (`actions` + `objects` + `messageActs`), universal `commands` grammar (git, shell builtins, common tool runners), and transferable `conventions` (file-role + structural-qualifier rules that type a path generically). Source of truth. | Hand-authored, slow-changing. |
+| `data/agents/claude-code.json` | **agent**  | tool name + input → (action, target); well-known paths; harness markers + roles.                                                                                                                                                                           | Hand-authored per harness.    |
 
-A domain ontology is shared across agents in that domain; what is genuinely per-agent is the
-_tool vocabulary_, not the action set. Agents reference the ontology by id (`"ontology": "coding"`).
+There is **no project layer**. Per-project file-organization mapping coupled labels to one repo's
+directory structure and didn't transfer; it's been replaced by domain-level `conventions`, so any
+coding project is grounded with zero per-project authoring. A domain ontology is shared across agents
+in that domain; what is genuinely per-agent is the _tool vocabulary_, not the action set. Agents
+reference the ontology by id (`"ontology": "coding"`).
+
+### Conventions (how a path gets typed, generically)
+
+`conventions.paths` types a file by **role** from its name/path (regex, first match wins) — e.g.
+`*.test.ts`→unit-test, `tsconfig*`→build-config, `*.ts`→source-code. `conventions.structure` extracts
+a **structural qualifier** from generic layout patterns — `packages|apps|libs/<name>/` → `package=<name>`.
+A path renders as `{object} ({qualifier})`, e.g. `edit packages/pipeline/src/x.ts` → `edit source code
+(package=pipeline)`; with no qualifier it's just the object type; an unmatched path keeps its basename
+(the full path is preserved on the canonical node for detail display).
 
 ## Resolution order (how a node gets labeled)
 
@@ -36,8 +47,8 @@ node (tool | llm_request)
   │                                                                                            │ no model
   ├─ tool → tool semantics     (agent.tools[name])        ── action + target field            │
   │            │                                                                               │
-  │            ├─ target.kind == path → project.architecture pathRules → object + label        │
-  │            ├─ escape-hatch (Bash) → project.commands then ontology.commands (.* escape)     │
+  │            ├─ target.kind == path → ontology.conventions (paths + structure) → object       │
+  │            ├─ escape-hatch (Bash) → ontology.commands grammar (.* escape)                    │
   │            └─ unknown tool → agent.tools._unknownTool (act / unknown, low-confidence)        │
   │                                                                                            │
   ├─ llm_request structural prefix (agent.structuralRoles)── thinking→plan, tool_use→invoke    │
@@ -54,15 +65,15 @@ lookup.
 ## The binding contract (referential integrity)
 
 `data/ontology/coding.json` is the **single source of truth for the vocabulary**. Every `action`
-and `object` value in the agent and project files MUST be an id defined there. This is the rule that
-keeps three independently-edited files from drifting into unaggregatable labels.
-`assembleSemanticsConfig` (in `src/config.ts`) **enforces this** — it throws if any agent/project
-file references an action or object id absent from the ontology. Because `defaultSemanticsConfig` is
-assembled at module import, a typo or stray id fails fast (at import, and in `config.test.ts`)
-instead of silently mislabeling.
+and `object` value in the agent file (and in the ontology's own `conventions`) MUST be an id defined
+in the ontology. This is the rule that keeps independently-edited config from drifting into
+unaggregatable labels. `assembleSemanticsConfig` (in `src/config.ts`) **enforces this** — it throws
+if any reference names an action or object id absent from the ontology. Because
+`defaultSemanticsConfig` is assembled at module import, a typo or stray id fails fast (at import, and
+in `config.test.ts`) instead of silently mislabeling.
 
 ```bash
-pnpm --filter @coach/semantics test   # asserts the bundled triple assembles + refs resolve
+pnpm --filter @coach/semantics test   # asserts the bundled pair assembles + refs resolve
 ```
 
 ## Escape hatches (open-world safety)

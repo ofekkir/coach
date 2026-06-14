@@ -106,7 +106,7 @@ packages/
     src/
       config.ts       # Zod schemas + types + assembleSemanticsConfig + accessors
       defaults.ts     # imports bundled JSON → defaultSemanticsConfig (no disk read)
-      data/           # ontology/ + agents/ + projects/ JSON artifacts (data, not code)
+      data/           # ontology/ + agents/ JSON artifacts (data, not code; no project layer)
   app/                # @coach/app — React SPA (upload UI + graph renderer)
     src/
       upload/         # UploadPage.tsx — landing page + file intake

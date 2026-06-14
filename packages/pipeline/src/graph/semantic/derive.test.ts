@@ -16,12 +16,12 @@ describe('toolPhrases (config-driven)', () => {
     ).toEqual(['edit claude code user settings']);
   });
 
-  it('renders "Both": basename + grounded ontology object type for a project path', () => {
+  it('renders the convention object type + structural qualifier for a workspace path', () => {
     expect(
       toolPhrases(defaultSemanticsConfig, 'Edit', {
         file_path: 'packages/pipeline/src/graph/semantic/derive.ts',
       }),
-    ).toEqual(['edit derive.ts (business logic)']);
+    ).toEqual(['edit source code (package=pipeline)']);
   });
 
   it('fetches + notes weak-model processing when WebFetch carries a prompt', () => {

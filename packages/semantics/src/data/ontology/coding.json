@@ -381,6 +381,48 @@
 
   "escape": { "action": "act", "object": "unknown" },
 
+  "conventions": {
+    "note": "Generic, transferable coding conventions — how files and project layout map to ontology objects regardless of which project. `paths` types a file by role from its name/path (first match wins, case-insensitive); `structure` extracts a structural qualifier (e.g. the monorepo workspace) from generic layout patterns. This deliberately replaces per-project file-organization mapping: anything that is truly project-specific (which dir is which feature, a project's own component names) is NOT encoded here.",
+    "paths": {
+      "rules": [
+        { "match": "\\.e2e\\.test\\.[tj]sx?$", "object": "e2e-test" },
+        { "match": "\\.(test|spec)\\.[tj]sx?$", "object": "unit-test" },
+        { "match": "(^|/)\\.github/workflows/", "object": "ci-cd" },
+        { "match": "(^|/)(\\.husky/|\\.git/hooks/)", "object": "vcs-artifact" },
+        { "match": "(^|/)\\.gitignore$", "object": "vcs-artifact" },
+        { "match": "(^|/)(\\.claude/|claude\\.md$|agents\\.md$)", "object": "agent-config" },
+        {
+          "match": "(^|/)(tsconfig[^/]*\\.json|(tsup|vite|vitest|jest|babel|webpack|rollup)\\.config\\.[a-z]+)$",
+          "object": "build-config"
+        },
+        { "match": "(^|/)(eslint\\.config\\.[a-z]+|\\.eslintrc[^/]*)$", "object": "linter-config" },
+        {
+          "match": "(^|/)(prettier\\.config\\.[a-z]+|\\.prettierrc[^/]*)$",
+          "object": "formatter-config"
+        },
+        {
+          "match": "(^|/)(pnpm-lock\\.yaml|yarn\\.lock|package-lock\\.json|bun\\.lockb|cargo\\.lock|go\\.sum|poetry\\.lock)$",
+          "object": "lockfile"
+        },
+        {
+          "match": "(^|/)(package\\.json|cargo\\.toml|go\\.mod|pyproject\\.toml|pom\\.xml)$",
+          "object": "manifest"
+        },
+        { "match": "(^|/)\\.env", "object": "secret" },
+        { "match": "\\.(md|mdx|rst)$", "object": "documentation" },
+        {
+          "match": "\\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|kt|swift|c|cc|cpp|h|hpp)$",
+          "object": "source-code"
+        },
+        { "match": ".*", "object": "unknown" }
+      ]
+    },
+    "structure": {
+      "note": "Ordered; first capture wins. Group 1 is the qualifier value. Generic monorepo workspace layouts (pnpm/yarn/npm/nx/turborepo).",
+      "rules": [{ "match": "(?:^|/)(?:packages|apps|libs)/([^/]+)/", "qualifier": "package" }]
+    }
+  },
+
   "commands": {
     "note": "Universal command→action grammar for the coding domain — git, shell builtins, and common tool/test-runner names that mean the same thing in any project. A project's own named scripts live in its grounding file and are matched first; these are the fallback, ending in the `.*` catch-all escape. Ordered; first match (case-insensitive, trimmed) wins.",
     "rules": [
