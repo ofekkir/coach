@@ -427,48 +427,6 @@
     }
   },
 
-  "commands": {
-    "note": "Universal command→action grammar for the coding domain — git, shell builtins, and common tool/test-runner names that mean the same thing in any project. A project's own named scripts live in its grounding file and are matched first; these are the fallback, ending in the `.*` catch-all escape. Ordered; first match (case-insensitive, trimmed) wins.",
-    "rules": [
-      { "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?lint", "action": "lint" },
-      { "match": "\\beslint\\b", "action": "lint" },
-      { "match": "\\bprettier\\b", "action": "format" },
-      { "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?format", "action": "format" },
-      { "match": "\\b(tsc|tsgo)\\b|typecheck", "action": "typecheck" },
-      {
-        "match": "\\b(vitest|jest|mocha|pytest|go\\s+test|cargo\\s+test|rspec)\\b",
-        "action": "test",
-        "object": "test-code"
-      },
-      {
-        "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?test",
-        "action": "test",
-        "object": "test-code"
-      },
-      {
-        "match": "^(pnpm|npm|yarn|bun)\\s+(run\\s+)?build|\\btsup\\b|\\bvite build\\b|\\bwebpack\\b",
-        "action": "build"
-      },
-      {
-        "match": "^(pnpm|npm|yarn|bun)\\s+(install|add|remove|i)\\b",
-        "action": "configure",
-        "object": "dependency"
-      },
-      { "match": "^git\\s+commit\\b", "action": "vcs", "label": "commit changes" },
-      {
-        "match": "^git\\s+(push|pull|fetch|merge|rebase|checkout|switch|branch|stash|tag)\\b",
-        "action": "vcs"
-      },
-      { "match": "^gh\\s+pr\\b", "action": "vcs", "label": "manage pull request" },
-      { "match": "^git\\s+(status|log|diff|show|blame)\\b", "action": "read", "object": "repo" },
-      { "match": "^(ls|cat|head|tail|find|rg|grep|tree|pwd|wc|stat)\\b", "action": "read" },
-      { "match": "^(mkdir|touch|cp|mv)\\b", "action": "write" },
-      { "match": "^rm\\b", "action": "delete" },
-      { "match": "^(curl|wget)\\b", "action": "fetch", "object": "web-resource" },
-      { "match": ".*", "action": "run", "object": "shell", "label": "run command" }
-    ]
-  },
-
   "messageActs": {
     "note": "Closed verb set for the model-residual: the weak model classifies the ACT of a genuine terminal assistant message into one or more of these, pairing each verb with a generic object to form a phrase like 'confirm edit' or 'suggest next steps'. This is a distinct axis from the leaf `actions` above (which are derived deterministically). The model prompt is built from this list — add a verb here rather than editing any prompt.",
     "verbs": [

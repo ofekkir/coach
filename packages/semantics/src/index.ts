@@ -7,7 +7,6 @@ export { defaultSemanticsConfig } from './defaults.ts';
 export { assembleSemanticsConfig, actionLabel, objectLabel, strField, isRecord } from './config.ts';
 export type {
   AgentSemantics,
-  CommandRule,
   MatchClause,
   MessageAct,
   Ontology,

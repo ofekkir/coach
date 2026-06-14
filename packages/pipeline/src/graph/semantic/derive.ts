@@ -46,12 +46,20 @@ export interface ToolCall {
   input: Record<string, unknown>;
 }
 
-/** A tool-call block of the given content type (the type string comes from a
+function toToolCall(block: ResponseMessage): ToolCall {
+  return { name: String(block.name), input: isRecord(block.input) ? block.input : {} };
+}
+
+/** All tool-call blocks of the given content type (the type string comes from a
  *  structural-role rule, never hardcoded). */
+function toolCallsOfType(messages: readonly ResponseMessage[], type: string): ToolCall[] {
+  return messages.filter((m) => m.type === type && typeof m.name === 'string').map(toToolCall);
+}
+
+/** The first tool-call block of the given type, used for existence checks. */
 function toolCallOfType(messages: readonly ResponseMessage[], type: string): ToolCall | undefined {
   const block = messages.find((m) => m.type === type && typeof m.name === 'string');
-  if (block == null) return undefined;
-  return { name: String(block.name), input: isRecord(block.input) ? block.input : {} };
+  return block != null ? toToolCall(block) : undefined;
 }
 
 /** Whether any response block has the given content type. */
@@ -87,29 +95,28 @@ function invokePhrase(config: SemanticsConfig, rule: StructuralRole, call: ToolC
   return rule.phrase.replace('{toolPhrase}', toolPhrase);
 }
 
-function rolePhrase(
+function rolePhrases(
   config: SemanticsConfig,
   rule: StructuralRole,
   response: readonly ResponseMessage[],
-): string | undefined {
+): string[] {
   const { responseHasBlockType: hasType, responseEndsWithBlockType: endsType } = rule.when;
-  if (hasType != null && responseHasBlockType(response, hasType)) return rule.phrase;
+  if (hasType != null && responseHasBlockType(response, hasType)) return [rule.phrase];
   if (endsType != null) {
-    const call = toolCallOfType(response, endsType);
-    if (call != null) return invokePhrase(config, rule, call);
+    const calls = toolCallsOfType(response, endsType);
+    return calls.map((call) => invokePhrase(config, rule, call));
   }
-  return undefined;
+  return [];
 }
 
 /** Deterministic prefix phrases for an inference — one per matching structural
- *  role (e.g. ["plan next steps", "invoke read package.json"]). */
+ *  role (e.g. ["plan next steps", "invoke read package.json"]). When a turn
+ *  invokes multiple tools in parallel, each generates its own phrase. */
 export function structuralPrefix(
   config: SemanticsConfig,
   response: readonly ResponseMessage[],
 ): string[] {
-  return config.agent.structuralRoles.rules
-    .map((rule) => rolePhrase(config, rule, response))
-    .filter((phrase): phrase is string => phrase != null);
+  return config.agent.structuralRoles.rules.flatMap((rule) => rolePhrases(config, rule, response));
 }
 
 // ── Harness markers (session-title, suggestion-mode) ───────────────────────────
