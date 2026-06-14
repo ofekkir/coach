@@ -108,7 +108,7 @@ describe('enrichExecutionGraph', () => {
     // `what` is the derived label; `comment` is the agent's verbatim description (display only)
     expect(toolNode?.canonical).toMatchObject({
       type: 'action',
-      what: ['run tests'],
+      what: ['bash'],
       comment: 'Run the test suite',
     });
   });

@@ -148,9 +148,8 @@
     },
     "Bash": {
       "escapeHatch": true,
-      "target": { "field": "command", "kind": "literal" },
       "commentField": "description",
-      "note": "Freeform command. The agent only knows this is an escape-hatch command tool; the command→(action, object) grammar is project/tech-specific and lives in project grounding's `commands`. `commentField` surfaces the agent's own 5-10 word `description` verbatim as the node's `comment` (display only, never part of `what`)."
+      "note": "Freeform shell escape hatch — labeled by tool name only. `commentField` surfaces the agent's own 5-10 word `description` verbatim as the node's `comment` (display only, never part of `what`)."
     },
 
     "_unknownTool": {

@@ -2,7 +2,6 @@ import {
   actionLabel,
   objectLabel,
   strField,
-  type CommandRule,
   type MatchClause,
   type SemanticsConfig,
   type ToolModifier,
@@ -22,10 +21,6 @@ function matchClause(clause: MatchClause, input: Record<string, unknown>): boole
   if (clause.equals != null) return value === clause.equals;
   if (clause.matches != null) return new RegExp(clause.matches, 'i').test(value);
   return false;
-}
-
-function matchCommand(rules: readonly CommandRule[], command: string): CommandRule | undefined {
-  return rules.find((rule) => new RegExp(rule.match, 'i').test(command.trim()));
 }
 
 // ── Path grounding — convention object type + structural qualifier ─────────────
@@ -175,11 +170,8 @@ export function toolPhrases(
   const tool =
     (name != null ? config.agent.tools[name] : undefined) ?? config.agent.tools._unknownTool;
   if (tool == null) return [name != null && name !== '' ? name.toLowerCase() : 'tool'];
-  // Escape-hatch tools (Bash, run_command) carry a freeform command — action and
-  // object come from the project/agent command grammar, not the generic path.
-  if (tool.escapeHatch && tool.target?.field != null) {
-    return [commandPhrase(config, strField(input, tool.target.field))];
-  }
+  // Escape-hatch tools (Bash, run_command) wrap arbitrary shell — label by tool name only.
+  if (tool.escapeHatch) return [name != null ? name.toLowerCase() : 'shell'];
   const resolved = applyOverrides(tool.overrides, input, {
     action: tool.action,
     object: tool.object,
@@ -203,13 +195,4 @@ export function toolComment(
   if (field == null) return undefined;
   const value = strField(input, field).trim();
   return value !== '' ? value : undefined;
-}
-
-/** Deterministic label for a Bash/shell command from the domain ontology's
- *  universal command grammar (git, shell builtins, common tool runners — ending
- *  in a `.*` catch-all). Falls back to the command's first word if none match. */
-function commandPhrase(config: SemanticsConfig, command: string): string {
-  const hit = matchCommand(config.ontology.commands?.rules ?? [], command);
-  if (hit == null) return command.trim().split(/\s+/)[0] ?? 'command';
-  return hit.label ?? actionLabel(config, hit.action);
 }

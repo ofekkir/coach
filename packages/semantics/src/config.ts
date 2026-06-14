@@ -32,15 +32,6 @@ const OntologyObjectSchema = z.object({
 
 const MessageActSchema = z.object({ verb: z.string(), hint: z.string().optional() });
 
-// A command→action rule, shared by the domain ontology (universal commands) and
-// project grounding (this project's own scripts). First match wins.
-const CommandRuleSchema = z.object({
-  match: z.string(),
-  action: z.string(),
-  object: z.string().optional(),
-  label: z.string().optional(),
-});
-
 // Transferable coding conventions (domain knowledge, not project-specific): a
 // file's role from its name/path, and a structural qualifier (e.g. the monorepo
 // workspace) from generic layout patterns. Both use regex `match`, first hit wins.
@@ -59,7 +50,6 @@ const OntologySchema = z.object({
     })
     .optional(),
   messageActs: z.object({ verbs: z.array(MessageActSchema) }).optional(),
-  commands: z.object({ rules: z.array(CommandRuleSchema) }).optional(),
 });
 
 // ── Agent tool semantics ───────────────────────────────────────────────────────
@@ -147,8 +137,6 @@ export type MatchClause = z.infer<typeof MatchClauseSchema>;
 export type ToolOverride = z.infer<typeof ToolOverrideSchema>;
 export type ToolModifier = z.infer<typeof ToolModifierSchema>;
 export type ToolSemantics = z.infer<typeof ToolSemanticsSchema>;
-export type CommandRule = z.infer<typeof CommandRuleSchema>;
-
 export interface SemanticsConfig {
   ontology: Ontology;
   agent: AgentSemantics;
