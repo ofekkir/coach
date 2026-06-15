@@ -6,6 +6,7 @@ export interface ContentBlock {
   readonly name?: string;
   readonly input?: unknown;
   readonly tool_use_id?: string;
+  readonly content?: unknown;
 }
 
 interface NativeMessage {

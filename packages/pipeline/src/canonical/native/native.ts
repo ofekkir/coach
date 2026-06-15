@@ -30,6 +30,10 @@ function sliceEntriesForInteraction(
   });
 }
 
+function firstTimestamp(group: NativeEntry[]): string {
+  return group.find((e) => e.timestamp)?.timestamp ?? '';
+}
+
 function isGroupInInteraction(
   group: NativeEntry[],
   startTs: string,
@@ -68,11 +72,22 @@ export function nativeSessionToTrace(jsonl: string): TempoTrace {
       seqIdx,
     );
 
-    const ownedSpans = [...requestGroups.entries()]
+    const ownedGroups = [...requestGroups.entries()]
       .filter(([, group]) => isGroupInInteraction(group, prompt.timestamp, nextTs))
-      .flatMap(([requestId, group]) =>
-        buildSpansForRequest(tId, requestId, group, byUuid, toolResultUser, interactionSpanId),
+      .sort(([, a], [, b]) => (firstTimestamp(a) < firstTimestamp(b) ? -1 : 1));
+
+    const ownedSpans = ownedGroups.flatMap(([requestId, group], idx) => {
+      const prevGroup = idx > 0 ? (ownedGroups[idx - 1]?.[1] ?? null) : null;
+      return buildSpansForRequest(
+        tId,
+        requestId,
+        group,
+        byUuid,
+        toolResultUser,
+        interactionSpanId,
+        prevGroup,
       );
+    });
 
     return [interactionSpan, ...ownedSpans];
   });
