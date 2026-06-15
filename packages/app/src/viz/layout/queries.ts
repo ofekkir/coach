@@ -8,7 +8,7 @@ import type {
   SessionNode,
 } from '@coach/pipeline';
 import { placeAgent, sessionWidth } from './place-graph.ts';
-import type { Ctx, TraceRFNode } from './types.ts';
+import type { Ctx, RFNode } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, NW, HG } from './types.ts';
 import type { Edge } from '@xyflow/react';
 
@@ -44,7 +44,7 @@ export function buildElements(
   graph: ExecutionGraph,
   expanded: Set<string>,
   selected: string | null,
-): { nodes: TraceRFNode[]; edges: Edge[] } {
+): { nodes: RFNode[]; edges: Edge[] } {
   const agent = toAgent(graph);
   const totalSessionsW = agent.sessions.reduce((sum, s, i) => {
     return sum + sessionWidth(s) + (i > 0 ? HG : 0);

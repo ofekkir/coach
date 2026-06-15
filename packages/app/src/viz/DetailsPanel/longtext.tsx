@@ -1,0 +1,100 @@
+import type { GraphNode } from '@coach/pipeline';
+import { fonts, tokens } from '../theme.ts';
+
+const INSET_BORDER = '#EAE2D4';
+const LONG_TEXT_THRESHOLD = 180;
+const CLAMP_LINES = 6;
+const EXPANDED_MAX_H = 240;
+
+const monoLabel: React.CSSProperties = {
+  fontFamily: fonts.mono,
+  fontSize: 9.5,
+  letterSpacing: '0.13em',
+  color: tokens.faintLane,
+};
+
+interface LongText {
+  label: string;
+  text: string;
+  quote: boolean;
+}
+
+function commentOf(canonical: GraphNode): string | undefined {
+  return 'comment' in canonical ? canonical.comment : undefined;
+}
+
+// The one long-text value worth surfacing in full: a prompt's full text, or a
+// tool's instruction to its weak model. Truncated on the card; whole here.
+export function longTextOf(canonical: GraphNode | undefined): LongText | null {
+  if (canonical == null) return null;
+  if (canonical.type === 'user_prompt') {
+    return { label: 'PROMPT', text: canonical.prompt, quote: false };
+  }
+  const comment = commentOf(canonical);
+  if (comment != null) return { label: 'INSTRUCTION TO WEAK MODEL', text: comment, quote: true };
+  return null;
+}
+
+function clampStyle(long: boolean, expanded: boolean): React.CSSProperties {
+  if (long && !expanded) {
+    return {
+      display: '-webkit-box',
+      WebkitLineClamp: CLAMP_LINES,
+      WebkitBoxOrient: 'vertical',
+      overflow: 'hidden',
+    };
+  }
+  return {
+    maxHeight: expanded ? EXPANDED_MAX_H : undefined,
+    overflowY: expanded ? 'auto' : 'visible',
+  };
+}
+
+// A long value in a scrollable, height-capped block: collapsed shows ~6 lines
+// with a `show full ▾` toggle, expanded scrolls. Short values skip the toggle.
+export function longTextBlock(
+  block: LongText,
+  expanded: boolean,
+  onToggle: () => void,
+): React.ReactNode {
+  const long = block.text.length > LONG_TEXT_THRESHOLD;
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ ...monoLabel, marginBottom: 10 }}>{block.label}</div>
+      <div
+        style={{
+          background: tokens.surface,
+          border: `1px solid ${INSET_BORDER}`,
+          borderRadius: 9,
+          padding: '11px 13px',
+          fontFamily: fonts.mono,
+          fontSize: 11.5,
+          lineHeight: 1.55,
+          color: tokens.inkSoft,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          ...clampStyle(long, expanded),
+        }}
+      >
+        {block.quote ? `“${block.text}”` : block.text}
+      </div>
+      {long && (
+        <button
+          onClick={onToggle}
+          style={{
+            marginTop: 7,
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            fontFamily: fonts.mono,
+            fontSize: 11,
+            color: tokens.accentInkSoft,
+          }}
+        >
+          {expanded ? 'show less ▴' : 'show full ▾'}
+        </button>
+      )}
+    </div>
+  );
+}

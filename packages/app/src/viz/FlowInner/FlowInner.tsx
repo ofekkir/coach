@@ -3,21 +3,22 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   ReactFlow,
   type Edge,
   type NodeMouseHandler,
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import type { TraceRFNode, TraceRFNodeData } from '../layout/types.ts';
+import { tokens } from '../theme.ts';
+import type { RFNode } from '../layout/types.ts';
 import { TraceNodeView } from '../TraceNode/TraceNode.tsx';
+import { BandView } from '../TraceNode/BandNode.tsx';
 import { useFlowSync } from './useFlowSync.ts';
 
-const nodeTypes: NodeTypes = { trace: TraceNodeView };
+const nodeTypes: NodeTypes = { trace: TraceNodeView, band: BandView };
 
 export interface Elements {
-  nodes: TraceRFNode[];
+  nodes: RFNode[];
   edges: Edge[];
 }
 
@@ -38,22 +39,20 @@ export function FlowInner({
 
   const { nodes, edges, onNodesChange, onEdgesChange } = useFlowSync(elements);
 
-  const onNodeClick: NodeMouseHandler<TraceRFNode> = useCallback(
+  const onNodeClick: NodeMouseHandler<RFNode> = useCallback(
     (_, node) => {
-      onSelectId(node.id);
+      if (node.type === 'trace') onSelectId(node.id);
     },
     [onSelectId],
   );
 
-  const onNodeDoubleClick: NodeMouseHandler<TraceRFNode> = useCallback(
+  const onNodeDoubleClick: NodeMouseHandler<RFNode> = useCallback(
     (_, node) => {
-      const d: TraceRFNodeData = node.data;
-      if (d.hasRFChildren) {
-        const next = new Set(expanded);
-        if (next.has(node.id)) next.delete(node.id);
-        else next.add(node.id);
-        onExpandedChange(next);
-      }
+      if (node.type !== 'trace' || !node.data.hasRFChildren) return;
+      const next = new Set(expanded);
+      if (next.has(node.id)) next.delete(node.id);
+      else next.add(node.id);
+      onExpandedChange(next);
     },
     [expanded, onExpandedChange],
   );
@@ -76,25 +75,17 @@ export function FlowInner({
       proOptions={{ hideAttribution: true }}
       minZoom={0.05}
       maxZoom={4}
+      style={{ background: tokens.paper }}
     >
-      <Background color="#e2e8f0" variant={BackgroundVariant.Dots} gap={20} size={1} />
+      <Background color={tokens.dot} variant={BackgroundVariant.Dots} gap={22} size={1.1} />
       <Controls
+        showInteractive={false}
         style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: 8,
-          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+          background: tokens.surfaceWarm,
+          border: `1px solid ${tokens.line}`,
+          borderRadius: 9,
+          boxShadow: 'none',
         }}
-      />
-      <MiniMap
-        style={{
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          borderRadius: 8,
-          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-        }}
-        nodeColor={(n: TraceRFNode) => n.data.color}
-        maskColor="rgba(248,250,252,0.75)"
       />
     </ReactFlow>
   );

@@ -85,7 +85,7 @@ describe('buildNodeCard', () => {
     expect(JSON.stringify(card)).not.toContain('/secret/path');
   });
 
-  it('joins a multi-action `what` into a single title', () => {
+  it('leads with the verb and carries the sub-verb + tool tag', () => {
     const action: ActionNode = {
       id: 'wf',
       type: 'action',
@@ -93,7 +93,23 @@ describe('buildNodeCard', () => {
       name: 'WebFetch',
       ...span,
     };
-    expect(buildNodeCard(action).title).toBe('fetch ynet.co.il · summarize headlines');
+    const card = buildNodeCard(action);
+    expect(card.title).toBe('fetch ynet.co.il');
+    expect(card.subtitle).toBe('summarize headlines');
+    expect(card.tag).toBe('ACTION · WEBFETCH');
+  });
+
+  it('tags an inference by its off-spine source, leaving the main thread bare', () => {
+    const base = {
+      what: ['plan next steps'],
+      model: 'claude-sonnet-4-6',
+      ...span,
+      ...tokens,
+    } as const;
+    const main: InferenceNode = { id: 'm', type: 'inference', source: 'repl_main_thread', ...base };
+    const bg: InferenceNode = { id: 'b', type: 'inference', source: 'background', ...base };
+    expect(buildNodeCard(main).tag).toBe('INFERENCE');
+    expect(buildNodeCard(bg).tag).toBe('INFERENCE · BACKGROUND');
   });
 });
 
