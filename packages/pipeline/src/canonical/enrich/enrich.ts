@@ -9,7 +9,8 @@ import {
 } from '../../types.ts';
 import { allSpansFlat, collectSpanMeta, strAttr } from './id-utils.ts';
 import type { SpanMeta } from './id-utils.ts';
-import { attributeLogsToSpans, buildRequestBodyIndex, buildToolInputIndex } from './logs.ts';
+import type { ToolEnrichment } from './logs.ts';
+import { attributeLogsToSpans, buildRequestBodyIndex, buildToolEnrichmentIndex } from './logs.ts';
 import { extractHooks, resolveHookParentB64 } from './hooks.ts';
 import type { HookEntry } from './hooks.ts';
 
@@ -74,20 +75,22 @@ function enrichLlmSpan(
   return extra.length > 0 ? { ...span, attributes: [...span.attributes, ...extra] } : span;
 }
 
-function enrichToolSpan(span: OtlpSpan, toolInput: string | null): OtlpSpan {
-  if (toolInput == null) return span;
-  return { ...span, attributes: [...span.attributes, strAttr('tool_input', toolInput)] };
+function enrichToolSpan(span: OtlpSpan, enrichment: ToolEnrichment | null): OtlpSpan {
+  if (enrichment == null) return span;
+  const extra = [strAttr('tool_use_id', enrichment.useId)];
+  if (enrichment.input != null) extra.push(strAttr('tool_input', enrichment.input));
+  return { ...span, attributes: [...span.attributes, ...extra] };
 }
 
 function enrichSpan(
   span: OtlpSpan,
   meta: SpanMeta,
   logs: LogEntry[],
-  toolInput: string | null,
+  toolEnrichment: ToolEnrichment | null,
   requestBodyIndex: Map<string, string>,
 ): OtlpSpan {
   if (meta.spanType === 'llm_request') return enrichLlmSpan(span, meta, logs, requestBodyIndex);
-  if (meta.spanType === 'tool') return enrichToolSpan(span, toolInput);
+  if (meta.spanType === 'tool') return enrichToolSpan(span, toolEnrichment);
   return span;
 }
 
@@ -95,27 +98,27 @@ function enrichSpanInBatch(
   span: OtlpSpan,
   metas: SpanMeta[],
   logsBySpan: Map<string, LogEntry[]>,
-  toolInputBySpanId: Map<string, string>,
+  toolEnrichmentBySpanId: Map<string, ToolEnrichment>,
   requestBodyIndex: Map<string, string>,
 ): OtlpSpan {
   const meta = metas.find((m) => m.b64 === span.spanId);
   if (meta == null) return span;
   const spanLogs = logsBySpan.get(meta.id) ?? [];
-  const toolInput = toolInputBySpanId.get(meta.id) ?? null;
-  return enrichSpan(span, meta, spanLogs, toolInput, requestBodyIndex);
+  const toolEnrichment = toolEnrichmentBySpanId.get(meta.id) ?? null;
+  return enrichSpan(span, meta, spanLogs, toolEnrichment, requestBodyIndex);
 }
 
 function enrichScopeSpan(
   ss: { spans: readonly OtlpSpan[] },
   metas: SpanMeta[],
   logsBySpan: Map<string, LogEntry[]>,
-  toolInputBySpanId: Map<string, string>,
+  toolEnrichmentBySpanId: Map<string, ToolEnrichment>,
   requestBodyIndex: Map<string, string>,
 ): { spans: OtlpSpan[] } {
   return {
     ...ss,
     spans: ss.spans.map((span) =>
-      enrichSpanInBatch(span, metas, logsBySpan, toolInputBySpanId, requestBodyIndex),
+      enrichSpanInBatch(span, metas, logsBySpan, toolEnrichmentBySpanId, requestBodyIndex),
     ),
   };
 }
@@ -159,14 +162,14 @@ export function enrichTrace(trace: TempoTrace, logs: readonly LogEntry[]): Tempo
   const traceId = allSpansFlat(trace)[0]?.traceId ?? '';
   const metas = collectSpanMeta(trace);
   const logsBySpan = attributeLogsToSpans(metas, logs);
-  const toolInputBySpanId = buildToolInputIndex(metas, logs, logsBySpan);
+  const toolEnrichmentBySpanId = buildToolEnrichmentIndex(metas, logs, logsBySpan);
   const requestBodyIndex = buildRequestBodyIndex(logs);
   const hooks = extractHooks(logs);
 
   const enrichedBatches: OtlpBatch[] = trace.batches.map((batch) => ({
     ...batch,
     scopeSpans: batch.scopeSpans.map((ss) =>
-      enrichScopeSpan(ss, metas, logsBySpan, toolInputBySpanId, requestBodyIndex),
+      enrichScopeSpan(ss, metas, logsBySpan, toolEnrichmentBySpanId, requestBodyIndex),
     ),
   }));
 

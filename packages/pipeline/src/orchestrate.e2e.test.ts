@@ -29,4 +29,21 @@ describe('pipeline e2e', () => {
     const files = loadFixtureDir(dir);
     expect(() => runPipeline(files)).not.toThrow();
   });
+
+  // Guards the full tool_use_id plumbing → causal builder for BOTH input formats:
+  // native (span attr stamped by the native builder) and OTEL (attr enriched onto
+  // the tool span from its decision log). A session with tool calls must yield
+  // causal edges either way — this is the harness-agnostic promise.
+  it.each(['native-claude/refactor-code', 'otel/update-claude-config'])(
+    '%s — derives causal edges end-to-end',
+    (dir) => {
+      const graph = runPipeline(loadFixtureDir(dir)).enrichedGraph;
+      if (graph.kind !== 'agent') throw new Error('expected agent graph');
+      const causal = graph.data.sessions.flatMap((s) =>
+        s.interactions.flatMap((i) => i.causalEdges),
+      );
+      expect(causal.length).toBeGreaterThan(0);
+      expect(causal.every((e) => e.fromId !== e.toId)).toBe(true);
+    },
+  );
 });

@@ -10,9 +10,14 @@ import type { GraphNode, RequestMessage, ResponseMessage } from '../types.ts';
 // The app derives all display text from the structured data.
 // ════════════════════════════════════════════════════════════════════════════
 
-/** A directed edge between two nodes. `gapMs` is the signed time gap between
- *  steps (ms); the app formats it ("+12ms"). Ids are plain canonical ids — the
- *  app maps them to its own container/subgraph ids for layout. */
+/** A directed edge in the causal graph — the only edge layer. Time-adjacency
+ *  ("step B is drawn under step A") is NOT modeled as an edge: it carries no
+ *  causal meaning. Every edge here is a real dependency — an inference emitted
+ *  this tool, a tool result fed this inference, a wait gated this execution, the
+ *  prompt triggered this turn. `gapMs` is the signed gap between cause-end and
+ *  effect-start (often negative for fan-out, when a tool is dispatched before its
+ *  inference finishes streaming). Ids are plain canonical ids — the app maps them
+ *  to its own container/subgraph ids for layout. */
 export interface GraphEdge {
   readonly fromId: string;
   readonly toId: string;
@@ -36,7 +41,6 @@ export interface ExecutionNode {
   // relabel (a SemanticNode), which is not canonical. Not renamed to avoid churn.
   readonly canonical: GraphNode;
   readonly children: readonly ExecutionNode[];
-  readonly innerEdges: readonly GraphEdge[];
   readonly requestMessagesDelta?: readonly RequestMessage[];
   readonly responseMessagesDelta?: readonly ResponseMessage[];
 }
@@ -45,13 +49,13 @@ export interface ExecutionNode {
 
 /** A thread is a mechanical execution lane within an interaction. `source` is
  *  the loop that emitted its inferences (e.g. "repl_main_thread"); the app
- *  renders the title from it. `members` are the steps (inference|action) in
- *  time order. */
+ *  renders the title from it. `members` are the steps (inference|action|hook) in
+ *  time order — a layout grouping; the flow between them is the causal graph
+ *  (`InteractionExecution.causalEdges`), not member order. */
 export interface Thread {
   readonly id: string;
   readonly source: string;
   readonly members: readonly ExecutionNode[];
-  readonly edges: readonly GraphEdge[];
 }
 
 /** One interaction's execution skeleton. `root` is the interaction node (its
@@ -64,6 +68,16 @@ export interface InteractionExecution {
   readonly userPrompt: ExecutionNode | null;
   readonly threads: readonly Thread[];
   readonly rootToThreadIds: readonly string[];
+  /** The causal flow for this interaction — the complete spine, not an overlay:
+   *  `userPrompt → first inference`, fan-out `inference → tool` (it emitted the
+   *  call) and fan-in `tool → inference` (it consumed the result, by tool_use_id
+   *  not timing), `inference → inference` continuation when no tool bridges them,
+   *  a tool's overlapping sub-spans as parallel children (`tool → wait`,
+   *  `tool → execution` — not a sequence), and tool hooks woven in
+   *  (`inference → PreToolUse → tool → PostToolUse → inference`). A DAG: one
+   *  inference fans out to many parallel tools, which fan back into the next.
+   *  `gapMs` decorates each edge. */
+  readonly causalEdges: readonly GraphEdge[];
 }
 
 /** One session's execution skeleton. Titles are derived app-side from each

@@ -184,6 +184,11 @@ export interface LlmRequestNode extends SpannedNode {
 export interface ToolNode extends SpannedNode {
   type: 'tool';
   name?: string;
+  /** The harness's tool-call id (Anthropic `tool_use.id`). The join key linking
+   *  this tool to the inference that emitted it (via a `tool_use` block in the
+   *  response) and the inference that consumed its result (via a `tool_result`
+   *  block referencing this id). Absent when the trace doesn't carry one. */
+  tool_use_id?: string;
   tool_input?: string;
 }
 

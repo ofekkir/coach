@@ -63,30 +63,40 @@ function buildUseIdToInput(allLogs: readonly LogEntry[]): Map<string, string> {
   return useIdToInput;
 }
 
-function resolveToolInput(
+/** What a tool span can be enriched with from its decision log: the harness's
+ *  `tool_use_id` (the causal join key) and, when known, the call's input JSON. */
+export interface ToolEnrichment {
+  readonly useId: string;
+  readonly input: string | null;
+}
+
+function resolveToolEnrichment(
   m: SpanMeta,
   logsBySpan: Map<string, LogEntry[]>,
   useIdToInput: Map<string, string>,
-): string | null {
+): ToolEnrichment | null {
   if (m.spanType !== 'tool.blocked_on_user' || m.parentB64 === null) return null;
   const logs = logsBySpan.get(m.id) ?? [];
   const decision = logs.find((l) => l.tool_use_id != null);
   if (decision?.tool_use_id == null) return null;
-  return useIdToInput.get(decision.tool_use_id) ?? null;
+  return { useId: decision.tool_use_id, input: useIdToInput.get(decision.tool_use_id) ?? null };
 }
 
-export function buildToolInputIndex(
+// Indexes the parent tool span id → its decision-derived enrichment. The
+// decision log lives on the `tool.blocked_on_user` gate span; its data belongs to
+// the parent `tool` span, so attribution maps onto the parent.
+export function buildToolEnrichmentIndex(
   metas: readonly SpanMeta[],
   allLogs: readonly LogEntry[],
   logsBySpan: Map<string, LogEntry[]>,
-): Map<string, string> {
+): Map<string, ToolEnrichment> {
   const useIdToInput = buildUseIdToInput(allLogs);
-  const result = new Map<string, string>();
+  const result = new Map<string, ToolEnrichment>();
   for (const m of metas) {
-    const input = resolveToolInput(m, logsBySpan, useIdToInput);
-    if (input == null || m.parentB64 == null) continue;
+    const enrichment = resolveToolEnrichment(m, logsBySpan, useIdToInput);
+    if (enrichment == null || m.parentB64 == null) continue;
     const parentId = SPAN_ID_PREFIX + b64toHex(m.parentB64);
-    result.set(parentId, input);
+    result.set(parentId, enrichment);
   }
   return result;
 }

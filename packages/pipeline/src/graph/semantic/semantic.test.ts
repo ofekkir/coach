@@ -56,15 +56,16 @@ function makeGraph(): ExecutionGraph {
   return {
     kind: 'agent',
     data: {
-      root: { id: 'agent', canonical: agent, children: [], innerEdges: [] },
+      root: { id: 'agent', canonical: agent, children: [] },
       sessions: [
         {
-          root: { id: 'sess', canonical: session, children: [], innerEdges: [] },
+          root: { id: 'sess', canonical: session, children: [] },
           interactions: [
             {
-              root: { id: 'inter', canonical: interaction, children: [], innerEdges: [] },
+              root: { id: 'inter', canonical: interaction, children: [] },
               userPrompt: null,
               rootToThreadIds: ['thread_repl_main_thread'],
+              causalEdges: [{ fromId: 'llm1', toId: 'tool1', gapMs: 10 }],
               threads: [
                 {
                   id: 'thread_repl_main_thread',
@@ -74,13 +75,11 @@ function makeGraph(): ExecutionGraph {
                       id: 'llm1',
                       canonical: llm1,
                       children: [],
-                      innerEdges: [],
                       requestMessagesDelta: [{ role: 'user', content: 'What should I do next?' }],
                       responseMessagesDelta: [{ type: 'text', text: 'You should run the tests.' }],
                     },
-                    { id: 'tool1', canonical: tool1, children: [], innerEdges: [] },
+                    { id: 'tool1', canonical: tool1, children: [] },
                   ],
-                  edges: [{ fromId: 'llm1', toId: 'tool1', gapMs: 10 }],
                 },
               ],
             },
@@ -130,7 +129,8 @@ describe('enrichExecutionGraph', () => {
 
     const thread = ix?.threads[0];
     expect(thread?.id).toBe('thread_repl_main_thread');
-    expect(thread?.edges[0]).toEqual({ fromId: 'llm1', toId: 'tool1', gapMs: 10 });
+    // Causal edges survive enrichment unchanged (node relabeling doesn't touch them).
+    expect(ix?.causalEdges[0]).toEqual({ fromId: 'llm1', toId: 'tool1', gapMs: 10 });
   });
 
   it('preserves existing canonical fields on converted nodes', () => {
@@ -158,9 +158,10 @@ describe('enrichExecutionGraph', () => {
     const graph: ExecutionGraph = {
       kind: 'interaction',
       data: {
-        root: { id: 'inter', canonical: interaction, children: [], innerEdges: [] },
+        root: { id: 'inter', canonical: interaction, children: [] },
         userPrompt: null,
         rootToThreadIds: ['t'],
+        causalEdges: [],
         threads: [
           {
             id: 't',
@@ -170,7 +171,6 @@ describe('enrichExecutionGraph', () => {
                 id: 'title1',
                 canonical: titleLlm,
                 children: [],
-                innerEdges: [],
                 requestMessagesDelta: [
                   { role: 'user', content: '<session>\nadd an mcp\n</session>' },
                 ],
@@ -179,7 +179,6 @@ describe('enrichExecutionGraph', () => {
                 ],
               },
             ],
-            edges: [],
           },
         ],
       },
@@ -196,16 +195,16 @@ describe('enrichExecutionGraph', () => {
     const graph: ExecutionGraph = {
       kind: 'interaction',
       data: {
-        root: { id: 'inter', canonical: interaction, children: [], innerEdges: [] },
+        root: { id: 'inter', canonical: interaction, children: [] },
         userPrompt: null,
         rootToThreadIds: ['t'],
+        causalEdges: [],
         threads: [
           {
             id: 't',
             source: 'repl_main_thread',
             // no requestMessagesDelta / responseMessagesDelta — nothing to read
-            members: [{ id: 'empty1', canonical: emptyLlm, children: [], innerEdges: [] }],
-            edges: [],
+            members: [{ id: 'empty1', canonical: emptyLlm, children: [] }],
           },
         ],
       },

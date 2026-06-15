@@ -94,6 +94,23 @@ Input files (accumulating — user stages N files/folders before submitting)
                             llm_request steps carry requestMessagesDelta /
                             responseMessagesDelta — the messages new to that step
                             vs. the previous request in the same thread
+                            threads/members are a LAYOUT grouping only — there is no
+                            time-ordering edge layer (adjacency ≠ causality). The sole
+                            edge layer is the causal flow (graph/execution/causal.ts,
+                            InteractionExecution.causalEdges): a complete spine where
+                            every step links to its cause — userPrompt → inference,
+                            fan-out inference → tool, fan-in tool → inference, inference
+                            → inference continuation, a tool's overlapping sub-spans as
+                            parallel children (tool → wait, tool → execution), and
+                            tool hooks woven in (inference → PreToolUse → tool →
+                            PostToolUse → inference). Tool links use tool_use_id
+                            correlation (never timing); hooks pair to tools by name +
+                            temporal adjacency (they carry no id). One recursive walk
+                            over time-ordered sibling groups; children walked as a
+                            sub-group headed by the parent. Signed gapMs per edge
+                            (fan-out negative under streamed dispatch). Harness-
+                            agnostic: native stamps tool_use_id on its tool spans,
+                            OTEL gets it via enrich (from the tool decision log).
         │
         ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
    enrichExecutionGraph(graph, config)  converts tool → action and llm_request →

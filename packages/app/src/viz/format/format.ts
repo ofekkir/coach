@@ -101,11 +101,6 @@ function sessionTitle(node: SessionNode, index: number): string {
   return `session ${String(index + 1)}`;
 }
 
-/** Title for a thread, derived from its emitting loop source. */
-export function threadTitle(source: string): string {
-  return `thread: ${source}`;
-}
-
 function field(label: string, value: string | undefined): CardField[] {
   return value != null && value !== '' ? [{ label, value }] : [];
 }

@@ -11,6 +11,7 @@ export interface ParsedSpan {
   readonly spanType: string;
   readonly model: string | null;
   readonly toolName: string | null;
+  readonly toolUseId: string | null;
   readonly userPrompt: string | null;
   readonly inputTokens: number | null;
   readonly outputTokens: number | null;
@@ -57,6 +58,9 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
         spanType: getStringAttr(span.attributes, 'span.type') ?? span.name,
         model: getStringAttr(span.attributes, 'model'),
         toolName: getStringAttr(span.attributes, 'tool_name'),
+        toolUseId:
+          getStringAttr(span.attributes, 'tool_use_id') ??
+          getStringAttr(span.attributes, 'gen_ai.tool.call.id'),
         userPrompt: getStringAttr(span.attributes, 'user_prompt'),
         inputTokens: getIntAttr(span.attributes, 'input_tokens'),
         outputTokens: getIntAttr(span.attributes, 'output_tokens'),
