@@ -7,8 +7,14 @@ const FAR_FUTURE_NS = 99999999999999999999n;
 
 // ── Message delta helpers ───────────────────────────────────────────────────
 
-function messageKey(msg: RequestMessage): string {
-  return JSON.stringify(msg);
+// Identity key for de-duplicating a message across consecutive requests. Ignores
+// `cache_control`: the API moves the ephemeral cache breakpoint between requests,
+// so the same logical message serializes differently from one turn to the next.
+// Keying on the raw JSON would treat it as new and leak it into the next delta.
+export function messageKey(msg: RequestMessage): string {
+  return JSON.stringify(msg, (key: string, value: unknown) =>
+    key === 'cache_control' ? undefined : value,
+  );
 }
 
 /** Messages in `current` not already present in `seenKeys`. Works for both

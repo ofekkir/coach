@@ -81,6 +81,15 @@ interface CausalIndex {
   readonly emitterOf: ReadonlyMap<string, ExecutionNode>; // tool_use_id → inference that emitted it
   readonly toolOf: ReadonlyMap<string, ExecutionNode>; // tool_use_id → the tool node
   readonly postHookOf: ReadonlyMap<string, ExecutionNode>; // tool node id → its PostToolUse hook
+  readonly threadOf: ReadonlyMap<string, number>; // node id → its thread index (descendants included)
+}
+
+function indexThreadMembership(threads: readonly Thread[]): Map<string, number> {
+  const threadOf = new Map<string, number>();
+  threads.forEach((thread, i) => {
+    flatten(thread.members).forEach((n) => threadOf.set(n.id, i));
+  });
+  return threadOf;
 }
 
 function flatten(nodes: readonly ExecutionNode[]): ExecutionNode[] {
@@ -131,7 +140,12 @@ function buildIndex(threads: readonly Thread[]): CausalIndex {
     if (!isInference(node.canonical)) continue;
     for (const id of emittedToolUseIds(node)) emitterOf.set(id, node);
   }
-  return { emitterOf, toolOf, postHookOf: indexPostHooks(threads.map((t) => t.members)) };
+  return {
+    emitterOf,
+    toolOf,
+    postHookOf: indexPostHooks(threads.map((t) => t.members)),
+    threadOf: indexThreadMembership(threads),
+  };
 }
 
 // ── Predecessor rules ───────────────────────────────────────────────────────────
@@ -167,10 +181,15 @@ function continuation(prev: ExecutionNode | null): ExecutionNode[] {
   return prev != null ? [prev] : [];
 }
 
+// A tool result that appears in this inference's request is only a CAUSAL fan-in
+// when both live in the same thread. A background loop (session-title, away-
+// summary, …) carries the main thread's history in its requests, but it doesn't
+// *consume* those tool results to continue — so cross-thread matches are skipped.
 function fanInPredecessors(inference: ExecutionNode, index: CausalIndex): ExecutionNode[] {
+  const thread = index.threadOf.get(inference.id);
   return consumedToolUseIds(inference).flatMap((useId) => {
     const tool = index.toolOf.get(useId);
-    if (tool == null) return [];
+    if (tool == null || index.threadOf.get(tool.id) !== thread) return [];
     return [index.postHookOf.get(tool.id) ?? tool];
   });
 }

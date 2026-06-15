@@ -12,6 +12,7 @@ import {
   buildChildrenOf,
   buildThreadMembers,
   compareStart,
+  messageKey,
   sortByStart,
   withLlmDeltas,
 } from './thread.ts';
@@ -125,7 +126,7 @@ function buildThread(
     const node = withLlmDeltas(base, m, seenMessageKeys);
     if (m.type === 'llm_request') {
       for (const msg of m.request_messages ?? []) {
-        seenMessageKeys.add(JSON.stringify(msg));
+        seenMessageKeys.add(messageKey(msg));
       }
     }
     return node;

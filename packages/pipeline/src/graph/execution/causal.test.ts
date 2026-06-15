@@ -135,4 +135,44 @@ describe('buildCausalEdges', () => {
     expect(edge(edges, 'toolA', 'toolB')).toBeDefined();
     expect(edge(edges, 'toolA', 'inf2')).toBeUndefined();
   });
+
+  // A background loop (different source/thread) carries the main thread's history
+  // in its request — but it does not CAUSALLY consume those tool results. Fan-in
+  // must not reach across threads.
+  it('does not fan in across threads when a background loop echoes a tool result', () => {
+    const mainInf: CanonicalNode = {
+      id: 'mainInf',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
+      response_messages: [{ type: 'tool_use', id: 'tu_x', name: 'Read' }],
+      ...span(100, 200),
+    };
+    const tool: CanonicalNode = {
+      id: 'toolX',
+      type: 'tool',
+      parent: 'root',
+      name: 'Read',
+      tool_use_id: 'tu_x',
+      ...span(210, 250),
+    };
+    const bgInf: CanonicalNode = {
+      id: 'bgInf',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'away_summary',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
+      // The background loop's request echoes the main thread's tool_result history.
+      request_messages: [{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu_x' }] }],
+      ...span(9000, 9100),
+    };
+    const edges = causalEdgesOf([interaction, mainInf, tool, bgInf]);
+    expect(edge(edges, 'mainInf', 'toolX')).toBeDefined(); // fan-out, same thread
+    expect(edge(edges, 'toolX', 'bgInf')).toBeUndefined(); // no cross-thread fan-in
+  });
 });
