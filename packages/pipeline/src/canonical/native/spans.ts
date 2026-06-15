@@ -53,6 +53,47 @@ function extractLlmSpanMeta(
   };
 }
 
+function groupToolUseIds(group: NativeEntry[]): string[] {
+  return collectContentBlocks(group).flatMap((b) =>
+    b.type === 'tool_use' && typeof b.id === 'string' ? [b.id] : [],
+  );
+}
+
+function toolResultEntryBlocks(entry: NativeEntry): readonly ContentBlock[] {
+  const content = entry.message?.content;
+  if (content == null || typeof content === 'string') return [];
+  return content;
+}
+
+// The previous inference may have emitted several (parallel) tool_use blocks;
+// every one of their results is fed back to the model as a single user turn.
+function collectPrevToolResultBlocks(
+  prevGroup: NativeEntry[],
+  toolResultUser: Map<string, NativeEntry>,
+): ContentBlock[] {
+  const seen = new Set<NativeEntry>();
+  const resultEntries: NativeEntry[] = [];
+  for (const id of groupToolUseIds(prevGroup)) {
+    const entry = toolResultUser.get(id);
+    if (entry == null || seen.has(entry)) continue;
+    seen.add(entry);
+    resultEntries.push(entry);
+  }
+  return resultEntries.flatMap(toolResultEntryBlocks);
+}
+
+function buildRequestMessages(
+  prevGroup: NativeEntry[] | null,
+  toolResultUser: Map<string, NativeEntry>,
+  trigUser: NativeEntry | null,
+): { role: string; content: unknown }[] {
+  if (prevGroup != null) {
+    const content = collectPrevToolResultBlocks(prevGroup, toolResultUser);
+    if (content.length > 0) return [{ role: 'user', content }];
+  }
+  return [{ role: 'user', content: trigUser?.message?.content ?? null }];
+}
+
 function buildLlmSpan(
   tId: string,
   requestId: string,
@@ -60,12 +101,14 @@ function buildLlmSpan(
   allBlocks: ContentBlock[],
   interactionSpanId: string,
   trigUser: NativeEntry | null,
+  prevGroup: NativeEntry[] | null,
+  toolResultUser: Map<string, NativeEntry>,
 ): OtlpSpan | null {
   const meta = extractLlmSpanMeta(group, trigUser);
   if (meta == null) return null;
 
   const rawRequestBody = JSON.stringify({
-    messages: [{ role: 'user', content: trigUser?.message?.content ?? null }],
+    messages: buildRequestMessages(prevGroup, toolResultUser, trigUser),
   });
   const rawResponseBody = JSON.stringify({ content: allBlocks, stop_reason: meta.stopReason });
 
@@ -132,6 +175,7 @@ export function buildSpansForRequest(
   byUuid: Map<string, NativeEntry>,
   toolResultUser: Map<string, NativeEntry>,
   interactionSpanId: string,
+  prevGroup: NativeEntry[] | null,
 ): OtlpSpan[] {
   group.sort((a, b) => ((a.timestamp ?? '') < (b.timestamp ?? '') ? -1 : 1));
   const first = group[0];
@@ -140,7 +184,16 @@ export function buildSpansForRequest(
   const allBlocks = collectContentBlocks(group);
   const trigUser = findTriggeringUser(first, byUuid);
 
-  const llmSpan = buildLlmSpan(tId, requestId, group, allBlocks, interactionSpanId, trigUser);
+  const llmSpan = buildLlmSpan(
+    tId,
+    requestId,
+    group,
+    allBlocks,
+    interactionSpanId,
+    trigUser,
+    prevGroup,
+    toolResultUser,
+  );
   if (!llmSpan) return [];
 
   const toolSpans = allBlocks.flatMap((block) => {

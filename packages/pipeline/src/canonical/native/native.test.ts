@@ -30,6 +30,18 @@ const MULTI_TURN_JSONL = readFileSync(
 
 const MULTI_TURN_SESSION_ID = 'adef15c8-c761-4850-bfff-180b36ed1cd2';
 
+const REFACTOR_JSONL = readFileSync(
+  join(import.meta.dirname, '../../../fixtures/native-claude/refactor-code/session.jsonl'),
+  'utf8',
+);
+
+function toolResultText(b: unknown): string | null {
+  if (typeof b !== 'object' || b === null) return null;
+  const block = b as { type?: unknown; content?: unknown };
+  if (block.type !== 'tool_result') return null;
+  return typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+}
+
 describe('nativeSessionToTrace', () => {
   it('produces a TempoTrace that passes schema validation', () => {
     const trace = nativeSessionToTrace(FIXTURE_JSONL);
@@ -127,5 +139,25 @@ describe('nativeSessionToTrace — multi-turn fixture', () => {
     for (const i of interactions) {
       expect(i.session_id).toBe(MULTI_TURN_SESSION_ID);
     }
+  });
+});
+
+describe('nativeSessionToTrace — parallel tool_results feed the next inference', () => {
+  it('reconstructs every sibling tool_result of the previous inference into one request', () => {
+    const nodes = transformTrace(nativeSessionToTrace(REFACTOR_JSONL));
+    const llms = nodes.filter((n) => n.type === 'llm_request');
+
+    const withBothResults = llms.find((n) => {
+      const firstMsg = n.request_messages?.[0]?.content;
+      if (!Array.isArray(firstMsg)) return false;
+      const texts = firstMsg.map(toolResultText).filter((t): t is string => t !== null);
+      return (
+        texts.length >= 2 &&
+        texts.some((t) => t.includes('.claire')) &&
+        texts.some((t) => t.includes('"name": "coach"'))
+      );
+    });
+
+    expect(withBothResults).toBeDefined();
   });
 });
