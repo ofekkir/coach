@@ -1,21 +1,22 @@
 import { useRef, useState } from 'react';
 import type { VizResult } from '@coach/pipeline';
 import { loadPipelineOutput } from '../../data-source.ts';
+import { danger, slate } from '../palette.ts';
 
 const cardStyle: React.CSSProperties = {
-  border: '1px solid #e2e8f0',
+  border: `1px solid ${slate.border}`,
   borderRadius: 12,
   padding: '20px 24px',
-  background: '#ffffff',
+  background: slate.surface,
   display: 'flex',
   flexDirection: 'column',
   gap: 12,
 };
 
 const buttonStyle: React.CSSProperties = {
-  background: '#f8fafc',
-  color: '#334155',
-  border: '1px solid #cbd5e1',
+  background: slate.page,
+  color: slate.body,
+  border: `1px solid ${slate.borderStrong}`,
   borderRadius: 7,
   padding: '7px 16px',
   fontSize: 12,
@@ -24,10 +25,10 @@ const buttonStyle: React.CSSProperties = {
 };
 
 const errorStyle: React.CSSProperties = {
-  color: '#dc2626',
+  color: danger.text,
   fontSize: 12,
-  background: '#fef2f2',
-  border: '1px solid #fecaca',
+  background: danger.bg,
+  border: `1px solid ${danger.border}`,
   borderRadius: 6,
   padding: '8px 12px',
   margin: 0,
@@ -61,23 +62,23 @@ export function PipelineOutputLoader({ onResults }: { onResults: (results: VizRe
           alignItems: 'center',
           gap: 12,
           margin: '24px 0',
-          color: '#94a3b8',
+          color: slate.faint,
           fontSize: 11,
           fontWeight: 500,
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
         }}
       >
-        <span style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+        <span style={{ flex: 1, height: 1, background: slate.border }} />
         or
-        <span style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+        <span style={{ flex: 1, height: 1, background: slate.border }} />
       </div>
       <div style={cardStyle}>
         <div>
-          <p style={{ color: '#334155', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+          <p style={{ color: slate.body, fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
             Load pipeline output
           </p>
-          <p style={{ color: '#64748b', fontSize: 12, lineHeight: 1.5 }}>
+          <p style={{ color: slate.muted, fontSize: 12, lineHeight: 1.5 }}>
             Load a pre-computed execution graph (e.g. <code>05-execution-graph.json</code> from{' '}
             <code>pnpm e2e</code>) — skips the in-browser pipeline.
           </p>

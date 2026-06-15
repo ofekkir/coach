@@ -1,17 +1,9 @@
 import type { GraphNode } from '@coach/pipeline';
-import { fonts, tokens } from '../theme.ts';
+import { fonts, monoLabel, tokens } from '../theme.ts';
 
-const INSET_BORDER = '#EAE2D4';
 const LONG_TEXT_THRESHOLD = 180;
 const CLAMP_LINES = 6;
 const EXPANDED_MAX_H = 240;
-
-const monoLabel: React.CSSProperties = {
-  fontFamily: fonts.mono,
-  fontSize: 9.5,
-  letterSpacing: '0.13em',
-  color: tokens.faintLane,
-};
 
 interface LongText {
   label: string;
@@ -64,7 +56,7 @@ export function longTextBlock(
       <div
         style={{
           background: tokens.surface,
-          border: `1px solid ${INSET_BORDER}`,
+          border: `1px solid ${tokens.insetBorder}`,
           borderRadius: 9,
           padding: '11px 13px',
           fontFamily: fonts.mono,

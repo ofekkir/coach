@@ -1,16 +1,10 @@
-import { ACCENT_SHADOW, fonts, glyphFor, isWeakModel, tokens } from '../theme.ts';
+import { ACCENT_SHADOW, ellipsis, fonts, glyphFor, isWeakModel, tokens } from '../theme.ts';
 import type { NodeCard } from '../format/format.ts';
 import { formatMetrics } from '../format/format.ts';
 import { BG_NW, COMPACT_NW, NW } from '../layout/types.ts';
 import type { TraceRFNodeData } from '../layout/types.ts';
 import { Glyph } from './Glyph.tsx';
 import { NodeBody, type StepPalette } from './NodeBody.tsx';
-
-const ELLIPSIS: React.CSSProperties = {
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
 
 const WEIGHT_BOLD = 600;
 const WEIGHT_NORMAL = 400;
@@ -46,7 +40,7 @@ const PALETTES: Record<StepState, FullPalette> = {
     model: tokens.faint,
   },
   nested: {
-    tag: '#B89B89',
+    tag: tokens.nestedTag,
     duration: tokens.muted,
     title: tokens.ink,
     sub: tokens.inkSoft,
@@ -88,7 +82,7 @@ function stepCardStyle(
     };
   }
   if (state === 'background') {
-    return { ...base, background: tokens.lane, border: '1px dashed #DDD3C2' };
+    return { ...base, background: tokens.lane, border: `1px dashed ${tokens.bgDash}` };
   }
   if (state === 'nested') {
     return {
@@ -123,7 +117,7 @@ function stepHeader(
       <Glyph kind={glyphFor(card.type, nested)} accent={accent} />
       <span
         style={{
-          ...ELLIPSIS,
+          ...ellipsis,
           fontFamily: fonts.mono,
           fontSize: 9.5,
           letterSpacing: '0.12em',

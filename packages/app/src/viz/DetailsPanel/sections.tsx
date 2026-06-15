@@ -1,24 +1,15 @@
 import type { GraphNode } from '@coach/pipeline';
-import { fonts, tokens } from '../theme.ts';
+import { fonts, monoLabel, tokens } from '../theme.ts';
 import { type NodeCard } from '../format/format.ts';
 import type { HiddenSubCall } from '../layout/types.ts';
 import { Glyph } from '../TraceNode/Glyph.tsx';
 import { JsonView } from '../JsonView/JsonView.tsx';
 import { longTextBlock, longTextOf } from './longtext.tsx';
 
-const INSET_BORDER = '#EAE2D4';
-const CALLOUT_INK = '#6E4B3A';
 const DURATION_FONT = 18;
 const METRIC_FONT = 15;
 const MS_PER_SECOND = 1000;
 const SECONDS_DECIMALS = 2;
-
-const monoLabel: React.CSSProperties = {
-  fontFamily: fonts.mono,
-  fontSize: 9.5,
-  letterSpacing: '0.13em',
-  color: tokens.faintLane,
-};
 
 function whatOf(canonical: GraphNode | undefined): readonly string[] {
   return canonical != null && 'what' in canonical ? canonical.what : [];
@@ -42,7 +33,7 @@ function metricCard(label: string, value: string, accent: boolean): React.ReactN
     <div
       style={{
         background: tokens.surface,
-        border: `1px solid ${INSET_BORDER}`,
+        border: `1px solid ${tokens.insetBorder}`,
         borderRadius: 9,
         padding: '10px 12px',
       }}
@@ -137,7 +128,9 @@ function hiddenSubCallCallout(sub: HiddenSubCall): React.ReactNode {
           HIDDEN SUB-CALL
         </span>
       </div>
-      <div style={{ fontFamily: fonts.sans, fontSize: 13, lineHeight: 1.5, color: CALLOUT_INK }}>
+      <div
+        style={{ fontFamily: fonts.sans, fontSize: 13, lineHeight: 1.5, color: tokens.calloutInk }}
+      >
         A second model — <span style={{ fontFamily: fonts.mono, fontSize: 11.5 }}>{sub.model}</span>{' '}
         — ran inside this tool for <span style={{ fontWeight: 600 }}>{seconds}s</span>, doing the
         bulk of its work.

@@ -1,10 +1,4 @@
-import { fonts, tokens } from '../theme.ts';
-
-const LINE: React.CSSProperties = {
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
+import { ellipsis, fonts, tokens } from '../theme.ts';
 
 // Text colors for the body, resolved by the card's accent/lane state in TraceNode.
 export interface StepPalette {
@@ -29,7 +23,7 @@ function shareBar(shareOfRun: number): React.ReactNode {
           marginTop: 9,
           height: 4,
           borderRadius: 2,
-          background: '#EFE6DB',
+          background: tokens.shareTrack,
           overflow: 'hidden',
         }}
       >
@@ -71,7 +65,7 @@ export function NodeBody({
       {title != null && (
         <div
           style={{
-            ...LINE,
+            ...ellipsis,
             fontFamily: fonts.sans,
             fontSize: 14.5,
             fontWeight: 600,
@@ -85,7 +79,7 @@ export function NodeBody({
       {subtitle != null && (
         <div
           style={{
-            ...LINE,
+            ...ellipsis,
             fontFamily: fonts.sans,
             fontSize: 13,
             color: palette.sub,
@@ -99,7 +93,7 @@ export function NodeBody({
       {model != null && (
         <div
           style={{
-            ...LINE,
+            ...ellipsis,
             fontFamily: fonts.mono,
             fontSize: 10.5,
             color: palette.model,

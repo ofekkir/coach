@@ -1,7 +1,9 @@
+import { accent, slate } from '../palette.ts';
+
 const buttonStyle: React.CSSProperties = {
-  background: '#f1f5f9',
-  color: '#334155',
-  border: '1px solid #e2e8f0',
+  background: slate.divider,
+  color: slate.body,
+  border: `1px solid ${slate.border}`,
   borderRadius: 7,
   padding: '6px 14px',
   fontSize: 12,
@@ -34,17 +36,17 @@ export function DropZone({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       style={{
-        border: `2px dashed ${dragOver ? '#6366f1' : '#cbd5e1'}`,
+        border: `2px dashed ${dragOver ? accent.drag : slate.borderStrong}`,
         borderRadius: 12,
         padding: '28px 24px',
-        background: dragOver ? '#eef2ff' : '#ffffff',
+        background: dragOver ? accent.dragBg : slate.surface,
         transition: 'border-color 0.15s, background 0.15s',
       }}
     >
       <div style={{ fontSize: 28, marginBottom: 10, textAlign: 'center' }}>📂</div>
       <p
         style={{
-          color: '#475569',
+          color: slate.label,
           fontSize: 13,
           fontWeight: 500,
           textAlign: 'center',

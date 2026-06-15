@@ -4,6 +4,7 @@ import { DropZone } from './DropZone/DropZone.tsx';
 import { PipelineOutputLoader } from './PipelineOutputLoader/PipelineOutputLoader.tsx';
 import { StagedFileList } from './StagedFileList/StagedFileList.tsx';
 import { useUploadHandlers } from './useUploadHandlers.ts';
+import { danger, slate } from './palette.ts';
 
 interface Props {
   onResults: (results: VizResult[]) => void;
@@ -18,7 +19,7 @@ function renderHeader(): React.ReactNode {
           fontWeight: 700,
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
-          color: '#94a3b8',
+          color: slate.faint,
           marginBottom: 12,
         }}
       >
@@ -28,14 +29,14 @@ function renderHeader(): React.ReactNode {
         style={{
           fontSize: 22,
           fontWeight: 600,
-          color: '#1e293b',
+          color: slate.heading,
           marginBottom: 8,
           lineHeight: 1.3,
         }}
       >
         Trace Viewer
       </h1>
-      <p style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+      <p style={{ color: slate.muted, fontSize: 13, lineHeight: 1.6 }}>
         Upload native Claude Code session logs (<code>.jsonl</code>) or OTEL sets (
         <code>logs.json</code> + <code>trace*.json</code>). Add multiple files or folders — all
         sessions roll up into one agent view.
@@ -76,7 +77,7 @@ export function UploadPage({ onResults }: Props) {
         justifyContent: 'center',
         width: '100vw',
         minHeight: '100vh',
-        background: '#f8fafc',
+        background: slate.page,
         fontFamily: 'system-ui, -apple-system, sans-serif',
         padding: '32px 0',
         boxSizing: 'border-box',
@@ -109,10 +110,10 @@ export function UploadPage({ onResults }: Props) {
           <p
             style={{
               marginTop: 16,
-              color: '#dc2626',
+              color: danger.text,
               fontSize: 12,
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
+              background: danger.bg,
+              border: `1px solid ${danger.border}`,
               borderRadius: 6,
               padding: '8px 12px',
             }}

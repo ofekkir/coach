@@ -1,4 +1,5 @@
 import type { UploadedFile } from '@coach/pipeline';
+import { slate } from '../palette.ts';
 
 const ghostButtonStyle: React.CSSProperties = {
   background: 'transparent',
@@ -19,14 +20,14 @@ function renderVisualizeFooter(
   onVisualize: () => void,
 ): React.ReactNode {
   return (
-    <div style={{ padding: '10px 14px', borderTop: '1px solid #f1f5f9' }}>
+    <div style={{ padding: '10px 14px', borderTop: `1px solid ${slate.divider}` }}>
       <button
         onClick={onVisualize}
         disabled={loading}
         style={{
           width: '100%',
-          background: loading ? '#94a3b8' : '#1e293b',
-          color: '#ffffff',
+          background: loading ? slate.faint : slate.heading,
+          color: slate.surface,
           border: 'none',
           borderRadius: 7,
           padding: '9px 0',
@@ -50,13 +51,13 @@ function renderFileRow(key: string, name: string, onRemove: (k: string) => void)
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '5px 14px',
-        borderBottom: '1px solid #f8fafc',
+        borderBottom: `1px solid ${slate.page}`,
       }}
     >
       <span
         style={{
           fontSize: 12,
-          color: '#334155',
+          color: slate.body,
           fontFamily: 'monospace',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -69,7 +70,7 @@ function renderFileRow(key: string, name: string, onRemove: (k: string) => void)
         onClick={() => {
           onRemove(key);
         }}
-        style={{ ...ghostButtonStyle, color: '#94a3b8', flexShrink: 0 }}
+        style={{ ...ghostButtonStyle, color: slate.faint, flexShrink: 0 }}
       >
         ✕
       </button>
@@ -102,9 +103,9 @@ export function StagedFileList({
     <div
       style={{
         marginTop: 16,
-        border: '1px solid #e2e8f0',
+        border: `1px solid ${slate.border}`,
         borderRadius: 10,
-        background: '#ffffff',
+        background: slate.surface,
         overflow: 'hidden',
       }}
     >
@@ -114,13 +115,13 @@ export function StagedFileList({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '10px 14px',
-          borderBottom: '1px solid #f1f5f9',
+          borderBottom: `1px solid ${slate.divider}`,
         }}
       >
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: slate.label }}>
           {stagedEntries.length} file{stagedEntries.length !== 1 ? 's' : ''} staged
         </span>
-        <button onClick={onClearAll} style={{ ...ghostButtonStyle, color: '#94a3b8' }}>
+        <button onClick={onClearAll} style={{ ...ghostButtonStyle, color: slate.faint }}>
           Clear all
         </button>
       </div>
@@ -135,8 +136,8 @@ export function StagedFileList({
                   fontWeight: 700,
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',
-                  color: '#94a3b8',
-                  background: '#f8fafc',
+                  color: slate.faint,
+                  background: slate.page,
                 }}
               >
                 {dir}
