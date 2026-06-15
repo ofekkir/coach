@@ -1,4 +1,4 @@
-import { aggregateAgent, aggregateSession } from './aggregate/aggregate.ts';
+import { aggregate, type AgentGraph } from './aggregate/aggregate.ts';
 import { toCanonical } from './canonical/canonical.ts';
 import { classifyInputs } from './classify/classify.ts';
 import { buildExecutionGraph } from './graph/execution/execution.ts';
@@ -7,13 +7,7 @@ import type { ExecutionGraph, VizResult } from './graph/types.ts';
 import { defaultSemanticsConfig, type SemanticsConfig } from '@coach/semantics';
 import { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 import { routeToSessions } from './route/route.ts';
-import type {
-  AgentNode,
-  CanonicalNode,
-  ClassifiedInput,
-  SessionInputs,
-  UploadedFile,
-} from './types.ts';
+import type { CanonicalNode, ClassifiedInput, SessionInputs, UploadedFile } from './types.ts';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -27,7 +21,7 @@ export interface PipelineResult {
   classified: ClassifiedInput[]; // Stage 1 — every file tagged by type
   sessions: SessionInputs[]; // Stage 2 — supported inputs grouped by session
   canonicalBySession: { sessionId: string; nodes: CanonicalNode[] }[]; // Stage 3
-  agentGraph: CanonicalNode[]; // Stage 4 — all sessions under one agent
+  agentGraph: AgentGraph; // Stage 4 — node table + agent/session entities
   executionGraph: ExecutionGraph; // Stage 5 — mechanical skeleton
   enrichedGraph: ExecutionGraph; // Stage 6 — deterministic semantic labels
 }
@@ -71,8 +65,7 @@ export function runPipeline(
     nodes: sortByTime(toCanonical(session)),
   }));
 
-  const allSessionNodes = aggregateSession(canonicalBySession.map((c) => c.nodes));
-  const agentGraph = aggregateAgent(allSessionNodes);
+  const agentGraph = aggregate(canonicalBySession.map((c) => c.nodes));
   const executionGraph = buildExecutionGraph(agentGraph);
   const enrichedGraph = enrichExecutionGraph(executionGraph, config);
 
@@ -91,12 +84,11 @@ export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
   // eslint-disable-next-line no-console
   if (unsupported > 0) console.warn(`coach: ignored ${String(unsupported)} unsupported file(s)`);
 
-  // No session node means nothing renderable (empty upload, or inputs that
+  // No session entity means nothing renderable (empty upload, or inputs that
   // resolved a session id but produced no canonical nodes — e.g. logs with no trace).
-  if (!result.agentGraph.some((n) => n.type === 'session')) return [];
+  if (result.agentGraph.sessions.length === 0) return [];
 
-  const agent = result.agentGraph.find((n): n is AgentNode => n.type === 'agent');
-  const title = agent?.user_id ?? 'agent';
+  const title = result.agentGraph.agent.userId || 'agent';
   return [{ title, data: result.executionGraph }];
 }
 

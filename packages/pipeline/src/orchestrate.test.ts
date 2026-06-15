@@ -59,7 +59,7 @@ describe('buildVizResults', () => {
     expect(results[0]?.data.kind).toBe('agent');
 
     const agentView = results[0]?.data.kind === 'agent' ? results[0].data.data : null;
-    expect(agentView?.root.id).toBe(`agent-${PSEUDO_USER_ID}`);
+    expect(agentView?.agent.id).toBe(`agent-${PSEUDO_USER_ID}`);
   });
 
   it('marks unrecognised files unsupported without dropping the usable ones', () => {

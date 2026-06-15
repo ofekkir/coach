@@ -1,8 +1,7 @@
 import type { ExecutionNode, Thread } from '@coach/pipeline';
 import { estimateNodeH } from './estimate.ts';
-import { buildNodeCard } from '../format/format.ts';
 import type { ParallelLevel } from './parallel.ts';
-import { placeStep, pushExecNode } from './place-members.ts';
+import { cardOf, nodeOf, placeStep, pushExecNode } from './place-members.ts';
 import type { Ctx } from './types.ts';
 import { CENTERING_DIVISOR, COMPACT_NW, HG, NW, PARALLEL_COMPACT_THRESHOLD, VG } from './types.ts';
 
@@ -30,8 +29,9 @@ function pushBand(
   });
 }
 
-function startNsOf(node: ExecutionNode): bigint {
-  return 'start_time_ns' in node.canonical ? BigInt(node.canonical.start_time_ns) : 0n;
+function startNsOf(node: ExecutionNode, ctx: Ctx): bigint {
+  const canonical = nodeOf(ctx, node.id);
+  return 'start_time_ns' in canonical ? BigInt(canonical.start_time_ns) : 0n;
 }
 
 // Branches ordered left→right by start time (ascending), so the eye reads the
@@ -40,11 +40,14 @@ function startNsOf(node: ExecutionNode): bigint {
 function orderedBranches(
   level: ParallelLevel,
   memberById: ReadonlyMap<string, ExecutionNode>,
+  ctx: Ctx,
 ): ExecutionNode[] {
   return level.childIds
     .map((id) => memberById.get(id))
     .filter((m): m is ExecutionNode => m != null)
-    .sort((a, b) => (startNsOf(a) < startNsOf(b) ? -1 : startNsOf(a) > startNsOf(b) ? 1 : 0));
+    .sort((a, b) =>
+      startNsOf(a, ctx) < startNsOf(b, ctx) ? -1 : startNsOf(a, ctx) > startNsOf(b, ctx) ? 1 : 0,
+    );
 }
 
 // Lays a parallel level as a centered row inside a faint band: branches spread
@@ -58,11 +61,11 @@ function placeLevelRow(
   memberById: ReadonlyMap<string, ExecutionNode>,
   ctx: Ctx,
 ): number {
-  const children = orderedBranches(level, memberById);
+  const children = orderedBranches(level, memberById, ctx);
   const compact = children.length > PARALLEL_COMPACT_THRESHOLD;
   const cw = compact ? COMPACT_NW : NW;
   const totalW = children.length * cw + (children.length - 1) * HG;
-  const rowH = Math.max(...children.map((c) => estimateNodeH(buildNodeCard(c.canonical))));
+  const rowH = Math.max(...children.map((c) => estimateNodeH(cardOf(ctx, c.id))));
 
   const spineCenter = spineX + NW / CENTERING_DIVISOR;
   const startX = spineCenter - totalW / CENTERING_DIVISOR;

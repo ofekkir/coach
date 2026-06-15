@@ -1,21 +1,26 @@
 import type {
-  ActionNode,
-  GraphNode,
-  InferenceNode,
+  Agent,
+  CanonicalNode,
   InteractionNode,
   LlmRequestNode,
-  SessionNode,
+  ResolvedNode,
+  SemanticFields,
+  Session,
+  ToolNode,
 } from '@coach/pipeline';
 
 // ════════════════════════════════════════════════════════════════════════════
-// Presentation lives in the APP, not the pipeline. The pipeline emits lossless,
-// presentation-free nodes (a full CanonicalNode per execution node); this module
-// derives a typed `NodeCard` — the curated, at-a-glance summary the renderer
-// draws. The card carries ONLY structural facts the canonical model guarantees
-// (display type, a title, structural key/values, numeric metrics). It never
-// interprets harness-shaped CONTENT (response content blocks, tool_input JSON):
-// that flows untouched into the JSON viewer in the details panel. Adding a node
-// type or field touches this builder; new content shapes need no change here.
+// Presentation lives in the APP, not the pipeline. The pipeline emits a
+// normalized node table (CanonicalNode by id) plus a sparse `semantics` overlay;
+// this module derives a typed `NodeCard` — the curated, at-a-glance summary the
+// renderer draws — from a RESOLVED node (the canonical row + its optional
+// semantic fields). The card carries ONLY structural facts the canonical model
+// guarantees (display type, a title, structural key/values, numeric metrics). It
+// never interprets harness-shaped CONTENT (response content blocks, tool_input
+// JSON): that flows untouched into the JSON viewer in the details panel.
+//
+// Agent and session are ENTITIES, not nodes — their cards come from
+// `buildAgentCard` / `buildSessionCard`, never the node table.
 // ════════════════════════════════════════════════════════════════════════════
 
 /** A single structural key/value shown on the card body and details header. */
@@ -80,7 +85,7 @@ export function formatRunCost(usd: number): string {
   return `$${usd.toFixed(TOPBAR_COST_DECIMALS)}`;
 }
 
-/** Formats a signed millisecond gap from a `GraphEdge` into "+12ms" / "-3ms".
+/** Formats a signed millisecond gap from a `CausalEdge` into "+12ms" / "-3ms".
  *  Returns null when there is no meaningful gap to show. */
 export function formatGap(gapMs: number | undefined): string | null {
   if (gapMs == null || !Number.isFinite(gapMs) || gapMs === 0) return null;
@@ -113,10 +118,10 @@ function interactionTitle(node: InteractionNode, index: number): string {
   return `interaction ${String(index + 1)}`;
 }
 
-/** Title for a session node: a short session_id preview, else a positional fallback. */
-function sessionTitle(node: SessionNode, index: number): string {
-  if (node.session_id.trim() !== '') {
-    return truncate(node.session_id, SESSION_TITLE_MAX);
+/** Title for a session entity: a short harness session-id preview, else positional. */
+function sessionTitle(session: Session, index: number): string {
+  if (session.sessionId.trim() !== '') {
+    return truncate(session.sessionId, SESSION_TITLE_MAX);
   }
   return `session ${String(index + 1)}`;
 }
@@ -125,8 +130,8 @@ function field(label: string, value: string | undefined): CardField[] {
   return value != null && value !== '' ? [{ label, value }] : [];
 }
 
-/** Display type + tag + title + structural fields for a node. `what` (set by the
- *  semantic stage) supplies the verb (`what[0]`) and sub-verb (`what[1]`), with
+/** Display type + tag + title + structural fields for a node. `what` (from the
+ *  semantics overlay) supplies the verb (`what[0]`) and sub-verb (`what[1]`), with
  *  the structural name/model as fallback. Content lives in the JSON viewer. */
 interface CardShape {
   type: string;
@@ -150,21 +155,24 @@ function toolTag(name: string | undefined): string {
   return name != null && name !== '' ? `ACTION · ${name.toUpperCase()}` : 'ACTION';
 }
 
-function actionShape(node: ActionNode): CardShape {
+// An enriched tool: a `tool` node with a semantics row. The verb leads from
+// `what`, the structural tool name backs the tag.
+function actionShape(node: ToolNode, semantics: SemanticFields): CardShape {
   return {
     type: 'action',
     tag: toolTag(node.name),
-    title: node.what[0] ?? node.name,
-    subtitle: node.what[1],
+    title: semantics.what[0] ?? node.name,
+    subtitle: semantics.what[1],
   };
 }
 
-function inferenceShape(node: InferenceNode): CardShape {
+// An enriched inference: an `llm_request` node with a semantics row.
+function inferenceShape(node: LlmRequestNode, semantics: SemanticFields): CardShape {
   return {
     type: 'inference',
     tag: `INFERENCE${sourceSuffix(node.source)}`,
-    title: node.what[0] ?? node.model,
-    subtitle: node.what[1],
+    title: semantics.what[0] ?? node.model,
+    subtitle: semantics.what[1],
     model: node.model,
   };
 }
@@ -182,12 +190,10 @@ function llmRequestShape(node: LlmRequestNode): CardShape {
 // Each builder is typed to the node member its discriminant selects, so field
 // access inside is checked against the right shape (no wide-union guards).
 type ShapeBuilders = {
-  [N in GraphNode as N['type']]?: (node: N, index: number) => CardShape;
+  [N in CanonicalNode as N['type']]?: (node: N, index: number) => CardShape;
 };
 
 const TYPE_SHAPE_BUILDERS: ShapeBuilders = {
-  agent: (n) => ({ type: 'agent', tag: 'AGENT', title: n.user_id }),
-  session: (n, i) => ({ type: 'session', tag: 'SESSION · OTEL', title: sessionTitle(n, i) }),
   interaction: (n, i) => ({
     type: 'interaction',
     tag: 'INTERACTION',
@@ -203,20 +209,26 @@ const TYPE_SHAPE_BUILDERS: ShapeBuilders = {
   'tool.blocked_on_user': () => ({ type: 'blocked_on_user', tag: 'WAIT' }),
   'tool.execution': () => ({ type: 'execution', tag: 'EXECUTION' }),
   hook: (n) => ({ type: 'hook', tag: `HOOK · ${n.name.toUpperCase()}`, title: n.name }),
-  action: (n) => actionShape(n),
-  inference: (n) => inferenceShape(n),
 };
 
-function shapeOf(node: GraphNode, index: number): CardShape {
+// The semantics overlay relabels a `tool` → action and `llm_request` → inference.
+// Its presence (not a node type) is what makes a node "enriched".
+function shapeOf(
+  node: CanonicalNode,
+  semantics: SemanticFields | undefined,
+  index: number,
+): CardShape {
+  if (node.type === 'tool' && semantics != null) return actionShape(node, semantics);
+  if (node.type === 'llm_request' && semantics != null) return inferenceShape(node, semantics);
   // The table is keyed by discriminant; TS can't correlate the lookup with the
   // node's narrowed type, so assert the resolved builder accepts this node.
   const builder = TYPE_SHAPE_BUILDERS[node.type] as
-    | ((node: GraphNode, index: number) => CardShape)
+    | ((node: CanonicalNode, index: number) => CardShape)
     | undefined;
   return builder?.(node, index) ?? { type: node.type, tag: node.type.toUpperCase() };
 }
 
-function metricsOf(node: GraphNode): CardMetrics {
+function metricsOf(node: CanonicalNode): CardMetrics {
   // `in` narrows to the members carrying each field and, since these are only
   // ever set when present, confirms a real value (no extra null guard needed).
   return {
@@ -227,10 +239,7 @@ function metricsOf(node: GraphNode): CardMetrics {
   };
 }
 
-/** The curated card for a node. `index` supplies positional fallbacks for
- *  session/interaction titles. */
-export function buildNodeCard(node: GraphNode, index = 0): NodeCard {
-  const shape = shapeOf(node, index);
+function finishCard(shape: CardShape, metrics: CardMetrics): NodeCard {
   return {
     type: shape.type,
     tag: shape.tag,
@@ -238,6 +247,25 @@ export function buildNodeCard(node: GraphNode, index = 0): NodeCard {
     ...(shape.subtitle != null && shape.subtitle !== '' ? { subtitle: shape.subtitle } : {}),
     ...(shape.model != null && shape.model !== '' ? { model: shape.model } : {}),
     fields: shape.fields ?? [],
-    metrics: metricsOf(node),
+    metrics,
   };
+}
+
+/** The curated card for a resolved node (canonical row + optional semantic
+ *  overlay). `index` supplies positional fallbacks for interaction titles. */
+export function buildNodeCard(resolved: ResolvedNode, index = 0): NodeCard {
+  return finishCard(shapeOf(resolved.node, resolved.semantics, index), metricsOf(resolved.node));
+}
+
+/** The container card for the agent ENTITY (not a node). */
+export function buildAgentCard(agent: Agent): NodeCard {
+  return finishCard({ type: 'agent', tag: 'AGENT', title: agent.userId }, {});
+}
+
+/** The container card for a session ENTITY (not a node). */
+export function buildSessionCard(session: Session, index = 0): NodeCard {
+  return finishCard(
+    { type: 'session', tag: 'SESSION · OTEL', title: sessionTitle(session, index) },
+    {},
+  );
 }

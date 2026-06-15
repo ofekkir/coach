@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CanonicalNode, RequestMessage, ResponseMessage } from '../../types.ts';
+import { agentEntityId, sessionEntityId } from '../../types.ts';
+import { aggregate } from '../../aggregate/aggregate.ts';
 import type { AgentExecution, ExecutionGraph, ExecutionNode, Thread } from '../types.ts';
-import { buildExecutionGraph, buildInteractionExecution } from './execution.ts';
+import { deltasOf, nodeData, resolve } from '../types.ts';
+import { buildExecutionGraph } from './execution.ts';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
+
+const SID = sessionEntityId('s-1');
 
 // Span-derived nodes carry real OTLP timing; this keeps fixtures self-consistent
 // (ns = ms × 1e6) without spelling out all three fields each time.
@@ -25,6 +30,7 @@ function span(
 const interaction: CanonicalNode = {
   id: 'root',
   type: 'interaction',
+  sessionId: SID,
   session_id: 's-1',
   user_id: 'u-1',
   sequence: 0,
@@ -36,6 +42,7 @@ const llm1: CanonicalNode = {
   id: 'llm1',
   type: 'llm_request',
   parent: 'root',
+  sessionId: SID,
   source: 'repl_main_thread',
   model: '',
   tokens_in: 0,
@@ -47,6 +54,7 @@ const llm2: CanonicalNode = {
   id: 'llm2',
   type: 'llm_request',
   parent: 'root',
+  sessionId: SID,
   source: 'repl_main_thread',
   model: '',
   tokens_in: 0,
@@ -58,37 +66,19 @@ const toolAfterLlm1: CanonicalNode = {
   id: 'toolA',
   type: 'tool',
   parent: 'root',
+  sessionId: SID,
   name: 'Read',
   ...span(210, 300),
 };
 
-// A small full agent forest: agent ▸ session ▸ interaction ▸ (llm1, toolA, llm2).
-function agentForest(): CanonicalNode[] {
-  const agent: CanonicalNode = { id: 'agent', type: 'agent', user_id: 'u1' };
-  const session: CanonicalNode = {
-    id: 'sess',
-    type: 'session',
-    parent: 'agent',
-    session_id: 's-123',
-    user_id: 'u1',
-  };
-  const inter: CanonicalNode = { ...interaction, parent: 'sess' };
-  return [agent, session, inter, llm1, toolAfterLlm1, llm2];
+// A small forest: one interaction ▸ (llm1, toolA, llm2). Entities (agent/session)
+// are synthesized by aggregate from the interaction's session_id/user_id.
+function forest(): CanonicalNode[] {
+  return [interaction, llm1, toolAfterLlm1, llm2];
 }
 
-// ── Recursive lossless / cleanliness assertions ────────────────────────────────
-
-function assertClean(node: ExecutionNode): void {
-  expect(node.canonical).toBeDefined();
-  expect(node.id).toBe(node.canonical.id);
-  expect(node).not.toHaveProperty('labelLines');
-  expect(node).not.toHaveProperty('segments');
-  expect(node).not.toHaveProperty('segmentIndex');
-  expect(node).not.toHaveProperty('shape');
-  expect(node).not.toHaveProperty('moves');
-  expect(node).not.toHaveProperty('verb');
-  expect(node).not.toHaveProperty('kind');
-  for (const child of node.children) assertClean(child);
+function buildGraph(nodes: CanonicalNode[]): ExecutionGraph {
+  return buildExecutionGraph(aggregate([nodes]));
 }
 
 function soleAgent(graph: ExecutionGraph): AgentExecution {
@@ -102,28 +92,30 @@ function soleThread(agent: AgentExecution): Thread {
   return thread;
 }
 
-function everyNode(agent: AgentExecution): ExecutionNode[] {
-  const sessionNodes = agent.sessions.flatMap((s) => [
-    s.root,
-    ...s.interactions.flatMap((i) => [i.root, ...i.threads.flatMap((t) => t.members)]),
-  ]);
-  return [agent.root, ...sessionNodes];
+// A tree/thread node is an EDGE — it carries only its id and children, no embedded
+// node data (that lives in the `nodes` table, resolved by id).
+function assertIdOnly(node: ExecutionNode): void {
+  expect(Object.keys(node).sort()).toEqual(['children', 'id']);
+  expect(node).not.toHaveProperty('canonical');
+  for (const child of node.children) assertIdOnly(child);
 }
 
 describe('buildExecutionGraph', () => {
-  it('builds kind:agent with sessions ▸ interactions ▸ threads ▸ members', () => {
-    const agent = soleAgent(buildExecutionGraph(agentForest()));
-    expect(agent.root.id).toBe('agent');
+  it('builds kind:agent with entities ▸ interactions ▸ threads ▸ members', () => {
+    const graph = buildGraph(forest());
+    const agent = soleAgent(graph);
+    expect(agent.agent.id).toBe(agentEntityId('u-1'));
+    expect(agent.agent.userId).toBe('u-1');
     expect(agent.sessions).toHaveLength(1);
 
     const session = agent.sessions[0];
-    expect(session?.root.id).toBe('sess');
+    expect(session?.session.id).toBe(SID);
+    expect(session?.session.sessionId).toBe('s-1');
     expect(session?.interactions).toHaveLength(1);
 
     const inter = session?.interactions[0];
-    expect(inter?.root.id).toBe('root');
+    expect(inter?.interactionId).toBe('root');
     expect(inter?.threads).toHaveLength(1);
-    expect(inter?.rootToThreadIds).toEqual(['thread_repl_main_thread']);
 
     const thread = soleThread(agent);
     expect(thread.id).toBe('thread_repl_main_thread');
@@ -132,30 +124,48 @@ describe('buildExecutionGraph', () => {
     expect(thread.members.map((m) => m.id)).toEqual(['llm1', 'toolA', 'llm2']);
   });
 
-  it('synthesizes a user_prompt node as the head of the interaction', () => {
-    const agent = soleAgent(buildExecutionGraph(agentForest()));
-    const inter = agent.sessions[0]?.interactions[0];
-    expect(inter?.userPrompt?.canonical.type).toBe('user_prompt');
-    expect(inter?.userPrompt?.canonical).toMatchObject({ prompt: 'hello' });
+  it('keeps agent and session as entities, NOT rows in the node table', () => {
+    const graph = buildGraph(forest());
+    expect(graph.nodes[agentEntityId('u-1')]).toBeUndefined();
+    expect(graph.nodes[SID]).toBeUndefined();
+    // Real nodes ARE in the table.
+    expect(graph.nodes.llm1).toBe(llm1);
+    expect(graph.nodes.toolA).toBe(toolAfterLlm1);
   });
 
-  it('embeds the full CanonicalNode losslessly on every node', () => {
-    const agent = soleAgent(buildExecutionGraph(agentForest()));
+  it('synthesizes a user_prompt node, referenced by id and stored in the table', () => {
+    const graph = buildGraph(forest());
+    const inter = soleAgent(graph).sessions[0]?.interactions[0];
+    expect(inter?.userPromptId).toBe('root__prompt');
+    const resolved = resolve(graph, 'root__prompt');
+    expect(resolved.node.type).toBe('user_prompt');
+    expect(resolved.node).toMatchObject({ prompt: 'hello', sessionId: SID });
+  });
 
-    const llm1Node = soleThread(agent).members.find((m) => m.id === 'llm1');
-    expect(llm1Node?.canonical).toBe(llm1);
-    expect(llm1Node?.canonical).toMatchObject({ source: 'repl_main_thread' });
+  it('makes every tree/thread node id-only — data resolves through the node table', () => {
+    const graph = buildGraph(forest());
+    const agent = soleAgent(graph);
+    for (const session of agent.sessions) {
+      for (const ix of session.interactions) {
+        assertIdOnly(ix.tree);
+        ix.threads.flatMap((t) => t.members).forEach(assertIdOnly);
+      }
+    }
+    // The id resolves to the very same canonical object that was passed in.
+    expect(nodeData(graph, 'llm1')).toBe(llm1);
+  });
 
-    everyNode(agent).forEach(assertClean);
+  it('builds an id-only containment tree rooted at the interaction', () => {
+    const graph = buildGraph(forest());
+    const inter = soleAgent(graph).sessions[0]?.interactions[0];
+    expect(inter?.tree.id).toBe('root');
+    expect(inter?.tree.children.map((c) => c.id)).toEqual(['llm1', 'toolA', 'llm2']);
   });
 
   it('carries the signed gap on causal edges (not on member ordering)', () => {
-    const graph = buildExecutionGraph(agentForest());
-    if (graph.kind !== 'agent') throw new Error('expected agent');
-
-    const causal = graph.data.sessions[0]?.interactions[0]?.causalEdges ?? [];
+    const inter = soleAgent(buildGraph(forest())).sessions[0]?.interactions[0];
     // llm1 ends at 200ms, toolA starts at 210ms → +10ms on the causal edge.
-    const edge = causal.find((e) => e.fromId === 'llm1' && e.toId === 'toolA');
+    const edge = (inter?.causalEdges ?? []).find((e) => e.fromId === 'llm1' && e.toId === 'toolA');
     expect(edge?.gapMs).toBe(10);
   });
 
@@ -164,6 +174,7 @@ describe('buildExecutionGraph', () => {
       id: 'twc',
       type: 'tool',
       parent: 'root',
+      sessionId: SID,
       name: 'Skill',
       ...span(210, 300),
     };
@@ -171,19 +182,22 @@ describe('buildExecutionGraph', () => {
       id: 'child1',
       type: 'tool.execution',
       parent: 'twc',
+      sessionId: SID,
       ...span(215, 220),
     };
-    const inter = buildInteractionExecution([interaction, llm1, toolWithChild, child]);
+    const inter = soleAgent(buildGraph([interaction, llm1, toolWithChild, child])).sessions[0]
+      ?.interactions[0];
     const edges = inter?.causalEdges ?? [];
     expect(edges.some((e) => e.toId === 'twc')).toBe(true);
     expect(edges.some((e) => e.fromId.startsWith('sg_') || e.toId.startsWith('sg_'))).toBe(false);
   });
 
-  it('preserves nested children on container nodes', () => {
+  it('preserves nested containment children (id-only) on a tool member', () => {
     const toolWithChild: CanonicalNode = {
       id: 'twc',
       type: 'tool',
       parent: 'root',
+      sessionId: SID,
       name: 'Skill',
       ...span(210, 300),
     };
@@ -191,41 +205,32 @@ describe('buildExecutionGraph', () => {
       id: 'child1',
       type: 'tool.execution',
       parent: 'twc',
+      sessionId: SID,
       ...span(215, 220),
     };
-    const inter = buildInteractionExecution([interaction, llm1, toolWithChild, child]);
+    const graph = buildGraph([interaction, llm1, toolWithChild, child]);
+    const inter = soleAgent(graph).sessions[0]?.interactions[0];
     const member = inter?.threads[0]?.members.find((m) => m.id === 'twc');
     expect(member?.children).toHaveLength(1);
     expect(member?.children[0]?.id).toBe('child1');
-    expect(member?.children[0]?.canonical).toBe(child);
+    expect(nodeData(graph, 'child1')).toBe(child);
   });
 
-  it('degrades to kind:session when no agent node is present', () => {
-    const session: CanonicalNode = {
-      id: 'sess',
-      type: 'session',
-      session_id: 's-1',
-      user_id: 'u-1',
-    };
-    const inter: CanonicalNode = { ...interaction, parent: 'sess' };
-    const graph = buildExecutionGraph([session, inter, { ...llm1, parent: 'root' }]);
-    expect(graph.kind).toBe('session');
+  it('produces kind:agent with empty sessions when there is no interaction', () => {
+    const graph = buildGraph([llm1]);
+    expect(graph.kind).toBe('agent');
+    expect(soleAgent(graph).sessions).toHaveLength(0);
   });
 
-  it('degrades to kind:interaction when only an interaction is present', () => {
-    const graph = buildExecutionGraph([interaction, llm1]);
-    expect(graph.kind).toBe('interaction');
-    if (graph.kind !== 'interaction') return;
-    expect(graph.data?.root.id).toBe('root');
-  });
-
-  it('returns kind:interaction with null data when no interaction exists', () => {
-    const graph = buildExecutionGraph([llm1]);
-    expect(graph).toEqual({ kind: 'interaction', data: null });
+  it('round-trips through JSON (plain serializable data, no cycles)', () => {
+    const graph = buildGraph(forest());
+    const round = JSON.parse(JSON.stringify(graph)) as ExecutionGraph;
+    expect(round.nodes.llm1).toEqual(llm1);
+    expect(round.kind).toBe('agent');
   });
 });
 
-// ── Message delta tests ──────────────────────────────────────────────────────
+// ── Message delta tests (now in the graph-level `deltas` table, keyed by id) ─────
 
 const msg1: RequestMessage = { role: 'user', content: 'Hello' };
 const msg2: RequestMessage = { role: 'assistant', content: 'Hi there' };
@@ -239,6 +244,7 @@ function makeInteractionWithLlms(llmNodes: CanonicalNode[]): CanonicalNode[] {
     {
       id: 'root',
       type: 'interaction',
+      sessionId: SID,
       session_id: 's-1',
       user_id: 'u-1',
       sequence: 0,
@@ -249,144 +255,67 @@ function makeInteractionWithLlms(llmNodes: CanonicalNode[]): CanonicalNode[] {
   ];
 }
 
-function findMember(
-  inter: ReturnType<typeof buildInteractionExecution>,
-  id: string,
-): ExecutionNode {
-  const member = inter?.threads[0]?.members.find((m) => m.id === id);
-  if (member == null) throw new Error(`member ${id} not found`);
-  return member;
+function llm(over: Partial<CanonicalNode> & { id: string }): CanonicalNode {
+  return {
+    type: 'llm_request',
+    parent: 'root',
+    sessionId: SID,
+    source: 'repl_main_thread',
+    model: '',
+    tokens_in: 0,
+    tokens_out: 0,
+    ...span(100, 200),
+    ...over,
+  } as CanonicalNode;
 }
 
-describe('message deltas on thread members', () => {
+describe('message deltas in the deltas table', () => {
   it('first llm_request in thread gets its full request_messages as delta', () => {
-    const llm: CanonicalNode = {
-      id: 'llm1',
-      type: 'llm_request',
-      parent: 'root',
-      source: 'repl_main_thread',
-      model: '',
-      tokens_in: 0,
-      tokens_out: 0,
-      ...span(100, 200),
-      request_messages: [msg1],
-      response_messages: resMsgs1,
-    };
-    const inter = buildInteractionExecution(makeInteractionWithLlms([llm]));
-    const member = findMember(inter, 'llm1');
-    expect(member.requestMessagesDelta).toEqual([msg1]);
-    expect(member.responseMessagesDelta).toEqual(resMsgs1);
+    const node = llm({ id: 'llm1', request_messages: [msg1], response_messages: resMsgs1 });
+    const graph = buildGraph(makeInteractionWithLlms([node]));
+    expect(deltasOf(graph, 'llm1')?.requestMessagesDelta).toEqual([msg1]);
+    expect(deltasOf(graph, 'llm1')?.responseMessagesDelta).toEqual(resMsgs1);
   });
 
-  it('subsequent llm_request gets suffix beyond previous request length as delta', () => {
-    const llmA: CanonicalNode = {
-      id: 'llmA',
-      type: 'llm_request',
-      parent: 'root',
-      source: 'repl_main_thread',
-      model: '',
-      tokens_in: 0,
-      tokens_out: 0,
-      ...span(100, 200),
-      request_messages: [msg1, msg2],
-      response_messages: resMsgs1,
-    };
-    const llmB: CanonicalNode = {
+  it('subsequent llm_request gets suffix beyond previous request as delta', () => {
+    const a = llm({ id: 'llmA', request_messages: [msg1, msg2], response_messages: resMsgs1 });
+    const b = llm({
       id: 'llmB',
-      type: 'llm_request',
-      parent: 'root',
-      source: 'repl_main_thread',
-      model: '',
-      tokens_in: 0,
-      tokens_out: 0,
       ...span(300, 400),
       request_messages: [msg1, msg2, msg3],
       response_messages: resMsgs2,
-    };
-    const inter = buildInteractionExecution(makeInteractionWithLlms([llmA, llmB]));
-    const memberA = findMember(inter, 'llmA');
-    const memberB = findMember(inter, 'llmB');
-
-    expect(memberA.requestMessagesDelta).toEqual([msg1, msg2]);
-    expect(memberB.requestMessagesDelta).toEqual([msg3]);
-    expect(memberB.responseMessagesDelta).toEqual(resMsgs2);
-  });
-
-  it('single-request thread: delta equals full request_messages', () => {
-    const llm: CanonicalNode = {
-      id: 'llmOnly',
-      type: 'llm_request',
-      parent: 'root',
-      source: 'repl_main_thread',
-      model: '',
-      tokens_in: 0,
-      tokens_out: 0,
-      ...span(100, 200),
-      request_messages: [msg1, msg2, msg3],
-      response_messages: resMsgs1,
-    };
-    const inter = buildInteractionExecution(makeInteractionWithLlms([llm]));
-    const member = findMember(inter, 'llmOnly');
-    expect(member.requestMessagesDelta).toEqual([msg1, msg2, msg3]);
+    });
+    const graph = buildGraph(makeInteractionWithLlms([a, b]));
+    expect(deltasOf(graph, 'llmA')?.requestMessagesDelta).toEqual([msg1, msg2]);
+    expect(deltasOf(graph, 'llmB')?.requestMessagesDelta).toEqual([msg3]);
+    expect(deltasOf(graph, 'llmB')?.responseMessagesDelta).toEqual(resMsgs2);
   });
 
   it('native format: each llm_request carries only new messages as delta', () => {
-    // Native traces log only the delta per request, not the full cumulative history.
-    const llmA: CanonicalNode = {
-      id: 'llmA',
-      type: 'llm_request',
-      parent: 'root',
-      source: 'repl_main_thread',
-      model: '',
-      tokens_in: 0,
-      tokens_out: 0,
-      ...span(100, 200),
-      request_messages: [msg1, msg2],
-      response_messages: resMsgs1,
-    };
-    const llmB: CanonicalNode = {
+    const a = llm({ id: 'llmA', request_messages: [msg1, msg2], response_messages: resMsgs1 });
+    // Native: only the new message, not the full cumulative history.
+    const b = llm({
       id: 'llmB',
-      type: 'llm_request',
-      parent: 'root',
-      source: 'repl_main_thread',
-      model: '',
-      tokens_in: 0,
-      tokens_out: 0,
       ...span(300, 400),
-      // Native: only the new message, not the full history
       request_messages: [msg3],
       response_messages: resMsgs2,
-    };
-    const inter = buildInteractionExecution(makeInteractionWithLlms([llmA, llmB]));
-    const memberA = findMember(inter, 'llmA');
-    const memberB = findMember(inter, 'llmB');
-
-    expect(memberA.requestMessagesDelta).toEqual([msg1, msg2]);
-    expect(memberB.requestMessagesDelta).toEqual([msg3]);
+    });
+    const graph = buildGraph(makeInteractionWithLlms([a, b]));
+    expect(deltasOf(graph, 'llmA')?.requestMessagesDelta).toEqual([msg1, msg2]);
+    expect(deltasOf(graph, 'llmB')?.requestMessagesDelta).toEqual([msg3]);
   });
 
-  it('tool nodes have no delta fields', () => {
-    const llm: CanonicalNode = {
-      id: 'llm1',
-      type: 'llm_request',
-      parent: 'root',
-      source: 'repl_main_thread',
-      model: '',
-      tokens_in: 0,
-      tokens_out: 0,
-      ...span(100, 200),
-      request_messages: [msg1],
-    };
+  it('tool nodes have no delta row', () => {
+    const node = llm({ id: 'llm1', request_messages: [msg1] });
     const tool: CanonicalNode = {
       id: 'toolA',
       type: 'tool',
       parent: 'root',
+      sessionId: SID,
       name: 'Read',
       ...span(210, 300),
     };
-    const inter = buildInteractionExecution(makeInteractionWithLlms([llm, tool]));
-    const toolMember = findMember(inter, 'toolA');
-    expect(toolMember.requestMessagesDelta).toBeUndefined();
-    expect(toolMember.responseMessagesDelta).toBeUndefined();
+    const graph = buildGraph(makeInteractionWithLlms([node, tool]));
+    expect(deltasOf(graph, 'toolA')).toBeUndefined();
   });
 });

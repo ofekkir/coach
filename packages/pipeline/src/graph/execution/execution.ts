@@ -1,4 +1,5 @@
-import type { CanonicalNode, InteractionNode, UserPromptNode } from '../../types.ts';
+import type { CanonicalNode, InteractionNode, MessageDeltas, UserPromptNode } from '../../types.ts';
+import type { AgentGraph } from '../../aggregate/aggregate.ts';
 import type {
   AgentExecution,
   ExecutionGraph,
@@ -7,42 +8,39 @@ import type {
   SessionExecution,
   Thread,
 } from '../types.ts';
-import { buildCausalEdges } from './causal.ts';
+import type { Session } from '../../types.ts';
+import { buildCausalEdges, type NodeResolver } from './causal.ts';
 import {
   buildChildrenOf,
   buildThreadMembers,
   compareStart,
+  llmDeltas,
   messageKey,
   sortByStart,
-  withLlmDeltas,
 } from './thread.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
-// Execution graph builder — the mechanical, lossless skeleton from a trace.
-//
-// Ported from view-model/{graph-view,session-view,thread}.ts but stripped of
-// all presentation and semantics: nodes embed the full CanonicalNode (no
-// labelLines), edges carry a raw signed gapMs (no "+12ms"), edge ids are plain
-// canonical ids (no sg_ prefix), and there are no segments/shape/moves/verbs.
+// Stage 5 — the mechanical, layered execution graph from the aggregated node
+// table. Three concerns stay separate (see graph/types.ts): the `nodes` table
+// (canonical data, additive), the `deltas` table (per-node message deltas built
+// here), and the edge layers — containment (`tree`, ids only) and causal
+// (`causalEdges`, a DAG). Entities (agent/session) own the structure; they are
+// not nodes. Threads are a layout grouping only.
 // ════════════════════════════════════════════════════════════════════════════
 
-// ── Recursive node building ─────────────────────────────────────────────────
-
-function isInteraction(n: CanonicalNode): n is InteractionNode {
-  return n.type === 'interaction';
+// Mutable accumulators threaded through the build: the node table (extended with
+// synthesized user_prompt nodes) and the per-node deltas table.
+interface BuildState {
+  readonly nodes: Record<string, CanonicalNode>;
+  readonly deltas: Record<string, MessageDeltas>;
+  readonly childrenOf: Map<string, CanonicalNode[]>;
 }
 
-function toExecutionNode(
-  node: CanonicalNode,
-  childrenOf: Map<string, CanonicalNode[]>,
-): ExecutionNode {
-  const rawChildren = childrenOf.get(node.id);
-  if (rawChildren == null || rawChildren.length === 0) {
-    return { id: node.id, canonical: node, children: [] };
-  }
-
-  const childNodes = sortByStart(rawChildren).map((child) => toExecutionNode(child, childrenOf));
-  return { id: node.id, canonical: node, children: childNodes };
+// The id-only containment tree rooted at `id`: each node carries only its id and
+// its time-ordered children. No embedded data — resolve through the node table.
+function buildTree(id: string, childrenOf: Map<string, CanonicalNode[]>): ExecutionNode {
+  const raw = childrenOf.get(id) ?? [];
+  return { id, children: sortByStart(raw).map((child) => buildTree(child.id, childrenOf)) };
 }
 
 // ── Interaction level ───────────────────────────────────────────────────────
@@ -70,159 +68,104 @@ function orderSources(
   });
 }
 
-export function buildInteractionExecution(
-  nodes: readonly CanonicalNode[],
-): InteractionExecution | null {
-  const interaction = nodes.find(isInteraction);
-  if (interaction == null) return null;
-
-  const childrenOf = buildChildrenOf(nodes);
-  const directChildren = childrenOf.get(interaction.id) ?? [];
-  const llmsByThread = groupLlmsByThread(directChildren);
-  const threadMembers = buildThreadMembers(directChildren, llmsByThread);
-  const sortedSources = orderSources(threadMembers, interaction);
-
-  const root: ExecutionNode = {
-    id: interaction.id,
-    canonical: interaction,
-    children: [],
-  };
-
-  const threads = sortedSources.map((source) =>
-    buildThread(source, threadMembers.get(source) ?? [], childrenOf),
-  );
-  const userPrompt = toUserPromptNode(interaction);
-
-  return {
-    root,
-    userPrompt,
-    threads,
-    rootToThreadIds: threads.map((t) => t.id),
-    causalEdges: buildCausalEdges(threads, userPrompt),
-  };
-}
-
-// The user prompt is a synthesized first node of the interaction — its input /
-// the head of the spine, carrying the full prompt. Mechanical, but not a step.
-function toUserPromptNode(interaction: InteractionNode): ExecutionNode | null {
+// The user prompt is a synthesized node carrying the interaction's full prompt —
+// its input / head of the spine. Added to the node table (cards resolve by id);
+// referenced from the interaction by id, NOT embedded. Null when there is no text.
+function buildUserPromptNode(interaction: InteractionNode): UserPromptNode | null {
   if (interaction.prompt.trim() === '') return null;
-  const canonical: UserPromptNode = {
+  return {
     id: `${interaction.id}__prompt`,
     type: 'user_prompt',
     parent: interaction.id,
+    sessionId: interaction.sessionId,
     prompt: interaction.prompt,
   };
-  return { id: canonical.id, canonical, children: [] };
 }
 
-function buildThread(
-  source: string,
-  members: readonly CanonicalNode[],
-  childrenOf: Map<string, CanonicalNode[]>,
-): Thread {
+function buildThread(source: string, members: readonly CanonicalNode[], state: BuildState): Thread {
   const seenMessageKeys = new Set<string>();
   const builtMembers = members.map((m) => {
-    const base = toExecutionNode(m, childrenOf);
-    const node = withLlmDeltas(base, m, seenMessageKeys);
+    const deltas = llmDeltas(m, seenMessageKeys);
+    if (deltas != null) state.deltas[m.id] = deltas;
     if (m.type === 'llm_request') {
-      for (const msg of m.request_messages ?? []) {
-        seenMessageKeys.add(messageKey(msg));
-      }
+      for (const msg of m.request_messages ?? []) seenMessageKeys.add(messageKey(msg));
     }
-    return node;
+    return buildTree(m.id, state.childrenOf);
   });
+  return { id: `thread_${source.replace(/\W+/g, '_')}`, source, members: builtMembers };
+}
 
+function resolverOf(state: BuildState): NodeResolver {
   return {
-    id: `thread_${source.replace(/\W+/g, '_')}`,
-    source,
-    members: builtMembers,
+    node: (id) => {
+      const node = state.nodes[id];
+      if (node == null) throw new Error(`execution graph: no node data for id '${id}'`);
+      return node;
+    },
+    deltas: (id) => state.deltas[id],
   };
 }
 
-function emptyInteractionExecution(interaction: InteractionNode): InteractionExecution {
+function buildInteractionExecution(
+  interaction: InteractionNode,
+  state: BuildState,
+): InteractionExecution {
+  const directChildren = state.childrenOf.get(interaction.id) ?? [];
+  const llmsByThread = groupLlmsByThread(directChildren);
+  const threadMembers = buildThreadMembers(directChildren, llmsByThread);
+  const sortedSources = orderSources(threadMembers, interaction);
+  const threads = sortedSources.map((source) =>
+    buildThread(source, threadMembers.get(source) ?? [], state),
+  );
+
+  const promptNode = buildUserPromptNode(interaction);
+  if (promptNode != null) state.nodes[promptNode.id] = promptNode;
+
   return {
-    root: { id: interaction.id, canonical: interaction, children: [] },
-    userPrompt: toUserPromptNode(interaction),
-    threads: [],
-    rootToThreadIds: [],
-    causalEdges: [],
+    interactionId: interaction.id,
+    userPromptId: promptNode?.id ?? null,
+    tree: buildTree(interaction.id, state.childrenOf),
+    threads,
+    causalEdges: buildCausalEdges(threads, promptNode?.id ?? null, resolverOf(state)),
   };
-}
-
-// ── Subtree extraction (ported from session-view.ts) ───────────────────────────
-
-function nodeSubtree(nodes: readonly CanonicalNode[], rootId: string): CanonicalNode[] {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const childrenOf = buildChildrenOf(nodes);
-  const result: CanonicalNode[] = [];
-  const queue: string[] = [rootId];
-  while (queue.length > 0) {
-    const id = queue.shift();
-    if (id == null) continue;
-    const node = byId.get(id);
-    if (node == null) continue;
-    result.push(node);
-    for (const child of childrenOf.get(id) ?? []) {
-      queue.push(child.id);
-    }
-  }
-  return result;
 }
 
 // ── Session level ──────────────────────────────────────────────────────────────
 
-function buildSessionExecution(nodes: readonly CanonicalNode[]): SessionExecution | null {
-  const session = nodes.find((n) => n.type === 'session');
-  if (session == null) return null;
-
-  const childrenOf = buildChildrenOf(nodes);
-  const interactions = sortByStart((childrenOf.get(session.id) ?? []).filter(isInteraction));
-  if (interactions.length === 0) return null;
-
-  const root: ExecutionNode = { id: session.id, canonical: session, children: [] };
-  const interactionExecutions = interactions.map((interaction) => {
-    const interactionNodes = nodeSubtree(nodes, interaction.id);
-    return buildInteractionExecution(interactionNodes) ?? emptyInteractionExecution(interaction);
-  });
-
-  return { root, interactions: interactionExecutions };
-}
-
-function emptySessionExecution(session: CanonicalNode): SessionExecution {
+function buildSessionExecution(
+  session: Session,
+  allNodes: readonly CanonicalNode[],
+  state: BuildState,
+): SessionExecution {
+  const interactions = sortByStart(
+    allNodes.filter(
+      (n): n is InteractionNode => n.type === 'interaction' && n.sessionId === session.id,
+    ),
+  );
   return {
-    root: { id: session.id, canonical: session, children: [] },
-    interactions: [],
+    session,
+    interactions: interactions.map((interaction) => buildInteractionExecution(interaction, state)),
   };
 }
 
-// ── Agent level ─────────────────────────────────────────────────────────────
+// ── Entry point ──────────────────────────────────────────────────────────────
 
-function buildAgentExecution(nodes: readonly CanonicalNode[]): AgentExecution | null {
-  const agent = nodes.find((n) => n.type === 'agent');
-  if (agent == null) return null;
+export function buildExecutionGraph(agentGraph: AgentGraph): ExecutionGraph {
+  const nodes: Record<string, CanonicalNode> = {};
+  for (const node of agentGraph.nodes) nodes[node.id] = node;
 
-  const childrenOf = buildChildrenOf(nodes);
-  const directSessions = (childrenOf.get(agent.id) ?? []).filter((n) => n.type === 'session');
-  const sessions = sortByStart(directSessions);
-  if (sessions.length === 0) return null;
+  const state: BuildState = {
+    nodes,
+    deltas: {},
+    childrenOf: buildChildrenOf(agentGraph.nodes),
+  };
 
-  const root: ExecutionNode = { id: agent.id, canonical: agent, children: [] };
-  const sessionExecutions = sessions.map((session) => {
-    const sessionNodes = nodeSubtree(nodes, session.id);
-    return buildSessionExecution(sessionNodes) ?? emptySessionExecution(session);
-  });
+  const data: AgentExecution = {
+    agent: agentGraph.agent,
+    sessions: agentGraph.sessions.map((session) =>
+      buildSessionExecution(session, agentGraph.nodes, state),
+    ),
+  };
 
-  return { root, sessions: sessionExecutions };
-}
-
-// ── Entry point — graceful degradation (ported from orchestrate.buildVizData) ──
-
-export function buildExecutionGraph(nodes: readonly CanonicalNode[]): ExecutionGraph {
-  const agent = buildAgentExecution(nodes);
-  if (agent != null) return { kind: 'agent', data: agent };
-
-  const session = buildSessionExecution(nodes);
-  if (session != null) return { kind: 'session', data: session };
-
-  return { kind: 'interaction', data: buildInteractionExecution(nodes) };
+  return { kind: 'agent', data, nodes: state.nodes, deltas: state.deltas, semantics: {} };
 }

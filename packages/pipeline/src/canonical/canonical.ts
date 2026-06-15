@@ -1,4 +1,3 @@
-import { addSessionNode } from '../aggregate/aggregate.ts';
 import type {
   CanonicalNode,
   ClassifiedInput,
@@ -50,9 +49,11 @@ function otelFromInputs(inputs: readonly ClassifiedInput[]): CanonicalNode[] {
   return otelToCanonical(traces, logs);
 }
 
-// Stage 3: turn one session's inputs into a session-rooted canonical node forest.
+// Stage 3: turn one session's inputs into a canonical node forest. Every node
+// already carries its `sessionId` FK (stamped in transform); the owning Session
+// entity is synthesized later, in aggregate.
 export function toCanonical(session: SessionInputs): CanonicalNode[] {
-  const nodes =
-    session.kind === 'native' ? nativeFromInputs(session.inputs) : otelFromInputs(session.inputs);
-  return addSessionNode(nodes);
+  return session.kind === 'native'
+    ? nativeFromInputs(session.inputs)
+    : otelFromInputs(session.inputs);
 }

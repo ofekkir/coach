@@ -1,4 +1,3 @@
-import type { GraphNode } from '@coach/pipeline';
 import { fonts, glyphFor, tokens } from '../theme.ts';
 import type { NodeCard } from '../format/format.ts';
 import { Glyph } from '../TraceNode/Glyph.tsx';
@@ -67,10 +66,11 @@ export function panelHeader(
 }
 
 // The footer: a clearly-interactive toggle (chevron + accent label) revealing the
-// raw canonical node + its id. The accent + chevron mark it as a control, not a
-// caption, so the JSON tree is discoverable.
+// raw node + its id. The accent + chevron mark it as a control, not a caption, so
+// the JSON tree is discoverable. `nodeId` is absent for entity selections (which
+// carry no node-table row).
 export function panelFooter(
-  canonical: GraphNode | undefined,
+  nodeId: string | undefined,
   showRaw: boolean,
   onToggle: () => void,
 ): React.ReactNode {
@@ -97,7 +97,7 @@ export function panelFooter(
       <span style={{ fontFamily: fonts.mono, fontSize: 11, color: tokens.accentInkSoft }}>
         {showRaw ? 'hide raw node' : 'view raw node'}
       </span>
-      {canonical != null && (
+      {nodeId != null && (
         <span
           style={{
             fontFamily: fonts.mono,
@@ -109,7 +109,7 @@ export function panelFooter(
             whiteSpace: 'nowrap',
           }}
         >
-          {canonical.id}
+          {nodeId}
         </span>
       )}
     </button>

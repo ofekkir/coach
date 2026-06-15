@@ -8,6 +8,7 @@ import type {
   ToolBlockedOnUserNode,
   HookNode,
 } from '../../types.ts';
+import { sessionEntityId } from '../../types.ts';
 import {
   extractRequestMessages,
   extractResponseMessages,
@@ -16,12 +17,29 @@ import {
 import { parseSpans } from './parse.ts';
 import type { ParsedSpan } from './parse.ts';
 
-function spanTiming(span: ParsedSpan): {
+// The id/timing/parent/sessionId fields every span-derived node shares. `sessionId`
+// is the FK → Session entity, denormalized onto every node (resolved once per
+// trace from the interaction span's session.id).
+function nodeBase(
+  span: ParsedSpan,
+  parent: string | null,
+  sessionId: string,
+): {
+  id: string;
+  sessionId: string;
   start_time_ns: string;
   end_time_ns: string;
   duration_ms: number;
+  parent?: string;
 } {
-  return { start_time_ns: span.startNs, end_time_ns: span.endNs, duration_ms: span.durationMs };
+  return {
+    id: span.id,
+    sessionId,
+    start_time_ns: span.startNs,
+    end_time_ns: span.endNs,
+    duration_ms: span.durationMs,
+    ...parentField(parent),
+  };
 }
 
 function effectiveParent(span: ParsedSpan, rootId: string | null): string | null {
@@ -38,12 +56,14 @@ function require<T>(value: T | null, spanId: string, attr: string): T {
   return value;
 }
 
-function buildInteractionNode(span: ParsedSpan, parent: string | null): InteractionNode {
+function buildInteractionNode(
+  span: ParsedSpan,
+  parent: string | null,
+  sessionId: string,
+): InteractionNode {
   return {
-    id: span.id,
+    ...nodeBase(span, parent, sessionId),
     type: 'interaction',
-    ...spanTiming(span),
-    ...parentField(parent),
     session_id: require(span.sessionId, span.id, 'session.id'),
     sequence: require(span.sequenceIndex, span.id, 'interaction.sequence'),
     prompt: require(span.userPrompt, span.id, 'user_prompt'),
@@ -67,13 +87,12 @@ function applyResponseBody(node: LlmRequestNode, rawResponseBody: string): void 
 function buildLlmRequestNode(
   span: ParsedSpan,
   parent: string | null,
+  sessionId: string,
   repair: boolean,
 ): LlmRequestNode {
   const node: LlmRequestNode = {
-    id: span.id,
+    ...nodeBase(span, parent, sessionId),
     type: 'llm_request',
-    ...spanTiming(span),
-    ...parentField(parent),
     model: require(span.model, span.id, 'model'),
     tokens_in: require(span.inputTokens, span.id, 'input_tokens'),
     tokens_out: require(span.outputTokens, span.id, 'output_tokens'),
@@ -88,55 +107,72 @@ function buildLlmRequestNode(
   return node;
 }
 
-function buildToolNode(span: ParsedSpan, parent: string | null): ToolNode {
-  const node: ToolNode = { id: span.id, type: 'tool', ...spanTiming(span), ...parentField(parent) };
+function buildToolNode(span: ParsedSpan, parent: string | null, sessionId: string): ToolNode {
+  const node: ToolNode = { ...nodeBase(span, parent, sessionId), type: 'tool' };
   if (span.toolName != null) node.name = span.toolName;
   if (span.toolUseId != null) node.tool_use_id = span.toolUseId;
   if (span.toolInputSummary != null) node.tool_input = span.toolInputSummary;
   return node;
 }
 
-function buildToolExecutionNode(span: ParsedSpan, parent: string | null): ToolExecutionNode {
-  return { id: span.id, type: 'tool.execution', ...spanTiming(span), ...parentField(parent) };
+function buildToolExecutionNode(
+  span: ParsedSpan,
+  parent: string | null,
+  sessionId: string,
+): ToolExecutionNode {
+  return { ...nodeBase(span, parent, sessionId), type: 'tool.execution' };
 }
 
 function buildToolBlockedOnUserNode(
   span: ParsedSpan,
   parent: string | null,
+  sessionId: string,
 ): ToolBlockedOnUserNode {
-  return { id: span.id, type: 'tool.blocked_on_user', ...spanTiming(span), ...parentField(parent) };
+  return { ...nodeBase(span, parent, sessionId), type: 'tool.blocked_on_user' };
 }
 
-function buildHookNode(span: ParsedSpan, parent: string | null): HookNode {
+function buildHookNode(span: ParsedSpan, parent: string | null, sessionId: string): HookNode {
   return {
-    id: span.id,
+    ...nodeBase(span, parent, sessionId),
     type: 'hook',
-    ...spanTiming(span),
-    ...parentField(parent),
     name: require(span.hookName, span.id, 'hook.name'),
   };
 }
 
-function spanToNode(span: ParsedSpan, rootId: string | null, repair: boolean): CanonicalNode {
+function spanToNode(
+  span: ParsedSpan,
+  rootId: string | null,
+  sessionId: string,
+  repair: boolean,
+): CanonicalNode {
   const parent = effectiveParent(span, rootId);
   switch (span.spanType) {
     case 'llm_request':
-      return buildLlmRequestNode(span, parent, repair);
+      return buildLlmRequestNode(span, parent, sessionId, repair);
     case 'tool':
-      return buildToolNode(span, parent);
+      return buildToolNode(span, parent, sessionId);
     case 'tool.execution':
-      return buildToolExecutionNode(span, parent);
+      return buildToolExecutionNode(span, parent, sessionId);
     case 'tool.blocked_on_user':
-      return buildToolBlockedOnUserNode(span, parent);
+      return buildToolBlockedOnUserNode(span, parent, sessionId);
     case 'hook':
-      return buildHookNode(span, parent);
+      return buildHookNode(span, parent, sessionId);
     default:
-      return buildInteractionNode(span, parent);
+      return buildInteractionNode(span, parent, sessionId);
   }
+}
+
+// The Session entity id every node carries as its `sessionId` FK, resolved once
+// from the trace's interaction span (the only span carrying `session.id`). Empty
+// when the trace has no session attribute (a degraded input).
+function resolveSessionId(spans: readonly ParsedSpan[]): string {
+  const harnessSessionId = spans.find((s) => s.sessionId != null)?.sessionId;
+  return harnessSessionId != null ? sessionEntityId(harnessSessionId) : '';
 }
 
 export function transformTrace(trace: TempoTrace, repair = false): CanonicalNode[] {
   const spans = parseSpans(trace);
   const rootId = spans.find((s) => s.parentId === null)?.id ?? null;
-  return spans.map((s) => spanToNode(s, rootId, repair));
+  const sessionId = resolveSessionId(spans);
+  return spans.map((s) => spanToNode(s, rootId, sessionId, repair));
 }

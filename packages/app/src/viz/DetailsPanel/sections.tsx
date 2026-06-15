@@ -1,4 +1,4 @@
-import type { GraphNode } from '@coach/pipeline';
+import type { ResolvedNode } from '@coach/pipeline';
 import { fonts, monoLabel, tokens } from '../theme.ts';
 import { type NodeCard } from '../format/format.ts';
 import type { HiddenSubCall } from '../layout/types.ts';
@@ -11,8 +11,9 @@ const METRIC_FONT = 15;
 const MS_PER_SECOND = 1000;
 const SECONDS_DECIMALS = 2;
 
-function whatOf(canonical: GraphNode | undefined): readonly string[] {
-  return canonical != null && 'what' in canonical ? canonical.what : [];
+// The `what` phrases come from the semantics overlay, not the node.
+function whatOf(resolved: ResolvedNode | undefined): readonly string[] {
+  return resolved?.semantics?.what ?? [];
 }
 
 export function isActionType(type: string): boolean {
@@ -141,7 +142,9 @@ function hiddenSubCallCallout(sub: HiddenSubCall): React.ReactNode {
 
 export interface PanelContent {
   card: NodeCard;
-  canonical: GraphNode | undefined;
+  resolved: ResolvedNode | undefined;
+  // The flattened node + semantics + deltas, fed raw to the JSON viewer.
+  raw: Record<string, unknown> | undefined;
   isLongest: boolean;
   hiddenSubCall: HiddenSubCall | undefined;
   duration: string | null;
@@ -151,17 +154,17 @@ export interface PanelContent {
 }
 
 export function panelBody(content: PanelContent): React.ReactNode {
-  const { card, canonical, isLongest, hiddenSubCall, duration, showRaw } = content;
-  const longText = longTextOf(canonical);
+  const { card, resolved, raw, isLongest, hiddenSubCall, duration, showRaw } = content;
+  const longText = longTextOf(resolved);
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px' }}>
       {metricsGrid(card, duration, isLongest)}
-      {whatHappened(whatOf(canonical))}
+      {whatHappened(whatOf(resolved))}
       {hiddenSubCall != null && hiddenSubCallCallout(hiddenSubCall)}
       {longText != null && longTextBlock(longText, content.expanded, content.onToggleExpanded)}
       {showRaw && (
         <div style={{ marginTop: 20 }}>
-          <JsonView value={canonical} />
+          <JsonView value={raw} />
         </div>
       )}
     </div>

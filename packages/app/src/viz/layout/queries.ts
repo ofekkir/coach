@@ -1,43 +1,41 @@
 import type {
+  Agent,
   AgentExecution,
-  AgentNode,
   ExecutionGraph,
   ExecutionNode,
   InteractionExecution,
+  Session,
   SessionExecution,
-  SessionNode,
 } from '@coach/pipeline';
 import { placeAgent, sessionWidth } from './place-graph.ts';
 import type { Ctx, RFNode } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, NW, HG } from './types.ts';
 import type { Edge } from '@xyflow/react';
 
-function synthetic(canonical: AgentNode | SessionNode): ExecutionNode {
-  return { id: canonical.id, canonical, children: [] };
+// Degraded-graph synthesizers — produce the missing upper ENTITIES (not nodes) so
+// layout always has an agent ▸ session to hang the interactions under.
+function syntheticAgent(): Agent {
+  return { id: '__agent__', userId: '' };
 }
 
-function syntheticAgent(): ExecutionNode {
-  return synthetic({ id: '__agent__', type: 'agent', user_id: '' });
-}
-
-// Empty session_id so the renderer falls back to a positional title.
-function syntheticSession(): ExecutionNode {
-  return synthetic({ id: '__session__', type: 'session', session_id: '', user_id: '' });
+// Empty sessionId so the renderer falls back to a positional title.
+function syntheticSession(): Session {
+  return { id: '__session__', agentId: '__agent__', userId: '', sessionId: '' };
 }
 
 /** Normalizes any ExecutionGraph variant into a single AgentExecution by
- *  synthesizing the missing upper levels. The pipeline degrades to
+ *  synthesizing the missing upper entities. The pipeline degrades to
  *  session/interaction when those levels are absent; layout always wants an agent. */
 function toAgent(graph: ExecutionGraph): AgentExecution {
   if (graph.kind === 'agent') return graph.data;
 
   if (graph.kind === 'session') {
-    return { root: syntheticAgent(), sessions: [graph.data] };
+    return { agent: syntheticAgent(), sessions: [graph.data] };
   }
 
   const interactions: InteractionExecution[] = graph.data != null ? [graph.data] : [];
-  const session: SessionExecution = { root: syntheticSession(), interactions };
-  return { root: syntheticAgent(), sessions: [session] };
+  const session: SessionExecution = { session: syntheticSession(), interactions };
+  return { agent: syntheticAgent(), sessions: [session] };
 }
 
 export function buildElements(
@@ -50,6 +48,7 @@ export function buildElements(
     return sum + sessionWidth(s) + (i > 0 ? HG : 0);
   }, 0);
   const ctx: Ctx = {
+    graph,
     cx: Math.max(NW, totalSessionsW) / CENTERING_DIVISOR + CANVAS_TOP,
     expanded,
     selected,
@@ -75,18 +74,18 @@ function expandableInteractionIds(interaction: InteractionExecution): string[] {
   const memberIds = interaction.threads
     .flatMap((thread) => thread.members)
     .flatMap(expandableSubtreeIds);
-  return [interaction.root.id, ...memberIds];
+  return [interaction.interactionId, ...memberIds];
 }
 
 export function allExpandableIds(graph: ExecutionGraph): Set<string> {
   const agent = toAgent(graph);
-  const sessionIds = agent.sessions.map((s) => s.root.id);
+  const sessionIds = agent.sessions.map((s) => s.session.id);
   const interactionExpandables = agent.sessions.flatMap((s) =>
     s.interactions.flatMap((i) => expandableInteractionIds(i)),
   );
-  return new Set([agent.root.id, ...sessionIds, ...interactionExpandables]);
+  return new Set([agent.agent.id, ...sessionIds, ...interactionExpandables]);
 }
 
 export function agentRoot(graph: ExecutionGraph): string {
-  return toAgent(graph).root.id;
+  return toAgent(graph).agent.id;
 }

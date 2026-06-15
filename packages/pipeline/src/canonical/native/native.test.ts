@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { addSessionNode } from '../../aggregate/aggregate.ts';
+import { aggregate } from '../../aggregate/aggregate.ts';
 import { TempoTraceSchema } from '../tempo.schema.ts';
 import type { CanonicalNode, ToolNode } from '../../types.ts';
+import { sessionEntityId } from '../../types.ts';
 import { transformTrace } from '../transform/transform.ts';
 import { nativeSessionToTrace } from './native.ts';
 
@@ -77,14 +78,17 @@ describe('nativeSessionToTrace', () => {
     expect(endTurnNodes).toHaveLength(1);
   });
 
-  it('addSessionNode produces a session node with the correct session_id', () => {
-    const nodes = addSessionNode(transformTrace(nativeSessionToTrace(FIXTURE_JSONL)));
-    const sessionNode = nodes.find((n) => n.type === 'session');
-    expect(sessionNode).toBeDefined();
-    expect(sessionNode?.session_id).toBe(SESSION_ID);
+  it('aggregate produces a Session entity with the correct session id', () => {
+    const nodes = transformTrace(nativeSessionToTrace(FIXTURE_JSONL));
+    const { sessions } = aggregate([nodes]);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.sessionId).toBe(SESSION_ID);
+    expect(sessions[0]?.id).toBe(sessionEntityId(SESSION_ID));
 
+    // The interaction is a root node carrying the session FK, not re-parented.
     const interaction = nodes.find((n) => n.type === 'interaction');
-    expect(interaction?.parent).toBe(`session-${SESSION_ID}`);
+    expect(interaction?.parent).toBeUndefined();
+    expect(interaction?.sessionId).toBe(sessionEntityId(SESSION_ID));
   });
 
   it('empty / whitespace input returns a valid empty TempoTrace without throwing', () => {
@@ -131,10 +135,11 @@ describe('nativeSessionToTrace — multi-turn fixture', () => {
     expect(counts.get(interactions[2]?.id ?? '')).toBe(1);
   });
 
-  it('all sessions carry the same session_id', () => {
-    const nodes = addSessionNode(transformTrace(nativeSessionToTrace(MULTI_TURN_JSONL)));
-    const session = nodes.find((n) => n.type === 'session');
-    expect(session?.session_id).toBe(MULTI_TURN_SESSION_ID);
+  it('all interactions roll up under one Session entity', () => {
+    const nodes = transformTrace(nativeSessionToTrace(MULTI_TURN_JSONL));
+    const { sessions } = aggregate([nodes]);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.sessionId).toBe(MULTI_TURN_SESSION_ID);
     const interactions = nodes.filter((n) => n.type === 'interaction');
     for (const i of interactions) {
       expect(i.session_id).toBe(MULTI_TURN_SESSION_ID);

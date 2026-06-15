@@ -1,40 +1,45 @@
 import { describe, expect, it } from 'vitest';
 import type {
-  ActionNode,
-  AgentNode,
-  InferenceNode,
+  Agent,
   LlmRequestNode,
+  ResolvedNode,
+  Session,
   ToolExecutionNode,
+  ToolNode,
 } from '@coach/pipeline';
-import { buildNodeCard, formatGap, formatMetrics } from './format.ts';
+import {
+  buildAgentCard,
+  buildNodeCard,
+  buildSessionCard,
+  formatGap,
+  formatMetrics,
+} from './format.ts';
 
+const SID = 'session-s-1';
 const span = { start_time_ns: '0', end_time_ns: '1', duration_ms: 12 };
 const tokens = { tokens_in: 40, tokens_out: 12 };
 
+function resolved(node: ResolvedNode['node'], semantics?: ResolvedNode['semantics']): ResolvedNode {
+  return { node, ...(semantics != null ? { semantics } : {}) };
+}
+
 describe('buildNodeCard', () => {
-  it('maps the structural discriminant to a display type and title', () => {
-    const agent: AgentNode = { id: 'a', type: 'agent', user_id: 'u-1' };
-    const card = buildNodeCard(agent);
-    expect(card.type).toBe('agent');
-    expect(card.title).toBe('u-1');
-    expect(card.fields).toEqual([]);
-  });
-
   it('collapses tool.execution to its display type with no title', () => {
-    const exec: ToolExecutionNode = { id: 't', type: 'tool.execution', ...span };
-    expect(buildNodeCard(exec).type).toBe('execution');
+    const exec: ToolExecutionNode = { id: 't', type: 'tool.execution', sessionId: SID, ...span };
+    expect(buildNodeCard(resolved(exec)).type).toBe('execution');
   });
 
-  it('puts model on the title and source in a structural field', () => {
+  it('puts model on the title and source in a structural field (no semantics row)', () => {
     const llm: LlmRequestNode = {
       id: 'l',
       type: 'llm_request',
+      sessionId: SID,
       model: 'claude-opus-4-8',
       source: 'main',
       ...span,
       ...tokens,
     };
-    const card = buildNodeCard(llm);
+    const card = buildNodeCard(resolved(llm));
     expect(card.title).toBe('claude-opus-4-8');
     expect(card.fields).toEqual([{ label: 'source', value: 'main' }]);
   });
@@ -43,12 +48,13 @@ describe('buildNodeCard', () => {
     const llm: LlmRequestNode = {
       id: 'l',
       type: 'llm_request',
+      sessionId: SID,
       model: 'claude-opus-4-8',
       cost_usd: 0.0001,
       ...span,
       ...tokens,
     };
-    expect(buildNodeCard(llm).metrics).toEqual({
+    expect(buildNodeCard(resolved(llm)).metrics).toEqual({
       durationMs: 12,
       tokensIn: 40,
       tokensOut: 12,
@@ -56,44 +62,39 @@ describe('buildNodeCard', () => {
     });
   });
 
-  it('does NOT read response_messages content (the card stays content-free)', () => {
-    const inference: InferenceNode = {
+  it('reads the verb from the semantics overlay, never response content', () => {
+    const llm: LlmRequestNode = {
       id: 'i',
-      type: 'inference',
-      what: ['decides to read the file'],
+      type: 'llm_request',
+      sessionId: SID,
       model: 'claude-opus-4-8',
       response_messages: [{ type: 'text', text: 'should never appear on the card' }],
       ...span,
       ...tokens,
     };
-    const card = buildNodeCard(inference);
+    const card = buildNodeCard(resolved(llm, { what: ['decides to read the file'] }));
     expect(card.title).toBe('decides to read the file');
-    const serialized = JSON.stringify(card);
-    expect(serialized).not.toContain('should never appear');
+    expect(JSON.stringify(card)).not.toContain('should never appear');
   });
 
   it('does NOT read tool_input content', () => {
-    const action: ActionNode = {
+    const tool: ToolNode = {
       id: 'ac',
-      type: 'action',
-      what: ['edits config'],
+      type: 'tool',
+      sessionId: SID,
       name: 'Edit',
       tool_input: '{"file":"/secret/path"}',
       ...span,
     };
-    const card = buildNodeCard(action);
+    const card = buildNodeCard(resolved(tool, { what: ['edits config'] }));
     expect(JSON.stringify(card)).not.toContain('/secret/path');
   });
 
-  it('leads with the verb and carries the sub-verb + tool tag', () => {
-    const action: ActionNode = {
-      id: 'wf',
-      type: 'action',
-      what: ['fetch ynet.co.il', 'summarize headlines'],
-      name: 'WebFetch',
-      ...span,
-    };
-    const card = buildNodeCard(action);
+  it('leads with the verb and carries the sub-verb + tool tag (enriched tool)', () => {
+    const tool: ToolNode = { id: 'wf', type: 'tool', sessionId: SID, name: 'WebFetch', ...span };
+    const card = buildNodeCard(
+      resolved(tool, { what: ['fetch ynet.co.il', 'summarize headlines'] }),
+    );
     expect(card.title).toBe('fetch ynet.co.il');
     expect(card.subtitle).toBe('summarize headlines');
     expect(card.tag).toBe('ACTION · WEBFETCH');
@@ -101,15 +102,39 @@ describe('buildNodeCard', () => {
 
   it('tags an inference by its off-spine source, leaving the main thread bare', () => {
     const base = {
-      what: ['plan next steps'],
+      type: 'llm_request',
+      sessionId: SID,
       model: 'claude-sonnet-4-6',
       ...span,
       ...tokens,
     } as const;
-    const main: InferenceNode = { id: 'm', type: 'inference', source: 'repl_main_thread', ...base };
-    const bg: InferenceNode = { id: 'b', type: 'inference', source: 'background', ...base };
-    expect(buildNodeCard(main).tag).toBe('INFERENCE');
-    expect(buildNodeCard(bg).tag).toBe('INFERENCE · BACKGROUND');
+    const main: LlmRequestNode = { id: 'm', source: 'repl_main_thread', ...base };
+    const bg: LlmRequestNode = { id: 'b', source: 'background', ...base };
+    const what = { what: ['plan next steps'] };
+    expect(buildNodeCard(resolved(main, what)).tag).toBe('INFERENCE');
+    expect(buildNodeCard(resolved(bg, what)).tag).toBe('INFERENCE · BACKGROUND');
+  });
+});
+
+describe('entity cards', () => {
+  it('builds the agent card from the entity userId', () => {
+    const agent: Agent = { id: 'agent-u-1', userId: 'u-1' };
+    const card = buildAgentCard(agent);
+    expect(card.type).toBe('agent');
+    expect(card.title).toBe('u-1');
+    expect(card.fields).toEqual([]);
+  });
+
+  it('builds the session card from the harness session id', () => {
+    const session: Session = {
+      id: SID,
+      agentId: 'agent-u-1',
+      userId: 'u-1',
+      sessionId: 'abcdef',
+    };
+    const card = buildSessionCard(session);
+    expect(card.type).toBe('session');
+    expect(card.title).toBe('abcdef');
   });
 });
 
