@@ -65,6 +65,7 @@ function makeGraph(): ExecutionGraph {
               root: { id: 'inter', canonical: interaction, children: [], innerEdges: [] },
               userPrompt: null,
               rootToThreadIds: ['thread_repl_main_thread'],
+              causalEdges: [],
               threads: [
                 {
                   id: 'thread_repl_main_thread',
@@ -80,7 +81,7 @@ function makeGraph(): ExecutionGraph {
                     },
                     { id: 'tool1', canonical: tool1, children: [], innerEdges: [] },
                   ],
-                  edges: [{ fromId: 'llm1', toId: 'tool1', gapMs: 10 }],
+                  edges: [{ fromId: 'llm1', toId: 'tool1', kind: 'sequence' }],
                 },
               ],
             },
@@ -130,7 +131,7 @@ describe('enrichExecutionGraph', () => {
 
     const thread = ix?.threads[0];
     expect(thread?.id).toBe('thread_repl_main_thread');
-    expect(thread?.edges[0]).toEqual({ fromId: 'llm1', toId: 'tool1', gapMs: 10 });
+    expect(thread?.edges[0]).toEqual({ fromId: 'llm1', toId: 'tool1', kind: 'sequence' });
   });
 
   it('preserves existing canonical fields on converted nodes', () => {
@@ -161,6 +162,7 @@ describe('enrichExecutionGraph', () => {
         root: { id: 'inter', canonical: interaction, children: [], innerEdges: [] },
         userPrompt: null,
         rootToThreadIds: ['t'],
+        causalEdges: [],
         threads: [
           {
             id: 't',
@@ -199,6 +201,7 @@ describe('enrichExecutionGraph', () => {
         root: { id: 'inter', canonical: interaction, children: [], innerEdges: [] },
         userPrompt: null,
         rootToThreadIds: ['t'],
+        causalEdges: [],
         threads: [
           {
             id: 't',

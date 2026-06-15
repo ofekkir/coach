@@ -154,6 +154,7 @@ function buildToolSpan(
   const toolAttrs: OtlpAttribute[] = [
     strAttr('span.type', 'tool'),
     strAttr('tool_name', block.name ?? 'unknown'),
+    strAttr('tool_use_id', block.id),
   ];
   if (block.input != null) toolAttrs.push(strAttr('tool_input', JSON.stringify(block.input)));
 

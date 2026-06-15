@@ -149,15 +149,15 @@ describe('buildExecutionGraph', () => {
     everyNode(agent).forEach(assertClean);
   });
 
-  it('carries gapMs as a signed number on thread edges', () => {
+  it('marks thread edges as sequence and carries no gap on them', () => {
     const graph = buildExecutionGraph(agentForest());
     if (graph.kind !== 'agent') throw new Error('expected agent');
 
     const edges = graph.data.sessions[0]?.interactions[0]?.threads[0]?.edges ?? [];
-    // llm1 ends at 200ms, toolA starts at 210ms → +10ms
     const edge = edges.find((e) => e.fromId === 'llm1' && e.toId === 'toolA');
-    expect(edge?.gapMs).toBe(10);
-    expect(typeof edge?.gapMs).toBe('number');
+    // Time-adjacency is not causality: the gap belongs on causal edges, not here.
+    expect(edge?.kind).toBe('sequence');
+    expect(edge?.gapMs).toBeUndefined();
   });
 
   it('uses plain canonical ids on edges (no sg_ prefix)', () => {

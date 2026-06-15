@@ -5,8 +5,8 @@ import type {
   Thread,
 } from '@coach/pipeline';
 import { estimateNodeH } from './estimate.ts';
-import { buildNodeCard } from '../format/format.ts';
-import { link, placeThread, pushStructural } from './place-members.ts';
+import { buildNodeCard, formatGap } from '../format/format.ts';
+import { causalLink, link, placeThread, pushStructural } from './place-members.ts';
 import type { Ctx } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, HG, LG, NW, VG } from './types.ts';
 
@@ -48,7 +48,20 @@ function placeInteraction(
     tx += NW + HG;
   }
 
+  placeCausalEdges(interaction, ctx);
   return maxEndY + VG;
+}
+
+// Overlays the interaction's causal dataflow DAG onto the placed nodes. Only
+// edges whose both endpoints are placed (visible in the expanded interaction) are
+// drawn — a collapsed member would otherwise leave a dangling edge.
+function placeCausalEdges(interaction: InteractionExecution, ctx: Ctx): void {
+  const placed = new Set(ctx.nodes.map((n) => n.id));
+  interaction.causalEdges
+    .filter((e) => placed.has(e.fromId) && placed.has(e.toId))
+    .forEach((e) => {
+      causalLink(e.fromId, e.toId, formatGap(e.gapMs) ?? undefined, ctx);
+    });
 }
 
 // Places the synthesized user-prompt node as the interaction's first child and

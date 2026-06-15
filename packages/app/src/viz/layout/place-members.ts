@@ -2,7 +2,7 @@ import { MarkerType } from '@xyflow/react';
 import type { ExecutionNode, Thread } from '@coach/pipeline';
 import { colorOf, fillOf } from './colors.ts';
 import { estimateNodeH } from './estimate.ts';
-import { buildNodeCard, formatGap, threadTitle } from '../format/format.ts';
+import { buildNodeCard, threadTitle } from '../format/format.ts';
 import type { Ctx, TraceRFNodeData } from './types.ts';
 import { VG } from './types.ts';
 
@@ -31,6 +31,29 @@ export function link(src: string, tgt: string, label: string | undefined, ctx: C
       : {}),
     style: { stroke: '#cbd5e1', strokeWidth: 1.5 },
     markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1', width: 14, height: 14 },
+  });
+}
+
+// The causal dataflow overlay (inference → tool fan-out, tool → inference fan-in).
+// Drawn distinct from the grey structural/sequence links: dashed amber, carrying
+// the signed gap ("+12ms" / "-3ms" — negative when a tool was dispatched before
+// its inference finished streaming). Higher zIndex so it reads on top of the lane.
+export function causalLink(src: string, tgt: string, label: string | undefined, ctx: Ctx): void {
+  ctx.edges.push({
+    id: `causal-${src}-${tgt}`,
+    source: src,
+    target: tgt,
+    type: 'smoothstep',
+    zIndex: 1,
+    ...(label != null
+      ? {
+          label,
+          labelStyle: { fill: '#b45309', fontSize: 10 },
+          labelBgStyle: { fill: '#fffbeb', fillOpacity: 0.95 },
+        }
+      : {}),
+    style: { stroke: '#f59e0b', strokeWidth: 1.5, strokeDasharray: '5 3' },
+    markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b', width: 14, height: 14 },
   });
 }
 
@@ -116,10 +139,11 @@ function placeSubtree(
   return { y, lastId };
 }
 
+// Sequence edges no longer carry a gap (time-adjacency is not causality — the
+// signed gap lives on the causal overlay). Only the first edge is labelled, with
+// the thread's title.
 function edgeLabelFor(thread: Thread, index: number): string | undefined {
-  if (index === 0) return threadTitle(thread.source);
-  const gap = thread.edges[index - 1]?.gapMs;
-  return formatGap(gap) ?? undefined;
+  return index === 0 ? threadTitle(thread.source) : undefined;
 }
 
 export function placeThread(

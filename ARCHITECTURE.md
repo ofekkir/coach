@@ -94,6 +94,15 @@ Input files (accumulating — user stages N files/folders before submitting)
                             llm_request steps carry requestMessagesDelta /
                             responseMessagesDelta — the messages new to that step
                             vs. the previous request in the same thread
+                            edges are two layers: `sequence` edges order steps in
+                            time within a lane (NO gap — adjacency ≠ causality), and
+                            graph/execution/causal.ts derives the `causal` DAG that
+                            overlays them: inference → tool (fan-out, the response
+                            emitted that tool_use id) and tool → inference (fan-in,
+                            the request consumed that tool_result). Built from
+                            tool_use_id correlation, never timing; the signed gapMs
+                            lives here (fan-out gaps go negative under streamed
+                            dispatch). InteractionExecution.causalEdges holds them.
         │
         ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
    enrichExecutionGraph(graph, config)  converts tool → action and llm_request →

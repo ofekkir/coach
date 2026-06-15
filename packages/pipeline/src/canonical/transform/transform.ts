@@ -91,6 +91,7 @@ function buildLlmRequestNode(
 function buildToolNode(span: ParsedSpan, parent: string | null): ToolNode {
   const node: ToolNode = { id: span.id, type: 'tool', ...spanTiming(span), ...parentField(parent) };
   if (span.toolName != null) node.name = span.toolName;
+  if (span.toolUseId != null) node.tool_use_id = span.toolUseId;
   if (span.toolInputSummary != null) node.tool_input = span.toolInputSummary;
   return node;
 }

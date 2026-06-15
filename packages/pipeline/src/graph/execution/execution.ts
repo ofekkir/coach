@@ -8,11 +8,11 @@ import type {
   SessionExecution,
   Thread,
 } from '../types.ts';
+import { buildCausalEdges } from './causal.ts';
 import {
   buildChildrenOf,
   buildThreadMembers,
   compareStart,
-  gapMsBetween,
   sortByStart,
   withLlmDeltas,
 } from './thread.ts';
@@ -42,30 +42,20 @@ function toExecutionNode(
   }
 
   const childNodes = sortByStart(rawChildren).map((child) => toExecutionNode(child, childrenOf));
-  const innerEdges = sequentialEdges(childNodes);
+  const innerEdges = sequenceEdges(childNodes.map((child) => child.id));
   return { id: node.id, canonical: node, children: childNodes, innerEdges };
 }
 
-/** Edges between consecutive children, plain ids, no gap (layout-internal). */
-function sequentialEdges(childNodes: readonly ExecutionNode[]): GraphEdge[] {
+// Edges between consecutive steps, in time order. `sequence` carries NO gap: a
+// gap between two time-adjacent steps is not a causal latency (see GraphEdge).
+// The meaningful signed gap now lives on the causal edges instead.
+function sequenceEdges(ids: readonly string[]): GraphEdge[] {
   const edges: GraphEdge[] = [];
-  for (let i = 0; i < childNodes.length - 1; i += 1) {
-    const prev = childNodes[i];
-    const next = childNodes[i + 1];
-    if (prev == null || next == null) continue;
-    edges.push({ fromId: prev.id, toId: next.id });
-  }
-  return edges;
-}
-
-function buildThreadEdges(members: readonly CanonicalNode[]): GraphEdge[] {
-  const edges: GraphEdge[] = [];
-  for (let i = 0; i < members.length - 1; i += 1) {
-    const prev = members[i];
-    const next = members[i + 1];
-    if (prev == null || next == null) continue;
-    const gapMs = gapMsBetween(prev, next);
-    edges.push({ fromId: prev.id, toId: next.id, ...(gapMs !== null ? { gapMs } : {}) });
+  for (let i = 0; i < ids.length - 1; i += 1) {
+    const fromId = ids[i];
+    const toId = ids[i + 1];
+    if (fromId == null || toId == null) continue;
+    edges.push({ fromId, toId, kind: 'sequence' });
   }
   return edges;
 }
@@ -123,6 +113,7 @@ export function buildInteractionExecution(
     userPrompt: toUserPromptNode(interaction),
     threads,
     rootToThreadIds: threads.map((t) => t.id),
+    causalEdges: buildCausalEdges(threads),
   };
 }
 
@@ -160,7 +151,7 @@ function buildThread(
     id: `thread_${source.replace(/\W+/g, '_')}`,
     source,
     members: builtMembers,
-    edges: buildThreadEdges(members),
+    edges: sequenceEdges(builtMembers.map((m) => m.id)),
   };
 }
 
@@ -170,6 +161,7 @@ function emptyInteractionExecution(interaction: InteractionNode): InteractionExe
     userPrompt: toUserPromptNode(interaction),
     threads: [],
     rootToThreadIds: [],
+    causalEdges: [],
   };
 }
 

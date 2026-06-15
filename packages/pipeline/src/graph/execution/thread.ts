@@ -1,4 +1,4 @@
-import type { CanonicalNode, RequestMessage, ResponseMessage } from '../../types.ts';
+import type { CanonicalNode, GraphNode, RequestMessage, ResponseMessage } from '../../types.ts';
 import { NS_PER_MS } from '../../types.ts';
 import type { ExecutionNode } from '../types.ts';
 
@@ -50,11 +50,11 @@ function nsOf(ns: string | undefined): bigint {
 // Timing lives on span-derived nodes (and optionally on the synthesized
 // user_prompt); aggregation nodes (agent/session) have none. These accessors
 // read it across the whole union without forcing a narrow at every call site.
-export function startNs(node: CanonicalNode): string | undefined {
+export function startNs(node: GraphNode): string | undefined {
   return 'start_time_ns' in node ? node.start_time_ns : undefined;
 }
 
-function endNs(node: CanonicalNode): string | undefined {
+function endNs(node: GraphNode): string | undefined {
   return 'end_time_ns' in node ? node.end_time_ns : undefined;
 }
 
@@ -79,7 +79,7 @@ export function sortByStart<T extends CanonicalNode>(list: T[]): T[] {
 
 /** Signed gap between two adjacent steps in milliseconds, or null when either
  *  timestamp is missing or the gap is zero/non-finite. Raw number — no format. */
-export function gapMsBetween(prev: CanonicalNode, next: CanonicalNode): number | null {
+export function gapMsBetween(prev: GraphNode, next: GraphNode): number | null {
   const prevEnd = endNs(prev);
   const nextStart = startNs(next);
   if (prevEnd == null || nextStart == null) return null;

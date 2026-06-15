@@ -36,6 +36,7 @@ export type {
   ExecutionGraph,
   ExecutionNode,
   GraphEdge,
+  GraphEdgeKind,
   InteractionExecution,
   SessionExecution,
   Thread,
