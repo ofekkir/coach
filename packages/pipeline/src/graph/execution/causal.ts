@@ -1,6 +1,6 @@
 import type { GraphNode } from '../../types.ts';
 import type { ExecutionNode, GraphEdge, Thread } from '../types.ts';
-import { gapMsBetween } from './thread.ts';
+import { gapMsBetween, startGapMsBetween } from './thread.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Causal-flow builder — THE edge layer of the execution graph (there is no
@@ -197,8 +197,14 @@ function fanInPredecessors(inference: ExecutionNode, index: CausalIndex): Execut
 
 // ── Recursive spine ──────────────────────────────────────────────────────────────
 
+// Containment edges (parent → its own child, e.g. tool → wait/execution) measure
+// the gap from the parent's START — the child runs WITHIN the parent, so end-to-
+// start would read misleadingly negative. Sequential edges use end-to-start.
 function edgeBetween(from: ExecutionNode, to: ExecutionNode): GraphEdge {
-  const gapMs = gapMsBetween(from.canonical, to.canonical);
+  const nested = 'parent' in to.canonical && to.canonical.parent === from.id;
+  const gapMs = nested
+    ? startGapMsBetween(from.canonical, to.canonical)
+    : gapMsBetween(from.canonical, to.canonical);
   return { fromId: from.id, toId: to.id, ...(gapMs !== null ? { gapMs } : {}) };
 }
 

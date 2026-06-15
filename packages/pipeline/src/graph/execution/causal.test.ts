@@ -202,17 +202,21 @@ describe('buildCausalEdges', () => {
       id: 'waitX',
       type: 'tool.blocked_on_user',
       parent: 'toolX',
-      ...span(210, 211),
+      ...span(211, 212),
     };
     const exec: CanonicalNode = {
       id: 'execX',
       type: 'tool.execution',
       parent: 'toolX',
-      ...span(210, 260),
+      ...span(212, 260),
     };
     const edges = causalEdgesOf([interaction, inf, tool, wait, exec]);
     expect(edge(edges, 'toolX', 'waitX')).toBeDefined();
     expect(edge(edges, 'toolX', 'execX')).toBeDefined();
     expect(edge(edges, 'waitX', 'execX')).toBeUndefined();
+    // Gap is measured from the tool's START (nested child), not its end:
+    // wait starts at 211ms, tool at 210ms → +1ms (end-based would read -49ms).
+    expect(edge(edges, 'toolX', 'waitX')?.gapMs).toBe(1);
+    expect(edge(edges, 'toolX', 'execX')?.gapMs).toBe(2);
   });
 });
