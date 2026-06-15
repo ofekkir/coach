@@ -163,6 +163,22 @@ content shapes from the pipeline render in the viewer for free; only the curated
 `format.ts`. The renderer consumes the typed `NodeCard` (and raw `canonical` for the viewer) —
 no stringly-typed label arrays.
 
+**Structure encodes role; color is reserved.** The renderer is a warm, low-saturation system
+(`viz/theme.ts` — the single token/glyph source, replacing the old per-type color maps). A node's
+type is carried by a CSS **glyph** (hollow = inference, filled = action, solid fills = levels), not
+a hue: levels render as **banners**, the user prompt as an **accent anchor**, everything else as a
+**step card** (`TraceNode/levels.tsx`, `step.tsx`). The lone clay accent is spent only on focus —
+selection, the prompt anchor, and the **longest step** (its share-of-run bar + the edge into it),
+derived app-side in the layout pass (`layout/place-graph.ts`). The main thread rides a spine;
+off-spine threads (`source !== 'repl_main_thread'`) move to a dimmed background lane, a tool's raw
+sub-spans (`tool.execution` / `tool.blocked_on_user`) are collapsed (only its one nested weak-model
+inference surfaces, indented), and the top bar (`viz/TopBar`) shows the breadcrumb + run aggregates.
+When the run is a DAG, the spine branches: `layout/parallel.ts` detects fork→branches→join groups
+from `causalEdges`, `layout/parallel-place.ts` lays each as a centered row inside a faint
+`PARALLEL LEVEL · ×N` band, and the slowest branch — the critical path — is the only one in accent.
+Long values (a pasted prompt, a tool instruction) clamp on the card and open in full in the details
+panel; the raw `canonical` node stays one click away in the JSON viewer.
+
 ## Upload flow and the data-source seam
 
 The app has two intake paths, both converging on `VizResult[]` before the renderer:

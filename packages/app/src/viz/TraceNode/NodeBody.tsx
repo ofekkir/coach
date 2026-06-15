@@ -1,5 +1,4 @@
-import type { CardField, CardMetrics } from '../format/format.ts';
-import { formatMetrics } from '../format/format.ts';
+import { fonts, tokens } from '../theme.ts';
 
 const LINE: React.CSSProperties = {
   whiteSpace: 'nowrap',
@@ -7,67 +6,109 @@ const LINE: React.CSSProperties = {
   textOverflow: 'ellipsis',
 };
 
-// Gap (px) under the title line when field lines follow it.
-const TITLE_GAP_WITH_FIELDS = 2;
+// Text colors for the body, resolved by the card's accent/lane state in TraceNode.
+export interface StepPalette {
+  title: string;
+  sub: string;
+  model: string;
+}
 
+const SHARE_PCT_BASE = 100;
+
+function sharePct(shareOfRun: number): number {
+  return Math.round(shareOfRun * SHARE_PCT_BASE);
+}
+
+// The share-of-run bar: a 4px track filled to this step's slice of the
+// interaction's wall-clock, captioned with the percentage.
+function shareBar(shareOfRun: number): React.ReactNode {
+  return (
+    <>
+      <div
+        style={{
+          marginTop: 9,
+          height: 4,
+          borderRadius: 2,
+          background: '#EFE6DB',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: `${String(sharePct(shareOfRun))}%`,
+            height: '100%',
+            background: tokens.accent,
+            borderRadius: 2,
+          }}
+        />
+      </div>
+      <div
+        style={{ fontFamily: fonts.mono, fontSize: 9.5, color: tokens.accentInkSoft, marginTop: 5 }}
+      >
+        {String(sharePct(shareOfRun))}% of interaction · longest step
+      </div>
+    </>
+  );
+}
+
+// The type ramp inside a step card: the verb leads (sans, 600), the sub-verb and
+// model fall back in weight/size, and the longest step carries a share-of-run bar.
 export function NodeBody({
   title,
-  fields,
-  metrics,
-  color,
+  subtitle,
+  model,
+  shareOfRun,
+  palette,
 }: {
   title: string | undefined;
-  fields: readonly CardField[];
-  metrics: CardMetrics;
-  color: string;
+  subtitle: string | undefined;
+  model: string | undefined;
+  shareOfRun: number | undefined;
+  palette: StepPalette;
 }) {
-  const { duration, secondary } = formatMetrics(metrics);
-
   return (
-    <div style={{ padding: '6px 10px 8px' }}>
+    <>
       {title != null && (
         <div
           style={{
             ...LINE,
-            color: '#1e293b',
-            fontSize: 11,
-            lineHeight: 1.4,
-            marginBottom: fields.length > 0 ? TITLE_GAP_WITH_FIELDS : 0,
+            fontFamily: fonts.sans,
+            fontSize: 14.5,
+            fontWeight: 600,
+            letterSpacing: '-0.01em',
+            color: palette.title,
           }}
         >
           {title}
         </div>
       )}
-      {fields.map((f) => (
-        <div
-          key={f.label}
-          style={{ ...LINE, color: '#64748b', fontSize: 10, lineHeight: 1.45, marginTop: 1 }}
-        >
-          {f.label}: {f.value}
-        </div>
-      ))}
-      {secondary != null && (
-        <div style={{ ...LINE, color: '#64748b', fontSize: 10, lineHeight: 1.45, marginTop: 1 }}>
-          {secondary}
-        </div>
-      )}
-      {duration != null && (
+      {subtitle != null && (
         <div
           style={{
-            display: 'inline-block',
-            marginTop: 5,
-            background: `${color}14`,
-            border: `1px solid ${color}40`,
-            borderRadius: 4,
-            padding: '1px 6px',
-            color,
-            fontSize: 10,
-            letterSpacing: '0.02em',
+            ...LINE,
+            fontFamily: fonts.sans,
+            fontSize: 13,
+            color: palette.sub,
+            marginTop: 1,
           }}
         >
-          {duration}
+          {subtitle}
         </div>
       )}
-    </div>
+      {shareOfRun != null && shareBar(shareOfRun)}
+      {model != null && (
+        <div
+          style={{
+            ...LINE,
+            fontFamily: fonts.mono,
+            fontSize: 10.5,
+            color: palette.model,
+            marginTop: 7,
+          }}
+        >
+          {model}
+        </div>
+      )}
+    </>
   );
 }

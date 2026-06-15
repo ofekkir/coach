@@ -1,10 +1,9 @@
-import { MarkerType } from '@xyflow/react';
-import type { ExecutionNode, Thread } from '@coach/pipeline';
-import { colorOf, fillOf } from './colors.ts';
+import type { ExecutionNode, GraphNode, Thread } from '@coach/pipeline';
 import { estimateNodeH } from './estimate.ts';
 import { buildNodeCard } from '../format/format.ts';
-import type { Ctx, TraceRFNodeData } from './types.ts';
-import { VG } from './types.ts';
+import { isWeakModel } from '../theme.ts';
+import type { Ctx, HiddenSubCall, TraceRFNodeData } from './types.ts';
+import { NESTED_INDENT, VG } from './types.ts';
 
 function push(id: string, x: number, y: number, data: TraceRFNodeData, ctx: Ctx): void {
   ctx.nodes.push({
@@ -16,49 +15,13 @@ function push(id: string, x: number, y: number, data: TraceRFNodeData, ctx: Ctx)
   });
 }
 
-export function link(src: string, tgt: string, label: string | undefined, ctx: Ctx): void {
-  ctx.edges.push({
-    id: `e-${src}-${tgt}`,
-    source: src,
-    target: tgt,
-    type: 'smoothstep',
-    ...(label != null
-      ? {
-          label,
-          labelStyle: { fill: '#94a3b8', fontSize: 10 },
-          labelBgStyle: { fill: '#f8fafc', fillOpacity: 0.9 },
-        }
-      : {}),
-    style: { stroke: '#cbd5e1', strokeWidth: 1.5 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1', width: 14, height: 14 },
-  });
-}
+const STRUCTURAL_FLAGS: Pick<TraceRFNodeData, 'lane' | 'nested' | 'isLongest'> = {
+  lane: 'main',
+  nested: false,
+  isLongest: false,
+};
 
-// The causal flow edge — the primary connective tissue of an expanded interaction
-// (inference → tool fan-out, tool → inference fan-in, prompt/continuation, hooks,
-// wait → exec). Amber to read distinct from the grey containment hierarchy, and
-// carrying the signed gap ("+12ms" / "-3ms" — negative when a tool was dispatched
-// before its inference finished streaming).
-export function causalLink(src: string, tgt: string, label: string | undefined, ctx: Ctx): void {
-  ctx.edges.push({
-    id: `causal-${src}-${tgt}`,
-    source: src,
-    target: tgt,
-    type: 'smoothstep',
-    zIndex: 1,
-    ...(label != null
-      ? {
-          label,
-          labelStyle: { fill: '#b45309', fontSize: 10 },
-          labelBgStyle: { fill: '#fffbeb', fillOpacity: 0.95 },
-        }
-      : {}),
-    style: { stroke: '#f59e0b', strokeWidth: 2 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b', width: 16, height: 16 },
-  });
-}
-
-/** Reusable card push for a structural execution node (agent/session/interaction/member). */
+/** Reusable card push for a structural execution node (agent/session/interaction/prompt). */
 export function pushStructural(
   node: ExecutionNode,
   kind: TraceRFNodeData['kind'],
@@ -67,17 +30,15 @@ export function pushStructural(
   hasKids: boolean,
   ctx: Ctx,
 ): void {
-  const card = buildNodeCard(node.canonical);
   push(
     node.id,
     x,
     y,
     {
       kind,
-      card,
+      card: buildNodeCard(node.canonical),
       canonical: node.canonical,
-      color: colorOf(card.type),
-      fill: fillOf(card.type),
+      ...STRUCTURAL_FLAGS,
       hasRFChildren: hasKids,
       isExpanded: ctx.expanded.has(node.id),
       selected: node.id === ctx.selected,
@@ -86,60 +47,118 @@ export function pushStructural(
   );
 }
 
-function pushExecNode(
+function durationOf(node: GraphNode): number {
+  return 'duration_ms' in node ? node.duration_ms : 0;
+}
+
+// Recursively finds a weak-model inference nested inside a tool/action (the call
+// lives under the tool's `execution` child), so the details panel can surface the
+// hidden sub-call that often dominates the tool's wall-clock.
+function hiddenSubCallOf(node: ExecutionNode): HiddenSubCall | undefined {
+  for (const child of node.children) {
+    const c = child.canonical;
+    if ((c.type === 'inference' || c.type === 'llm_request') && isWeakModel(c.model)) {
+      return { model: c.model, durationMs: durationOf(c) };
+    }
+    const nested = hiddenSubCallOf(child);
+    if (nested != null) return nested;
+  }
+  return undefined;
+}
+
+// Share-of-run flags for a spine step: whether it is the interaction's longest
+// step and, if so, its slice of the interaction's wall-clock (for the bar).
+function shareFlags(
   node: ExecutionNode,
-  kind: TraceRFNodeData['kind'],
+  ctx: Ctx,
+): Pick<TraceRFNodeData, 'isLongest' | 'shareOfRun'> {
+  if (node.id !== ctx.longestId) return { isLongest: false };
+  const dur = durationOf(node.canonical);
+  const total = ctx.interactionDurMs ?? 0;
+  return { isLongest: true, ...(total > 0 ? { shareOfRun: Math.min(1, dur / total) } : {}) };
+}
+
+// Places one execution-graph node as a card. Steps are not expandable: a tool's
+// raw sub-spans (`tool.execution` / `tool.blocked_on_user`) never become cards —
+// only its one meaningful nested inference does, surfaced by `placeStep`.
+type ParallelFlags = Partial<Pick<TraceRFNodeData, 'critical' | 'compact'>>;
+
+export function pushExecNode(
+  node: ExecutionNode,
   x: number,
   y: number,
-  hasRFChildren: boolean,
-  isExpanded: boolean,
+  lane: TraceRFNodeData['lane'],
+  nested: boolean,
   ctx: Ctx,
+  flags: ParallelFlags = {},
 ): void {
-  const card = buildNodeCard(node.canonical);
+  const hiddenSubCall = hiddenSubCallOf(node);
   push(
     node.id,
     x,
     y,
     {
-      kind,
-      card,
+      kind: 'member',
+      card: buildNodeCard(node.canonical),
       canonical: node.canonical,
-      color: colorOf(card.type),
-      fill: fillOf(card.type),
-      hasRFChildren,
-      isExpanded,
+      lane,
+      nested,
+      ...shareFlags(node, ctx),
+      ...(hiddenSubCall != null ? { hiddenSubCall } : {}),
+      ...flags,
+      hasRFChildren: false,
+      isExpanded: false,
       selected: node.id === ctx.selected,
     },
     ctx,
   );
 }
 
-// Recursively POSITIONS a node's children when expanded (e.g. tool ▸ execution ▸
-// nested inference). It draws no connecting edges — the flow between nodes is the
-// causal graph, laid down separately in place-graph. Returns the bottom y.
-function placeSubtree(node: ExecutionNode, tx: number, startY: number, ctx: Ctx): number {
-  let y = startY;
+// The one meaningful child of a tool: the weak model running *inside* it (e.g.
+// WebFetch's `web_fetch_apply` → claude-haiku). Found by descending through the
+// mechanical `execution`/`blocked_on_user` sub-spans, which are never carded.
+function nestedInferenceNode(node: ExecutionNode): ExecutionNode | undefined {
   for (const child of node.children) {
-    const hasKids = child.children.length > 0;
-    const isExpanded = hasKids && ctx.expanded.has(child.id);
-    pushExecNode(child, 'member', tx, y, hasKids, isExpanded, ctx);
-    y += estimateNodeH(buildNodeCard(child.canonical)) + VG;
-    if (isExpanded) y = placeSubtree(child, tx, y, ctx);
+    const t = child.canonical.type;
+    if (t === 'inference' || t === 'llm_request') return child;
+    const deeper = nestedInferenceNode(child);
+    if (deeper != null) return deeper;
   }
-  return y;
+  return undefined;
+}
+
+// Places a step card and, when it is a tool with a weak-model sub-call, the one
+// nested-inference card indented beneath it. Returns the next y.
+export function placeStep(
+  member: ExecutionNode,
+  tx: number,
+  y: number,
+  lane: TraceRFNodeData['lane'],
+  ctx: Ctx,
+): number {
+  pushExecNode(member, tx, y, lane, false, ctx);
+  let next = y + estimateNodeH(buildNodeCard(member.canonical)) + VG;
+  const nested = nestedInferenceNode(member);
+  if (nested != null) {
+    pushExecNode(nested, tx + NESTED_INDENT, next, lane, true, ctx);
+    next += estimateNodeH(buildNodeCard(nested.canonical)) + VG;
+  }
+  return next;
 }
 
 // Stacks a thread's members in a column (layout only). No member-to-member edges:
-// member order is not causality — the causal flow is drawn by place-graph.
-export function placeThread(thread: Thread, tx: number, startY: number, ctx: Ctx): number {
+// member order is not causality — the causal flow is drawn by place-graph. Used
+// for the dimmed background lane (always linear).
+export function placeThread(
+  thread: Thread,
+  tx: number,
+  startY: number,
+  lane: TraceRFNodeData['lane'],
+  ctx: Ctx,
+): number {
   let y = startY;
   for (const member of thread.members) {
-    const hasSubNodes = member.children.length > 0;
-    const isExpandedMember = hasSubNodes && ctx.expanded.has(member.id);
-
-    pushExecNode(member, 'member', tx, y, hasSubNodes, isExpandedMember, ctx);
-    y += estimateNodeH(buildNodeCard(member.canonical)) + VG;
-    if (isExpandedMember) y = placeSubtree(member, tx, y, ctx);
+    y = placeStep(member, tx, y, lane, ctx);
   }
   return y;
 }
