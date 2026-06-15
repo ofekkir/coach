@@ -129,6 +129,15 @@ describe('enrichTrace', () => {
     expect(getStringAttr(child?.attributes ?? [], 'cost_usd')).toBe('0.001234');
   });
 
+  it('real fixture: tool spans gain a tool_use_id from their decision log', () => {
+    const enriched = enrichTrace(traceFixture, logsFixture);
+    const toolSpans = allSpans(enriched).filter(
+      (s) => getStringAttr(s.attributes, 'span.type') === 'tool',
+    );
+    expect(toolSpans.length).toBeGreaterThan(0);
+    expect(toolSpans.every((s) => getStringAttr(s.attributes, 'tool_use_id') != null)).toBe(true);
+  });
+
   it('sets UserPromptSubmit hook parent to the interaction span', () => {
     const logs: LogEntry[] = [
       {

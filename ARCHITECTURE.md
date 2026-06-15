@@ -103,6 +103,9 @@ Input files (accumulating — user stages N files/folders before submitting)
                             tool_use_id correlation, never timing; the signed gapMs
                             lives here (fan-out gaps go negative under streamed
                             dispatch). InteractionExecution.causalEdges holds them.
+                            Harness-agnostic: native stamps tool_use_id on its tool
+                            spans, OTEL gets it via enrich (from the tool decision
+                            log) — so both formats yield causal edges.
         │
         ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
    enrichExecutionGraph(graph, config)  converts tool → action and llm_request →
