@@ -1,13 +1,7 @@
-import { fonts, glyphFor, tokens } from '../theme.ts';
+import { ellipsis, fonts, glyphFor, tokens } from '../theme.ts';
 import type { NodeCard } from '../format/format.ts';
 import { NW } from '../layout/types.ts';
 import { Glyph } from './Glyph.tsx';
-
-const ELLIPSIS: React.CSSProperties = {
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
 
 // The colored depth rail that marks a level banner's place in the hierarchy.
 const BANNER_RAIL: Record<string, string> = {
@@ -48,7 +42,7 @@ export function renderBanner(card: NodeCard): React.ReactNode {
         </div>
         {card.title != null && (
           <div
-            style={{ ...ELLIPSIS, fontFamily: fonts.mono, fontSize: 12.5, color: tokens.inkValue }}
+            style={{ ...ellipsis, fontFamily: fonts.mono, fontSize: 12.5, color: tokens.inkValue }}
           >
             {card.title}
           </div>

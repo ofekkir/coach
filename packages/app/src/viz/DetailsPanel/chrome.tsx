@@ -3,8 +3,6 @@ import { fonts, glyphFor, tokens } from '../theme.ts';
 import type { NodeCard } from '../format/format.ts';
 import { Glyph } from '../TraceNode/Glyph.tsx';
 
-const DIVIDER = '#EDE6DA';
-
 // The selected node's header: glyph + `TYPE · SELECTED` + verb + close.
 export function panelHeader(
   card: NodeCard,
@@ -17,7 +15,7 @@ export function panelHeader(
     <div
       style={{
         padding: '16px 20px',
-        borderBottom: `1px solid ${DIVIDER}`,
+        borderBottom: `1px solid ${tokens.divider}`,
         display: 'flex',
         alignItems: 'center',
         gap: 10,
@@ -81,7 +79,7 @@ export function panelFooter(
       onClick={onToggle}
       style={{
         border: 'none',
-        borderTop: `1px solid ${DIVIDER}`,
+        borderTop: `1px solid ${tokens.divider}`,
         background: showRaw ? tokens.surface : 'none',
         padding: '13px 20px',
         display: 'flex',

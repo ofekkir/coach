@@ -1,4 +1,5 @@
 import ReactJsonView from '@uiw/react-json-view';
+import { tokens } from '../theme.ts';
 
 // Generic, content-agnostic tree view over any canonical node. It makes NO
 // assumptions about field names or value shapes — provider-specific content
@@ -7,7 +8,9 @@ import ReactJsonView from '@uiw/react-json-view';
 // few structural fields we chose; this shows everything the node carries.
 export function JsonView({ value }: { value: object | undefined }) {
   if (value == null) {
-    return <div style={{ color: '#94a3b8', fontSize: 11 }}>No structured data for this node.</div>;
+    return (
+      <div style={{ color: tokens.faint, fontSize: 11 }}>No structured data for this node.</div>
+    );
   }
   return (
     <ReactJsonView

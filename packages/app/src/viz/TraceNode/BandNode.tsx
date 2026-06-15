@@ -1,4 +1,5 @@
 import type { NodeProps } from '@xyflow/react';
+import { tokens } from '../theme.ts';
 import type { BandRFNode } from '../layout/types.ts';
 
 // The faint band bracketing a parallel level — a backdrop behind the branch cards
@@ -11,9 +12,9 @@ export function BandView({ data }: NodeProps<BandRFNode>) {
         width: data.width,
         height: data.height,
         pointerEvents: 'none',
-        background: '#EAE3D6',
+        background: tokens.bandFill,
         opacity: 0.55,
-        border: '1px dashed #DAD0BF',
+        border: `1px dashed ${tokens.bandBorder}`,
         borderRadius: 13,
       }}
     />

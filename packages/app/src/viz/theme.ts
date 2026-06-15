@@ -40,12 +40,37 @@ export const tokens = {
   accentCallout: '#FCF4EE', // hidden-sub-call callout fill
   accentCalloutBorder: '#EAD3C5',
   positive: '#5B8C6E', // "carries over" check marks only
+  // ── inset surfaces, dividers, and one-off skins (warm system) ──
+  insetBorder: '#EAE2D4', // border on inset value blocks (metric cards, long-text)
+  divider: '#EDE6DA', // details-panel header/footer hairline
+  shareTrack: '#EFE6DB', // share-of-run bar track (behind the accent fill)
+  bandFill: '#EAE3D6', // parallel-level band backdrop
+  bandBorder: '#DAD0BF', // parallel-level band dashed border
+  bgDash: '#DDD3C2', // background-lane card dashed border
+  nestedTag: '#B89B89', // nested step's mono tag text
+  calloutInk: '#6E4B3A', // hidden-sub-call callout body text
 } as const;
 
 export const fonts = {
   sans: "'Instrument Sans', system-ui, -apple-system, sans-serif",
   mono: "'IBM Plex Mono', ui-monospace, 'SF Mono', monospace",
 } as const;
+
+// ── shared style primitives ──────────────────────────────────────────────────
+// Single-line truncation, spread into any text node that must not wrap.
+export const ellipsis: React.CSSProperties = {
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+};
+
+// The faint mono micro-label that captions details-panel sections.
+export const monoLabel: React.CSSProperties = {
+  fontFamily: fonts.mono,
+  fontSize: 9.5,
+  letterSpacing: '0.13em',
+  color: tokens.faintLane,
+};
 
 // The 3px ring + soft drop a node wears when it is selected or the longest step.
 export const ACCENT_SHADOW = `0 0 0 3px ${tokens.accentRing}, 0 4px 14px -6px rgba(160,90,50,0.3)`;
