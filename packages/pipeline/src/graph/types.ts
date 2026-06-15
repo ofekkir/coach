@@ -72,7 +72,8 @@ export interface InteractionExecution {
    *  `userPrompt → first inference`, fan-out `inference → tool` (it emitted the
    *  call) and fan-in `tool → inference` (it consumed the result, by tool_use_id
    *  not timing), `inference → inference` continuation when no tool bridges them,
-   *  within-tool `wait → execution`, and tool hooks woven in
+   *  a tool's overlapping sub-spans as parallel children (`tool → wait`,
+   *  `tool → execution` — not a sequence), and tool hooks woven in
    *  (`inference → PreToolUse → tool → PostToolUse → inference`). A DAG: one
    *  inference fans out to many parallel tools, which fan back into the next.
    *  `gapMs` decorates each edge. */

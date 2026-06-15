@@ -100,7 +100,8 @@ Input files (accumulating — user stages N files/folders before submitting)
                             InteractionExecution.causalEdges): a complete spine where
                             every step links to its cause — userPrompt → inference,
                             fan-out inference → tool, fan-in tool → inference, inference
-                            → inference continuation, within-tool wait → execution, and
+                            → inference continuation, a tool's overlapping sub-spans as
+                            parallel children (tool → wait, tool → execution), and
                             tool hooks woven in (inference → PreToolUse → tool →
                             PostToolUse → inference). Tool links use tool_use_id
                             correlation (never timing); hooks pair to tools by name +

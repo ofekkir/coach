@@ -13,7 +13,8 @@ import { gapMsBetween } from './thread.ts';
 //   inference  ─▶ tool        (fan-out)      the response emitted this tool_use id
 //   tool       ─▶ inference   (fan-in)       the request consumed this tool_result
 //   inference  ─▶ inference   (continuation) a turn with no tool to bridge it
-//   wait       ─▶ execution   (within tool)  the gate released the run
+//   tool       ─▶ wait, exec  (within tool)  parallel sub-spans (they overlap —
+//                                            the wait does not precede execution)
 //   inference ─▶ PreToolUse ─▶ tool ─▶ PostToolUse ─▶ inference   (hooks woven in)
 //
 // One inference fans out to many parallel tools, which fan back into the next —
@@ -204,17 +205,21 @@ function edgeBetween(from: ExecutionNode, to: ExecutionNode): GraphEdge {
 // Walks one time-ordered sibling group, linking each node to its cause and
 // recursing into its children (headed by that node). `head` seeds the running
 // predecessor — the userPrompt for a thread, the parent node for a sub-group.
+// `chainSiblings` is false for a tool's own sub-spans: its wait and execution
+// start together (overlapping), so they are PARALLEL children of the tool, not a
+// wait → execution sequence — each links to the tool head, not to each other.
 function spineEdges(
   group: readonly ExecutionNode[],
   head: ExecutionNode | null,
   index: CausalIndex,
+  chainSiblings = true,
 ): GraphEdge[] {
   const edges: GraphEdge[] = [];
   let prev = head;
   for (const node of group) {
     for (const pred of predecessorsOf(node, prev, index)) edges.push(edgeBetween(pred, node));
-    edges.push(...spineEdges(node.children, node, index));
-    prev = node;
+    edges.push(...spineEdges(node.children, node, index, !isCallableTool(node)));
+    if (chainSiblings) prev = node;
   }
   return edges;
 }

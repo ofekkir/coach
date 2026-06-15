@@ -175,4 +175,44 @@ describe('buildCausalEdges', () => {
     expect(edge(edges, 'mainInf', 'toolX')).toBeDefined(); // fan-out, same thread
     expect(edge(edges, 'toolX', 'bgInf')).toBeUndefined(); // no cross-thread fan-in
   });
+
+  // A tool's wait and execution sub-spans start together (overlapping), so they
+  // are parallel children of the tool — not a wait → execution sequence.
+  it('links a tool to its wait and execution sub-spans in parallel (not wait→exec)', () => {
+    const inf: CanonicalNode = {
+      id: 'inf',
+      type: 'llm_request',
+      parent: 'root',
+      source: 'repl_main_thread',
+      model: '',
+      tokens_in: 0,
+      tokens_out: 0,
+      response_messages: [{ type: 'tool_use', id: 'tu_x', name: 'Read' }],
+      ...span(100, 200),
+    };
+    const tool: CanonicalNode = {
+      id: 'toolX',
+      type: 'tool',
+      parent: 'root',
+      name: 'Read',
+      tool_use_id: 'tu_x',
+      ...span(210, 260),
+    };
+    const wait: CanonicalNode = {
+      id: 'waitX',
+      type: 'tool.blocked_on_user',
+      parent: 'toolX',
+      ...span(210, 211),
+    };
+    const exec: CanonicalNode = {
+      id: 'execX',
+      type: 'tool.execution',
+      parent: 'toolX',
+      ...span(210, 260),
+    };
+    const edges = causalEdgesOf([interaction, inf, tool, wait, exec]);
+    expect(edge(edges, 'toolX', 'waitX')).toBeDefined();
+    expect(edge(edges, 'toolX', 'execX')).toBeDefined();
+    expect(edge(edges, 'waitX', 'execX')).toBeUndefined();
+  });
 });
