@@ -54,13 +54,17 @@ both call it. Stage 6 enrichment is deterministic and always runs (using `config
 bundled `defaultSemanticsConfig`). `buildVizResults` is a thin adapter that wraps the execution graph
 for the renderer.
 
-The pipeline **organizes** data; it does not decide how to render it. Graph nodes are **lossless**
-(each carries its full `CanonicalNode`) and carry **no formatted presentation** — no `labelLines`,
-no "+12ms" strings, no truncated titles. Presentation/label formatting was de-leaked out of the
-pipeline and into the app: the app derives all display text from the structured graph data.
-Beside `canonical`, execution nodes may carry **derived structural fields** that need thread
-ordering to compute — `requestMessagesDelta` / `responseMessagesDelta` on `llm_request` steps,
-the messages new to that step relative to the previous request in the same thread.
+The pipeline **organizes** data; it does not decide how to render it. The execution graph is
+**normalized**: node data lives once in `ExecutionGraph.nodes` (a `Record<id, GraphNode>` — the
+lossless node table), and the tree and causal edges carry **ids only**. Resolve a node's data with
+`resolveNode(graph, id)`. This means a node serializes once (no duplication across the places it
+appears), identity is preserved (an id always resolves to the one record), and a step's data is
+looked up by id without walking. Nodes carry **no formatted presentation** — no `labelLines`, no
+"+12ms" strings, no truncated titles. Presentation/label formatting lives in the app, which derives
+all display text from the resolved node. Tree nodes additionally carry **derived structural fields**
+that need thread ordering to compute — `requestMessagesDelta` / `responseMessagesDelta` on
+`llm_request` steps, the messages new to that step relative to the previous request in the same
+thread; these are position-dependent, so they live on the tree node, not in the table.
 
 ```
 Input files (accumulating — user stages N files/folders before submitting)
@@ -153,15 +157,16 @@ execution graph, and sessions are navigated by expand/collapse inside the graph.
 are carried through `classified` (never silently dropped) and surfaced as a count. The graph is
 consumed only by the renderer — no raw `CanonicalNode[]` reaches the visualization layer.
 
-**Display derives from structure, never content.** `viz/format/format.ts` turns each node's
-`canonical` into a typed `NodeCard` — a curated, at-a-glance summary (display type, title,
-structural key/values, numeric metrics) drawn on the node. The card reads only fields the
-canonical model guarantees; it never interprets harness-shaped content (response content blocks,
-`tool_input` JSON). That content flows untouched into a generic JSON tree (`viz/JsonView`,
-backed by `@uiw/react-json-view`) shown in the details panel. Net effect: new node types or
-content shapes from the pipeline render in the viewer for free; only the curated card touches
-`format.ts`. The renderer consumes the typed `NodeCard` (and raw `canonical` for the viewer) —
-no stringly-typed label arrays.
+**Display derives from structure, never content.** Layout resolves each tree node's data by id from
+the graph's node table (`viz/layout/resolve.ts :: canonOf`, over a `ctx.byId` table that also holds
+the app-synthesized agent/session roots), then `viz/format/format.ts` turns that node into a typed
+`NodeCard` — a curated, at-a-glance summary (display type, title, structural key/values, numeric
+metrics) drawn on the node. The card reads only fields the node model guarantees; it never interprets
+harness-shaped content (response content blocks, `tool_input` JSON). That content flows untouched
+into a generic JSON tree (`viz/JsonView`, backed by `@uiw/react-json-view`) shown in the details
+panel. The card is **not** copied onto every React Flow node; on selection, `App.tsx` resolves the
+one selected node by id (`nodeTable`) for the viewer. Net effect: new node types or content shapes
+from the pipeline render in the viewer for free; only the curated card touches `format.ts`.
 
 **Structure encodes role; color is reserved.** The renderer is a warm, low-saturation system
 (`viz/theme.ts` — the single token/glyph source, replacing the old per-type color maps). A node's

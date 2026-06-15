@@ -12,6 +12,7 @@ import { causalLink, link } from './edges.ts';
 import { placeThread, pushStructural } from './place-members.ts';
 import { placeSpine } from './parallel-place.ts';
 import { detectParallelLevels } from './parallel.ts';
+import { canonOf } from './resolve.ts';
 import type { Ctx } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, HG, LANE_GAP, LG, NW, VG } from './types.ts';
 
@@ -32,12 +33,12 @@ function durationOf(node: GraphNode): number | undefined {
 
 // The interaction's longest step — the one (and the edge into it) that wears the
 // accent — taken over the main thread's top-level members.
-function longestStepId(thread: Thread | undefined): string | undefined {
+function longestStepId(thread: Thread | undefined, ctx: Ctx): string | undefined {
   if (thread == null) return undefined;
   let id: string | undefined;
   let maxMs = 0;
   for (const member of thread.members) {
-    const ms = durationOf(member.canonical) ?? 0;
+    const ms = durationOf(canonOf(ctx, member)) ?? 0;
     if (ms > maxMs) {
       maxMs = ms;
       id = member.id;
@@ -59,20 +60,20 @@ function placeInteraction(
 
   pushStructural(root, 'interaction', ctx.cx - NW / CENTERING_DIVISOR, y, hasKids, ctx);
   link(parentId, root.id, ctx);
-  y += estimateNodeH(buildNodeCard(root.canonical)) + (isExpanded && hasKids ? LG : VG);
+  y += estimateNodeH(buildNodeCard(canonOf(ctx, root))) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
   placeUserPrompt(interaction.userPrompt, root.id, y, ctx);
   if (interaction.userPrompt != null) {
-    y += estimateNodeH(buildNodeCard(interaction.userPrompt.canonical)) + VG;
+    y += estimateNodeH(buildNodeCard(canonOf(ctx, interaction.userPrompt))) + VG;
   }
 
   const mainThread = threads.find((t) => t.source === MAIN_THREAD_SOURCE) ?? threads[0];
   const backgroundThreads = threads.filter((t) => t !== mainThread);
-  ctx.longestId = longestStepId(mainThread);
-  ctx.interactionDurMs = durationOf(root.canonical);
+  ctx.longestId = longestStepId(mainThread, ctx);
+  ctx.interactionDurMs = durationOf(canonOf(ctx, root));
 
-  const levels = mainThread != null ? parallelLevelsOf(mainThread, interaction) : [];
+  const levels = mainThread != null ? parallelLevelsOf(mainThread, interaction, ctx) : [];
   ctx.criticalIds = new Set(levels.map((l) => l.criticalId));
 
   const spineX = ctx.cx - NW / CENTERING_DIVISOR;
@@ -88,9 +89,9 @@ function placeInteraction(
 
 // Parallel levels (fork → branches → join) detected on the main thread from the
 // interaction's causal edges — the critical branch is the slowest by duration.
-function parallelLevelsOf(mainThread: Thread, interaction: InteractionExecution) {
+function parallelLevelsOf(mainThread: Thread, interaction: InteractionExecution, ctx: Ctx) {
   const memberIds = new Set(mainThread.members.map((m) => m.id));
-  const durById = new Map(mainThread.members.map((m) => [m.id, durationOf(m.canonical) ?? 0]));
+  const durById = new Map(mainThread.members.map((m) => [m.id, durationOf(canonOf(ctx, m)) ?? 0]));
   return detectParallelLevels(memberIds, interaction.causalEdges, (id) => durById.get(id) ?? 0);
 }
 
@@ -134,35 +135,16 @@ function gapLabel(edge: GraphEdge, byId: ReadonlyMap<string, GraphNode>): string
   return formatGap(Number(start - end) / NS_PER_MS) ?? undefined;
 }
 
-function canonicalById(interaction: InteractionExecution): Map<string, GraphNode> {
-  const byId = new Map<string, GraphNode>();
-  const add = (n: {
-    id: string;
-    canonical: GraphNode;
-    children: readonly { id: string }[];
-  }): void => {
-    byId.set(n.id, n.canonical);
-  };
-  const walk = (node: InteractionExecution['root']): void => {
-    add(node);
-    node.children.forEach(walk);
-  };
-  interaction.threads.flatMap((t) => t.members).forEach(walk);
-  if (interaction.userPrompt != null) walk(interaction.userPrompt);
-  walk(interaction.root);
-  return byId;
-}
-
 // Draws the interaction's causal flow between the placed nodes. Only edges whose
 // both endpoints are placed (visible in the expanded interaction) are drawn — a
-// collapsed member would otherwise leave a dangling edge.
+// collapsed member would otherwise leave a dangling edge. Edge endpoints resolve
+// their timing through the layout's node table (`ctx.byId`).
 function placeCausalEdges(interaction: InteractionExecution, ctx: Ctx): void {
   const placed = new Set(ctx.nodes.map((n) => n.id));
-  const byId = canonicalById(interaction);
   interaction.causalEdges
     .filter((e) => placed.has(e.fromId) && placed.has(e.toId))
     .forEach((e) => {
-      causalLink(e.fromId, e.toId, gapLabel(e, byId), ctx);
+      causalLink(e.fromId, e.toId, gapLabel(e, ctx.byId), ctx);
     });
 }
 
@@ -187,7 +169,7 @@ function placeSession(session: SessionExecution, parentId: string, y: number, ct
 
   pushStructural(root, 'session', ctx.cx - NW / CENTERING_DIVISOR, y, hasKids, ctx);
   link(parentId, root.id, ctx);
-  y += estimateNodeH(buildNodeCard(root.canonical)) + (isExpanded && hasKids ? LG : VG);
+  y += estimateNodeH(buildNodeCard(canonOf(ctx, root))) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
   for (const interaction of session.interactions) {
@@ -205,7 +187,7 @@ export function placeAgent(agent: AgentExecution, ctx: Ctx): void {
   pushStructural(root, 'root', ctx.cx - NW / CENTERING_DIVISOR, CANVAS_TOP, hasKids, ctx);
   if (!isExpanded || !hasKids) return;
 
-  const y = CANVAS_TOP + estimateNodeH(buildNodeCard(root.canonical)) + LG;
+  const y = CANVAS_TOP + estimateNodeH(buildNodeCard(canonOf(ctx, root))) + LG;
   const sessionWidths = agent.sessions.map((s) => sessionWidth(s));
   const totalW = sessionWidths.reduce((sum, w) => sum + w, 0) + (agent.sessions.length - 1) * HG;
   let sx = ctx.cx - totalW / CENTERING_DIVISOR;

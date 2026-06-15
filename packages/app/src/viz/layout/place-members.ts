@@ -2,6 +2,7 @@ import type { ExecutionNode, GraphNode, Thread } from '@coach/pipeline';
 import { estimateNodeH } from './estimate.ts';
 import { buildNodeCard } from '../format/format.ts';
 import { isWeakModel } from '../theme.ts';
+import { canonOf } from './resolve.ts';
 import type { Ctx, HiddenSubCall, TraceRFNodeData } from './types.ts';
 import { NESTED_INDENT, VG } from './types.ts';
 
@@ -36,8 +37,7 @@ export function pushStructural(
     y,
     {
       kind,
-      card: buildNodeCard(node.canonical),
-      canonical: node.canonical,
+      card: buildNodeCard(canonOf(ctx, node)),
       ...STRUCTURAL_FLAGS,
       hasRFChildren: hasKids,
       isExpanded: ctx.expanded.has(node.id),
@@ -54,13 +54,13 @@ function durationOf(node: GraphNode): number {
 // Recursively finds a weak-model inference nested inside a tool/action (the call
 // lives under the tool's `execution` child), so the details panel can surface the
 // hidden sub-call that often dominates the tool's wall-clock.
-function hiddenSubCallOf(node: ExecutionNode): HiddenSubCall | undefined {
+function hiddenSubCallOf(node: ExecutionNode, ctx: Ctx): HiddenSubCall | undefined {
   for (const child of node.children) {
-    const c = child.canonical;
+    const c = canonOf(ctx, child);
     if ((c.type === 'inference' || c.type === 'llm_request') && isWeakModel(c.model)) {
       return { model: c.model, durationMs: durationOf(c) };
     }
-    const nested = hiddenSubCallOf(child);
+    const nested = hiddenSubCallOf(child, ctx);
     if (nested != null) return nested;
   }
   return undefined;
@@ -73,7 +73,7 @@ function shareFlags(
   ctx: Ctx,
 ): Pick<TraceRFNodeData, 'isLongest' | 'shareOfRun'> {
   if (node.id !== ctx.longestId) return { isLongest: false };
-  const dur = durationOf(node.canonical);
+  const dur = durationOf(canonOf(ctx, node));
   const total = ctx.interactionDurMs ?? 0;
   return { isLongest: true, ...(total > 0 ? { shareOfRun: Math.min(1, dur / total) } : {}) };
 }
@@ -92,15 +92,14 @@ export function pushExecNode(
   ctx: Ctx,
   flags: ParallelFlags = {},
 ): void {
-  const hiddenSubCall = hiddenSubCallOf(node);
+  const hiddenSubCall = hiddenSubCallOf(node, ctx);
   push(
     node.id,
     x,
     y,
     {
       kind: 'member',
-      card: buildNodeCard(node.canonical),
-      canonical: node.canonical,
+      card: buildNodeCard(canonOf(ctx, node)),
       lane,
       nested,
       ...shareFlags(node, ctx),
@@ -117,11 +116,11 @@ export function pushExecNode(
 // The one meaningful child of a tool: the weak model running *inside* it (e.g.
 // WebFetch's `web_fetch_apply` → claude-haiku). Found by descending through the
 // mechanical `execution`/`blocked_on_user` sub-spans, which are never carded.
-function nestedInferenceNode(node: ExecutionNode): ExecutionNode | undefined {
+function nestedInferenceNode(node: ExecutionNode, ctx: Ctx): ExecutionNode | undefined {
   for (const child of node.children) {
-    const t = child.canonical.type;
+    const t = canonOf(ctx, child).type;
     if (t === 'inference' || t === 'llm_request') return child;
-    const deeper = nestedInferenceNode(child);
+    const deeper = nestedInferenceNode(child, ctx);
     if (deeper != null) return deeper;
   }
   return undefined;
@@ -137,11 +136,11 @@ export function placeStep(
   ctx: Ctx,
 ): number {
   pushExecNode(member, tx, y, lane, false, ctx);
-  let next = y + estimateNodeH(buildNodeCard(member.canonical)) + VG;
-  const nested = nestedInferenceNode(member);
+  let next = y + estimateNodeH(buildNodeCard(canonOf(ctx, member))) + VG;
+  const nested = nestedInferenceNode(member, ctx);
   if (nested != null) {
     pushExecNode(nested, tx + NESTED_INDENT, next, lane, true, ctx);
-    next += estimateNodeH(buildNodeCard(nested.canonical)) + VG;
+    next += estimateNodeH(buildNodeCard(canonOf(ctx, nested))) + VG;
   }
   return next;
 }

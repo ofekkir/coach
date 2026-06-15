@@ -31,6 +31,7 @@ export type {
 } from './types.ts';
 
 // Graph contract — execution graph (mechanical skeleton)
+export { resolveNode } from './graph/types.ts';
 export type {
   AgentExecution,
   ExecutionGraph,

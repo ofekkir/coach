@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CanonicalNode, RequestMessage, ResponseMessage } from '../../types.ts';
 import type { AgentExecution, ExecutionGraph, ExecutionNode, Thread } from '../types.ts';
+import { resolveNode } from '../types.ts';
 import { buildExecutionGraph, buildInteractionExecution } from './execution.ts';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -78,9 +79,11 @@ function agentForest(): CanonicalNode[] {
 
 // ── Recursive lossless / cleanliness assertions ────────────────────────────────
 
-function assertClean(node: ExecutionNode): void {
-  expect(node.canonical).toBeDefined();
-  expect(node.id).toBe(node.canonical.id);
+function assertClean(node: ExecutionNode, graph: ExecutionGraph): void {
+  // Normalized: data lives in the table, not on the tree node — the id resolves,
+  // and the tree node carries no embedded payload or presentation.
+  expect(resolveNode(graph, node.id).id).toBe(node.id);
+  expect(node).not.toHaveProperty('canonical');
   expect(node).not.toHaveProperty('labelLines');
   expect(node).not.toHaveProperty('segments');
   expect(node).not.toHaveProperty('segmentIndex');
@@ -88,7 +91,7 @@ function assertClean(node: ExecutionNode): void {
   expect(node).not.toHaveProperty('moves');
   expect(node).not.toHaveProperty('verb');
   expect(node).not.toHaveProperty('kind');
-  for (const child of node.children) assertClean(child);
+  for (const child of node.children) assertClean(child, graph);
 }
 
 function soleAgent(graph: ExecutionGraph): AgentExecution {
@@ -133,20 +136,28 @@ describe('buildExecutionGraph', () => {
   });
 
   it('synthesizes a user_prompt node as the head of the interaction', () => {
-    const agent = soleAgent(buildExecutionGraph(agentForest()));
-    const inter = agent.sessions[0]?.interactions[0];
-    expect(inter?.userPrompt?.canonical.type).toBe('user_prompt');
-    expect(inter?.userPrompt?.canonical).toMatchObject({ prompt: 'hello' });
+    const graph = buildExecutionGraph(agentForest());
+    const inter = soleAgent(graph).sessions[0]?.interactions[0];
+    expect(inter?.userPrompt?.id).toBe('root__prompt');
+    expect(resolveNode(graph, 'root__prompt')).toMatchObject({
+      type: 'user_prompt',
+      prompt: 'hello',
+    });
   });
 
-  it('embeds the full CanonicalNode losslessly on every node', () => {
-    const agent = soleAgent(buildExecutionGraph(agentForest()));
+  it('keeps a lossless node table keyed by id; the tree carries ids only', () => {
+    const graph = buildExecutionGraph(agentForest());
+    const agent = soleAgent(graph);
 
     const llm1Node = soleThread(agent).members.find((m) => m.id === 'llm1');
-    expect(llm1Node?.canonical).toBe(llm1);
-    expect(llm1Node?.canonical).toMatchObject({ source: 'repl_main_thread' });
+    expect(llm1Node).not.toHaveProperty('canonical');
+    // The table holds the original node by reference (pointed to, not copied).
+    expect(graph.nodes.llm1).toBe(llm1);
+    expect(graph.nodes.llm1).toMatchObject({ source: 'repl_main_thread' });
 
-    everyNode(agent).forEach(assertClean);
+    everyNode(agent).forEach((node) => {
+      assertClean(node, graph);
+    });
   });
 
   it('carries the signed gap on causal edges (not on member ordering)', () => {
@@ -197,7 +208,6 @@ describe('buildExecutionGraph', () => {
     const member = inter?.threads[0]?.members.find((m) => m.id === 'twc');
     expect(member?.children).toHaveLength(1);
     expect(member?.children[0]?.id).toBe('child1');
-    expect(member?.children[0]?.canonical).toBe(child);
   });
 
   it('degrades to kind:session when no agent node is present', () => {
@@ -221,7 +231,8 @@ describe('buildExecutionGraph', () => {
 
   it('returns kind:interaction with null data when no interaction exists', () => {
     const graph = buildExecutionGraph([llm1]);
-    expect(graph).toEqual({ kind: 'interaction', data: null });
+    // The node table still carries every input node, even with no tree to build.
+    expect(graph).toEqual({ kind: 'interaction', nodes: { llm1 }, data: null });
   });
 });
 

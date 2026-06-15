@@ -2,6 +2,11 @@ import type { GraphNode } from '../../types.ts';
 import type { ExecutionNode, GraphEdge, Thread } from '../types.ts';
 import { gapMsBetween, startGapMsBetween } from './thread.ts';
 
+/** Resolves a tree node to its data. The tree carries ids only; causal rules read
+ *  node payloads (type, name, tool_use_id, timing), so every helper that inspects
+ *  a node takes this resolver. */
+export type CanonResolver = (node: ExecutionNode) => GraphNode;
+
 // ════════════════════════════════════════════════════════════════════════════
 // Causal-flow builder — THE edge layer of the execution graph (there is no
 // "timeline"/sequence layer; member order is a layout grouping only).
@@ -102,11 +107,12 @@ function flatten(nodes: readonly ExecutionNode[]): ExecutionNode[] {
 function pairPostHooksInGroup(
   group: readonly ExecutionNode[],
   postHookOf: Map<string, ExecutionNode>,
+  canon: CanonResolver,
 ): void {
   const recentToolByName = new Map<string, ExecutionNode>();
   for (const node of group) {
-    if (isCallableTool(node)) recentToolByName.set(toolName(node) ?? '', node);
-    const hook = parseHook(node.canonical);
+    if (isCallableTool(node, canon)) recentToolByName.set(toolName(node, canon) ?? '', node);
+    const hook = parseHook(canon(node));
     if (hook?.event !== 'PostToolUse' || hook.toolName == null) continue;
     const tool = recentToolByName.get(hook.toolName);
     if (tool != null) postHookOf.set(tool.id, node);
@@ -115,45 +121,52 @@ function pairPostHooksInGroup(
 
 function indexPostHooks(
   orderedGroups: readonly (readonly ExecutionNode[])[],
+  canon: CanonResolver,
 ): Map<string, ExecutionNode> {
   const postHookOf = new Map<string, ExecutionNode>();
-  for (const group of orderedGroups) pairPostHooksInGroup(group, postHookOf);
+  for (const group of orderedGroups) pairPostHooksInGroup(group, postHookOf, canon);
   return postHookOf;
 }
 
 // The tool node that issues the call (carries tool_use_id), as opposed to its
 // `tool.execution` sub-span.
-function isCallableTool(node: ExecutionNode): boolean {
-  return isToolLike(node.canonical) && node.canonical.type !== 'tool.execution';
+function isCallableTool(node: ExecutionNode, canon: CanonResolver): boolean {
+  const c = canon(node);
+  return isToolLike(c) && c.type !== 'tool.execution';
 }
 
-function toolName(node: ExecutionNode): string | undefined {
-  return 'name' in node.canonical ? node.canonical.name : undefined;
+function toolName(node: ExecutionNode, canon: CanonResolver): string | undefined {
+  const c = canon(node);
+  return 'name' in c ? c.name : undefined;
 }
 
-function buildIndex(threads: readonly Thread[]): CausalIndex {
+function buildIndex(threads: readonly Thread[], canon: CanonResolver): CausalIndex {
   const all = flatten(threads.flatMap((t) => t.members));
   const emitterOf = new Map<string, ExecutionNode>();
   const toolOf = new Map<string, ExecutionNode>();
   for (const node of all) {
-    const useId = isToolLike(node.canonical) ? toolUseIdOf(node.canonical) : undefined;
+    const c = canon(node);
+    const useId = isToolLike(c) ? toolUseIdOf(c) : undefined;
     if (useId != null) toolOf.set(useId, node);
-    if (!isInference(node.canonical)) continue;
+    if (!isInference(c)) continue;
     for (const id of emittedToolUseIds(node)) emitterOf.set(id, node);
   }
   return {
     emitterOf,
     toolOf,
-    postHookOf: indexPostHooks(threads.map((t) => t.members)),
+    postHookOf: indexPostHooks(
+      threads.map((t) => t.members),
+      canon,
+    ),
     threadOf: indexThreadMembership(threads),
   };
 }
 
 // ── Predecessor rules ───────────────────────────────────────────────────────────
 
-function isPreHookFor(prev: ExecutionNode, tool: ExecutionNode): boolean {
-  const hook = parseHook(prev.canonical);
-  return hook?.event === 'PreToolUse' && hook.toolName === toolName(tool);
+function isPreHookFor(prev: ExecutionNode, tool: ExecutionNode, canon: CanonResolver): boolean {
+  const hook = parseHook(canon(prev));
+  return hook?.event === 'PreToolUse' && hook.toolName === toolName(tool, canon);
 }
 
 // What caused `node`. Tools: their PreToolUse hook if it directly precedes, else
@@ -164,14 +177,15 @@ function predecessorsOf(
   node: ExecutionNode,
   prev: ExecutionNode | null,
   index: CausalIndex,
+  canon: CanonResolver,
 ): ExecutionNode[] {
-  if (isCallableTool(node)) {
-    if (prev != null && isPreHookFor(prev, node)) return [prev];
-    const useId = toolUseIdOf(node.canonical);
+  if (isCallableTool(node, canon)) {
+    if (prev != null && isPreHookFor(prev, node, canon)) return [prev];
+    const useId = toolUseIdOf(canon(node));
     const emitter = useId != null ? index.emitterOf.get(useId) : undefined;
     return emitter != null ? [emitter] : continuation(prev);
   }
-  if (isInference(node.canonical)) {
+  if (isInference(canon(node))) {
     const fanIn = fanInPredecessors(node, index);
     return fanIn.length > 0 ? fanIn : continuation(prev);
   }
@@ -200,11 +214,11 @@ function fanInPredecessors(inference: ExecutionNode, index: CausalIndex): Execut
 // Containment edges (parent → its own child, e.g. tool → wait/execution) measure
 // the gap from the parent's START — the child runs WITHIN the parent, so end-to-
 // start would read misleadingly negative. Sequential edges use end-to-start.
-function edgeBetween(from: ExecutionNode, to: ExecutionNode): GraphEdge {
-  const nested = 'parent' in to.canonical && to.canonical.parent === from.id;
-  const gapMs = nested
-    ? startGapMsBetween(from.canonical, to.canonical)
-    : gapMsBetween(from.canonical, to.canonical);
+function edgeBetween(from: ExecutionNode, to: ExecutionNode, canon: CanonResolver): GraphEdge {
+  const fromCanon = canon(from);
+  const toCanon = canon(to);
+  const nested = 'parent' in toCanon && toCanon.parent === from.id;
+  const gapMs = nested ? startGapMsBetween(fromCanon, toCanon) : gapMsBetween(fromCanon, toCanon);
   return { fromId: from.id, toId: to.id, ...(gapMs !== null ? { gapMs } : {}) };
 }
 
@@ -218,13 +232,16 @@ function spineEdges(
   group: readonly ExecutionNode[],
   head: ExecutionNode | null,
   index: CausalIndex,
+  canon: CanonResolver,
   chainSiblings = true,
 ): GraphEdge[] {
   const edges: GraphEdge[] = [];
   let prev = head;
   for (const node of group) {
-    for (const pred of predecessorsOf(node, prev, index)) edges.push(edgeBetween(pred, node));
-    edges.push(...spineEdges(node.children, node, index, !isCallableTool(node)));
+    for (const pred of predecessorsOf(node, prev, index, canon)) {
+      edges.push(edgeBetween(pred, node, canon));
+    }
+    edges.push(...spineEdges(node.children, node, index, canon, !isCallableTool(node, canon)));
     if (chainSiblings) prev = node;
   }
   return edges;
@@ -234,7 +251,8 @@ function spineEdges(
 export function buildCausalEdges(
   threads: readonly Thread[],
   userPrompt: ExecutionNode | null,
+  canon: CanonResolver,
 ): GraphEdge[] {
-  const index = buildIndex(threads);
-  return threads.flatMap((thread) => spineEdges(thread.members, userPrompt, index));
+  const index = buildIndex(threads, canon);
+  return threads.flatMap((thread) => spineEdges(thread.members, userPrompt, index, canon));
 }

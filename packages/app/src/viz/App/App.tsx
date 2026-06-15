@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ExecutionGraph } from '@coach/pipeline';
-import { allExpandableIds, agentRoot, buildElements, initialExpanded } from '../layout/queries.ts';
+import {
+  allExpandableIds,
+  agentRoot,
+  buildElements,
+  initialExpanded,
+  nodeTable,
+} from '../layout/queries.ts';
 import type { Elements } from '../FlowInner/FlowInner.tsx';
 import { FlowInner } from '../FlowInner/FlowInner.tsx';
 import { DetailsPanel } from '../DetailsPanel/DetailsPanel.tsx';
@@ -31,6 +37,10 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
   const stats = useMemo(() => summarizeRun(data), [data]);
 
   const selected = selectedData(elements, selectedId);
+  // The card carries no node payload; resolve the selected node's full data by id
+  // from the table (one lookup, not a copy on every node) for the details viewer.
+  const byId = useMemo(() => nodeTable(data), [data]);
+  const selectedNode = selectedId != null ? byId.get(selectedId) : undefined;
 
   const onExpandAll = useCallback(() => {
     setExpanded(new Set(allExpandable));
@@ -66,7 +76,7 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
           <DetailsPanel
             key={selectedId}
             card={selected.card}
-            canonical={selected.canonical}
+            canonical={selectedNode}
             isLongest={selected.isLongest}
             hiddenSubCall={selected.hiddenSubCall}
             nested={selected.nested}

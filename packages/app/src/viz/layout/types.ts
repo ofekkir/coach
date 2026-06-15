@@ -35,11 +35,10 @@ type NodeKind = 'root' | 'session' | 'interaction' | 'member';
 
 export interface TraceRFNodeData extends Record<string, unknown> {
   kind: NodeKind;
-  /** Curated, structural-only view-model computed app-side from canonical. */
+  /** Curated, structural-only view-model computed app-side from the node's data.
+   *  The raw node (for the details JSON viewer) is resolved by id from the graph's
+   *  node table, not copied onto every card — see `App.tsx` / `nodeTable`. */
   card: NodeCard;
-  /** The node behind this card — canonical, or its semantic relabel after
-   *  enrichment (absent on synthetic nodes). Fed raw to the details JSON viewer. */
-  canonical?: GraphNode;
   /** `main` rides the spine; `background` is an off-spine housekeeping thread,
    *  rendered dimmed and set aside. */
   lane: 'main' | 'background';
@@ -83,6 +82,9 @@ export interface Ctx {
   selected: string | null;
   nodes: RFNode[];
   edges: Edge[];
+  /** The id→data table the layout resolves a tree node's payload from (the graph's
+   *  own nodes plus the app-synthesized agent/session roots) — see `canonOf`. */
+  byId: ReadonlyMap<string, GraphNode>;
   /** The longest step in the interaction currently being placed — it (and the
    *  edge into it) wears the accent. `interactionDurMs` is that interaction's
    *  wall-clock, for the share-of-run bar. Reset around each interaction. */

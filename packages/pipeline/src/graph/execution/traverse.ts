@@ -9,60 +9,65 @@ import type {
 
 // ════════════════════════════════════════════════════════════════════════════
 // Execution-graph traversal — a single generic combinator that visits every
-// ExecutionNode and rebuilds the graph from the mapper's results. The structural
-// shape (agent ▸ session ▸ interaction ▸ thread ▸ step) is walked in ONE place,
-// so per-node transforms (e.g. semantic enrichment) stay pure functions of a
-// single node and never re-implement the hierarchy walk.
+// ExecutionNode in the tree. The structural shape (agent ▸ session ▸ interaction
+// ▸ thread ▸ step) is walked in ONE place, so per-node passes (e.g. semantic
+// enrichment, which rebuilds the `nodes` table) never re-implement the hierarchy
+// walk. The tree itself is immutable here — node data lives in the graph's
+// `nodes` table, so a transform mutates the table, not the tree.
 //
 // Container nodes (agent/session/interaction roots, the synthesized user prompt)
-// are visited too; a mapper that only cares about leaf step types simply returns
-// them unchanged. Ids, edges, hierarchy, and thread metadata are preserved.
+// are visited too; a visitor that only cares about leaf step types simply skips
+// the others by id.
 // ════════════════════════════════════════════════════════════════════════════
 
-type ExecutionNodeMapper = (node: ExecutionNode) => ExecutionNode;
+type ExecutionNodeVisitor = (node: ExecutionNode) => void;
 
-function mapNode(node: ExecutionNode, fn: ExecutionNodeMapper): ExecutionNode {
-  const mapped = fn(node);
-  if (mapped.children.length === 0) return mapped;
-  return { ...mapped, children: mapped.children.map((child) => mapNode(child, fn)) };
+function visitNode(node: ExecutionNode, visit: ExecutionNodeVisitor): void {
+  visit(node);
+  node.children.forEach((child) => {
+    visitNode(child, visit);
+  });
 }
 
-function mapThread(thread: Thread, fn: ExecutionNodeMapper): Thread {
-  return { ...thread, members: thread.members.map((member) => mapNode(member, fn)) };
+function visitThread(thread: Thread, visit: ExecutionNodeVisitor): void {
+  thread.members.forEach((member) => {
+    visitNode(member, visit);
+  });
 }
 
-function mapInteraction(ix: InteractionExecution, fn: ExecutionNodeMapper): InteractionExecution {
-  return {
-    ...ix,
-    root: mapNode(ix.root, fn),
-    userPrompt: ix.userPrompt != null ? mapNode(ix.userPrompt, fn) : null,
-    threads: ix.threads.map((thread) => mapThread(thread, fn)),
-  };
+function visitInteraction(ix: InteractionExecution, visit: ExecutionNodeVisitor): void {
+  visitNode(ix.root, visit);
+  if (ix.userPrompt != null) visitNode(ix.userPrompt, visit);
+  ix.threads.forEach((thread) => {
+    visitThread(thread, visit);
+  });
 }
 
-function mapSession(session: SessionExecution, fn: ExecutionNodeMapper): SessionExecution {
-  return {
-    ...session,
-    root: mapNode(session.root, fn),
-    interactions: session.interactions.map((ix) => mapInteraction(ix, fn)),
-  };
+function visitSession(session: SessionExecution, visit: ExecutionNodeVisitor): void {
+  visitNode(session.root, visit);
+  session.interactions.forEach((ix) => {
+    visitInteraction(ix, visit);
+  });
 }
 
-function mapAgent(agent: AgentExecution, fn: ExecutionNodeMapper): AgentExecution {
-  return {
-    root: mapNode(agent.root, fn),
-    sessions: agent.sessions.map((session) => mapSession(session, fn)),
-  };
+function visitAgent(agent: AgentExecution, visit: ExecutionNodeVisitor): void {
+  visitNode(agent.root, visit);
+  agent.sessions.forEach((session) => {
+    visitSession(session, visit);
+  });
 }
 
-/**
- * Applies `fn` to every ExecutionNode in the graph and returns a structurally
- * identical graph built from the results. The `interaction`/null graph has no
- * nodes to visit and is returned by reference.
- */
-export function mapExecutionNodes(graph: ExecutionGraph, fn: ExecutionNodeMapper): ExecutionGraph {
-  if (graph.kind === 'agent') return { kind: 'agent', data: mapAgent(graph.data, fn) };
-  if (graph.kind === 'session') return { kind: 'session', data: mapSession(graph.data, fn) };
-  if (graph.data == null) return graph;
-  return { kind: 'interaction', data: mapInteraction(graph.data, fn) };
+/** Calls `visit` on every ExecutionNode in the graph's tree. The `interaction`/
+ *  null graph has no nodes to visit. */
+export function forEachExecutionNode(graph: ExecutionGraph, visit: ExecutionNodeVisitor): void {
+  if (graph.kind === 'agent') {
+    visitAgent(graph.data, visit);
+    return;
+  }
+  if (graph.kind === 'session') {
+    visitSession(graph.data, visit);
+    return;
+  }
+  if (graph.data == null) return;
+  visitInteraction(graph.data, visit);
 }

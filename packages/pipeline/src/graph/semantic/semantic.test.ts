@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CanonicalNode } from '../../types.ts';
 import type { ExecutionGraph } from '../types.ts';
+import { resolveNode } from '../types.ts';
 import { defaultSemanticsConfig } from '@coach/semantics';
 import { enrichExecutionGraph } from './semantic.ts';
 
@@ -55,14 +56,15 @@ const tool1: CanonicalNode = {
 function makeGraph(): ExecutionGraph {
   return {
     kind: 'agent',
+    nodes: { agent, sess: session, inter: interaction, llm1, tool1 },
     data: {
-      root: { id: 'agent', canonical: agent, children: [] },
+      root: { id: 'agent', children: [] },
       sessions: [
         {
-          root: { id: 'sess', canonical: session, children: [] },
+          root: { id: 'sess', children: [] },
           interactions: [
             {
-              root: { id: 'inter', canonical: interaction, children: [] },
+              root: { id: 'inter', children: [] },
               userPrompt: null,
               rootToThreadIds: ['thread_repl_main_thread'],
               causalEdges: [{ fromId: 'llm1', toId: 'tool1', gapMs: 10 }],
@@ -73,12 +75,11 @@ function makeGraph(): ExecutionGraph {
                   members: [
                     {
                       id: 'llm1',
-                      canonical: llm1,
                       children: [],
                       requestMessagesDelta: [{ role: 'user', content: 'What should I do next?' }],
                       responseMessagesDelta: [{ type: 'text', text: 'You should run the tests.' }],
                     },
-                    { id: 'tool1', canonical: tool1, children: [] },
+                    { id: 'tool1', children: [] },
                   ],
                 },
               ],
@@ -95,17 +96,12 @@ function makeGraph(): ExecutionGraph {
 describe('enrichExecutionGraph', () => {
   it('derives tool intent and labels a terminal assistant message as respond', () => {
     const enriched = enrichExecutionGraph(makeGraph(), defaultSemanticsConfig);
-    if (enriched.kind !== 'agent') throw new Error('expected agent');
-
-    const thread = enriched.data.sessions[0]?.interactions[0]?.threads[0];
-    const llmNode = thread?.members.find((m) => m.id === 'llm1');
-    const toolNode = thread?.members.find((m) => m.id === 'tool1');
 
     // The final text turn (no trailing tool call) gets the generic deterministic
     // respond act — no model classifies it more finely.
-    expect(llmNode?.canonical).toMatchObject({ type: 'inference', what: ['respond'] });
+    expect(resolveNode(enriched, 'llm1')).toMatchObject({ type: 'inference', what: ['respond'] });
     // `what` is the derived label; `comment` is the agent's verbatim description (display only)
-    expect(toolNode?.canonical).toMatchObject({
+    expect(resolveNode(enriched, 'tool1')).toMatchObject({
       type: 'action',
       what: ['bash'],
       comment: 'Run the test suite',
@@ -118,13 +114,13 @@ describe('enrichExecutionGraph', () => {
 
     const data = enriched.data;
     expect(data.root.id).toBe('agent');
-    expect(data.root.canonical.type).toBe('agent'); // unchanged
+    expect(resolveNode(enriched, 'agent').type).toBe('agent'); // unchanged
 
     const sess = data.sessions[0];
     expect(sess?.root.id).toBe('sess');
 
     const ix = sess?.interactions[0];
-    expect(ix?.root.canonical.type).toBe('interaction');
+    expect(resolveNode(enriched, 'inter').type).toBe('interaction');
     expect(ix?.rootToThreadIds).toEqual(['thread_repl_main_thread']);
 
     const thread = ix?.threads[0];
@@ -135,30 +131,27 @@ describe('enrichExecutionGraph', () => {
 
   it('preserves existing canonical fields on converted nodes', () => {
     const enriched = enrichExecutionGraph(makeGraph(), defaultSemanticsConfig);
-    if (enriched.kind !== 'agent') throw new Error('expected agent');
 
-    const thread = enriched.data.sessions[0]?.interactions[0]?.threads[0];
-    const llmNode = thread?.members.find((m) => m.id === 'llm1');
-
-    expect(llmNode?.canonical).toMatchObject({
+    expect(resolveNode(enriched, 'llm1')).toMatchObject({
       tokens_in: 100,
       tokens_out: 20,
       model: 'claude-haiku',
     });
   });
 
-  it('returns the graph unchanged when there are no tool or llm_request nodes', () => {
-    const emptyGraph: ExecutionGraph = { kind: 'interaction', data: null };
+  it('returns the graph content unchanged when there are no tool or llm_request nodes', () => {
+    const emptyGraph: ExecutionGraph = { kind: 'interaction', nodes: {}, data: null };
     const result = enrichExecutionGraph(emptyGraph, defaultSemanticsConfig);
-    expect(result).toBe(emptyGraph); // same reference — nothing to enrich
+    expect(result).toEqual(emptyGraph); // nothing to enrich
   });
 
   it('labels session-title calls deterministically (marker short-circuit)', () => {
     const titleLlm: CanonicalNode = { ...llm1, id: 'title1' };
     const graph: ExecutionGraph = {
       kind: 'interaction',
+      nodes: { inter: interaction, title1: titleLlm },
       data: {
-        root: { id: 'inter', canonical: interaction, children: [] },
+        root: { id: 'inter', children: [] },
         userPrompt: null,
         rootToThreadIds: ['t'],
         causalEdges: [],
@@ -169,7 +162,6 @@ describe('enrichExecutionGraph', () => {
             members: [
               {
                 id: 'title1',
-                canonical: titleLlm,
                 children: [],
                 requestMessagesDelta: [
                   { role: 'user', content: '<session>\nadd an mcp\n</session>' },
@@ -184,18 +176,20 @@ describe('enrichExecutionGraph', () => {
       },
     };
     const enriched = enrichExecutionGraph(graph, defaultSemanticsConfig);
-    if (enriched.kind !== 'interaction' || enriched.data == null) throw new Error('expected ix');
 
-    const node = enriched.data.threads[0]?.members[0];
-    expect(node?.canonical).toMatchObject({ type: 'inference', what: ['generate session title'] });
+    expect(resolveNode(enriched, 'title1')).toMatchObject({
+      type: 'inference',
+      what: ['generate session title'],
+    });
   });
 
   it('labels nodes with no message delta with the model-id fallback', () => {
     const emptyLlm: CanonicalNode = { ...llm1, id: 'empty1' };
     const graph: ExecutionGraph = {
       kind: 'interaction',
+      nodes: { inter: interaction, empty1: emptyLlm },
       data: {
-        root: { id: 'inter', canonical: interaction, children: [] },
+        root: { id: 'inter', children: [] },
         userPrompt: null,
         rootToThreadIds: ['t'],
         causalEdges: [],
@@ -204,15 +198,16 @@ describe('enrichExecutionGraph', () => {
             id: 't',
             source: 'repl_main_thread',
             // no requestMessagesDelta / responseMessagesDelta — nothing to read
-            members: [{ id: 'empty1', canonical: emptyLlm, children: [] }],
+            members: [{ id: 'empty1', children: [] }],
           },
         ],
       },
     };
     const enriched = enrichExecutionGraph(graph, defaultSemanticsConfig);
-    if (enriched.kind !== 'interaction' || enriched.data == null) throw new Error('expected ix');
 
-    const node = enriched.data.threads[0]?.members[0];
-    expect(node?.canonical).toMatchObject({ type: 'inference', what: ['claude-haiku'] });
+    expect(resolveNode(enriched, 'empty1')).toMatchObject({
+      type: 'inference',
+      what: ['claude-haiku'],
+    });
   });
 });

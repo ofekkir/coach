@@ -1,4 +1,4 @@
-import type { CanonicalNode, InteractionNode, UserPromptNode } from '../../types.ts';
+import type { CanonicalNode, GraphNode, InteractionNode, UserPromptNode } from '../../types.ts';
 import type {
   AgentExecution,
   ExecutionGraph,
@@ -7,7 +7,7 @@ import type {
   SessionExecution,
   Thread,
 } from '../types.ts';
-import { buildCausalEdges } from './causal.ts';
+import { buildCausalEdges, type CanonResolver } from './causal.ts';
 import {
   buildChildrenOf,
   buildThreadMembers,
@@ -18,12 +18,10 @@ import {
 } from './thread.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
-// Execution graph builder — the mechanical, lossless skeleton from a trace.
-//
-// Ported from view-model/{graph-view,session-view,thread}.ts but stripped of
-// all presentation and semantics: nodes embed the full CanonicalNode (no
-// labelLines), edges carry a raw signed gapMs (no "+12ms"), edge ids are plain
-// canonical ids (no sg_ prefix), and there are no segments/shape/moves/verbs.
+// Execution graph builder — the mechanical skeleton from a trace. Normalized:
+// node data lives once in the graph's `nodes` table (see collectNodes); the tree
+// and edges carry ids only. Stripped of presentation/semantics: raw signed gapMs
+// (no "+12ms"), plain canonical edge ids, no segments/shape/moves/verbs.
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Recursive node building ─────────────────────────────────────────────────
@@ -38,11 +36,11 @@ function toExecutionNode(
 ): ExecutionNode {
   const rawChildren = childrenOf.get(node.id);
   if (rawChildren == null || rawChildren.length === 0) {
-    return { id: node.id, canonical: node, children: [] };
+    return { id: node.id, children: [] };
   }
 
   const childNodes = sortByStart(rawChildren).map((child) => toExecutionNode(child, childrenOf));
-  return { id: node.id, canonical: node, children: childNodes };
+  return { id: node.id, children: childNodes };
 }
 
 // ── Interaction level ───────────────────────────────────────────────────────
@@ -82,11 +80,7 @@ export function buildInteractionExecution(
   const threadMembers = buildThreadMembers(directChildren, llmsByThread);
   const sortedSources = orderSources(threadMembers, interaction);
 
-  const root: ExecutionNode = {
-    id: interaction.id,
-    canonical: interaction,
-    children: [],
-  };
+  const root: ExecutionNode = { id: interaction.id, children: [] };
 
   const threads = sortedSources.map((source) =>
     buildThread(source, threadMembers.get(source) ?? [], childrenOf),
@@ -98,21 +92,41 @@ export function buildInteractionExecution(
     userPrompt,
     threads,
     rootToThreadIds: threads.map((t) => t.id),
-    causalEdges: buildCausalEdges(threads, userPrompt),
+    causalEdges: buildCausalEdges(threads, userPrompt, interactionResolver(nodes, interaction)),
+  };
+}
+
+// Causal-edge building reads each node's data; the interaction's nodes plus its
+// synthesized user_prompt form the local table to resolve ids against.
+function interactionResolver(
+  nodes: readonly CanonicalNode[],
+  interaction: InteractionNode,
+): CanonResolver {
+  const byId = new Map<string, GraphNode>(nodes.map((n) => [n.id, n]));
+  const prompt = userPromptCanonical(interaction);
+  if (prompt != null) byId.set(prompt.id, prompt);
+  return (node) => {
+    const found = byId.get(node.id);
+    if (found == null) throw new Error(`interaction has no node with id: ${node.id}`);
+    return found;
   };
 }
 
 // The user prompt is a synthesized first node of the interaction — its input /
 // the head of the spine, carrying the full prompt. Mechanical, but not a step.
-function toUserPromptNode(interaction: InteractionNode): ExecutionNode | null {
+function userPromptCanonical(interaction: InteractionNode): UserPromptNode | null {
   if (interaction.prompt.trim() === '') return null;
-  const canonical: UserPromptNode = {
+  return {
     id: `${interaction.id}__prompt`,
     type: 'user_prompt',
     parent: interaction.id,
     prompt: interaction.prompt,
   };
-  return { id: canonical.id, canonical, children: [] };
+}
+
+function toUserPromptNode(interaction: InteractionNode): ExecutionNode | null {
+  const canonical = userPromptCanonical(interaction);
+  return canonical != null ? { id: canonical.id, children: [] } : null;
 }
 
 function buildThread(
@@ -141,7 +155,7 @@ function buildThread(
 
 function emptyInteractionExecution(interaction: InteractionNode): InteractionExecution {
   return {
-    root: { id: interaction.id, canonical: interaction, children: [] },
+    root: { id: interaction.id, children: [] },
     userPrompt: toUserPromptNode(interaction),
     threads: [],
     rootToThreadIds: [],
@@ -179,7 +193,7 @@ function buildSessionExecution(nodes: readonly CanonicalNode[]): SessionExecutio
   const interactions = sortByStart((childrenOf.get(session.id) ?? []).filter(isInteraction));
   if (interactions.length === 0) return null;
 
-  const root: ExecutionNode = { id: session.id, canonical: session, children: [] };
+  const root: ExecutionNode = { id: session.id, children: [] };
   const interactionExecutions = interactions.map((interaction) => {
     const interactionNodes = nodeSubtree(nodes, interaction.id);
     return buildInteractionExecution(interactionNodes) ?? emptyInteractionExecution(interaction);
@@ -190,7 +204,7 @@ function buildSessionExecution(nodes: readonly CanonicalNode[]): SessionExecutio
 
 function emptySessionExecution(session: CanonicalNode): SessionExecution {
   return {
-    root: { id: session.id, canonical: session, children: [] },
+    root: { id: session.id, children: [] },
     interactions: [],
   };
 }
@@ -206,7 +220,7 @@ function buildAgentExecution(nodes: readonly CanonicalNode[]): AgentExecution | 
   const sessions = sortByStart(directSessions);
   if (sessions.length === 0) return null;
 
-  const root: ExecutionNode = { id: agent.id, canonical: agent, children: [] };
+  const root: ExecutionNode = { id: agent.id, children: [] };
   const sessionExecutions = sessions.map((session) => {
     const sessionNodes = nodeSubtree(nodes, session.id);
     return buildSessionExecution(sessionNodes) ?? emptySessionExecution(session);
@@ -217,12 +231,27 @@ function buildAgentExecution(nodes: readonly CanonicalNode[]): AgentExecution | 
 
 // ── Entry point — graceful degradation (ported from orchestrate.buildVizData) ──
 
-export function buildExecutionGraph(nodes: readonly CanonicalNode[]): ExecutionGraph {
-  const agent = buildAgentExecution(nodes);
-  if (agent != null) return { kind: 'agent', data: agent };
+// The graph's node table: every input node by id, plus the synthesized
+// user_prompt node for each interaction (the only node not present in the input).
+// The tree/edges reference these ids; the data lives here once.
+function collectNodes(input: readonly CanonicalNode[]): Record<string, GraphNode> {
+  const nodes: Record<string, GraphNode> = {};
+  for (const node of input) {
+    nodes[node.id] = node;
+    const prompt = isInteraction(node) ? userPromptCanonical(node) : null;
+    if (prompt != null) nodes[prompt.id] = prompt;
+  }
+  return nodes;
+}
 
-  const session = buildSessionExecution(nodes);
-  if (session != null) return { kind: 'session', data: session };
+export function buildExecutionGraph(input: readonly CanonicalNode[]): ExecutionGraph {
+  const nodes = collectNodes(input);
 
-  return { kind: 'interaction', data: buildInteractionExecution(nodes) };
+  const agent = buildAgentExecution(input);
+  if (agent != null) return { kind: 'agent', data: agent, nodes };
+
+  const session = buildSessionExecution(input);
+  if (session != null) return { kind: 'session', data: session, nodes };
+
+  return { kind: 'interaction', data: buildInteractionExecution(input), nodes };
 }

@@ -2,8 +2,10 @@ import type { GraphNode, RequestMessage, ResponseMessage } from '../types.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Execution graph — the deterministic mechanical skeleton produced from the
-// trace. Lossless: every node carries its full GraphNode (a CanonicalNode, or
-// its semantically-relabeled counterpart after enrichment); no display text.
+// trace. Normalized: node data lives once in the graph's `nodes` table, keyed by
+// id; the tree and edges carry ids only. Resolve a node's data with
+// `resolveNode`. Lossless: each table entry is a full GraphNode (a CanonicalNode,
+// or its semantically-relabeled counterpart after enrichment); no display text.
 //
 //   agent ▸ session ▸ interaction ▸ thread ▸ step
 //
@@ -24,22 +26,19 @@ export interface GraphEdge {
   readonly gapMs?: number;
 }
 
-/** A node in the execution skeleton. Lossless: `canonical` carries every field
- *  from the trace; `id` is hoisted (== canonical.id) for layout/expansion keys.
- *  Display text is the app's job — derive it from `canonical`.
+/** A node in the execution skeleton. Holds only its `id` (a key into the graph's
+ *  `nodes` table) and its children — resolve the node's data with `resolveNode`.
+ *  Display text is the app's job — derive it from the resolved GraphNode.
  *
- *  For `llm_request` nodes, `requestMessagesDelta` is the suffix of
- *  `canonical.request_messages` beyond the previous request in the same thread
- *  (the first request carries its full array). `responseMessagesDelta` is the
- *  full `canonical.response_messages` — each response is always all-new (not
- *  cumulative), so there is nothing to diff. Both fields are undefined on
- *  non-`llm_request` nodes. */
+ *  For `llm_request` nodes, `requestMessagesDelta` is the suffix of the resolved
+ *  node's `request_messages` beyond the previous request in the same thread (the
+ *  first request carries its full array). `responseMessagesDelta` is the full
+ *  `response_messages` — each response is always all-new (not cumulative), so
+ *  there is nothing to diff. Both are position-dependent (they need thread
+ *  ordering to compute) and so live on the tree node, NOT in the `nodes` table;
+ *  both are undefined on non-`llm_request` nodes. */
 export interface ExecutionNode {
   readonly id: string;
-  // Named `canonical` for the mechanical graph, but typed `GraphNode`: after the
-  // semantic stage runs, a tool/llm_request step here holds its action/inference
-  // relabel (a SemanticNode), which is not canonical. Not renamed to avoid churn.
-  readonly canonical: GraphNode;
   readonly children: readonly ExecutionNode[];
   readonly requestMessagesDelta?: readonly RequestMessage[];
   readonly responseMessagesDelta?: readonly ResponseMessage[];
@@ -81,7 +80,7 @@ export interface InteractionExecution {
 }
 
 /** One session's execution skeleton. Titles are derived app-side from each
- *  interaction's `root.canonical` (prompt) or its position. */
+ *  interaction root's resolved node (its prompt) or its position. */
 export interface SessionExecution {
   readonly root: ExecutionNode;
   readonly interactions: readonly InteractionExecution[];
@@ -95,11 +94,28 @@ export interface AgentExecution {
 
 /** The execution graph. Aggregation normally rolls everything under one agent,
  *  but the builder degrades gracefully to session/interaction when upper levels
- *  are absent. */
-export type ExecutionGraph =
+ *  are absent.
+ *
+ *  `nodes` is the single source of node data: every id in the tree (and on every
+ *  causal edge) resolves here to its full GraphNode. The tree/edges are pure
+ *  structure (ids only), so a node serializes once and a step's data can be
+ *  looked up by id without walking — use `resolveNode`. */
+export type ExecutionGraph = {
+  readonly nodes: Readonly<Record<string, GraphNode>>;
+} & (
   | { readonly kind: 'agent'; readonly data: AgentExecution }
   | { readonly kind: 'session'; readonly data: SessionExecution }
-  | { readonly kind: 'interaction'; readonly data: InteractionExecution | null };
+  | { readonly kind: 'interaction'; readonly data: InteractionExecution | null }
+);
+
+/** Resolves a node id (from the tree or a causal edge) to its data in the graph's
+ *  `nodes` table. Throws on an unknown id — the tree and table are built together,
+ *  so a miss is a builder bug, not a data condition. */
+export function resolveNode(graph: ExecutionGraph, id: string): GraphNode {
+  const node = graph.nodes[id];
+  if (node == null) throw new Error(`execution graph has no node with id: ${id}`);
+  return node;
+}
 
 // ── App-facing result ─────────────────────────────────────────────────────────
 

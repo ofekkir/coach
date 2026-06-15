@@ -9,7 +9,8 @@ import {
   structuralPrefix,
 } from './derive.ts';
 import { toolComment, toolPhrases } from './tool-intent.ts';
-import { mapExecutionNodes } from '../execution/traverse.ts';
+import { forEachExecutionNode } from '../execution/traverse.ts';
+import { resolveNode } from '../types.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Semantic enrichment stage — converts mechanical tool/llm_request nodes into
@@ -61,28 +62,28 @@ function inferenceLabel(
   return mechanicalLabel(canonical);
 }
 
-function enrichNode(node: ExecutionNode, config: SemanticsConfig): ExecutionNode {
-  const canonical = node.canonical;
+// Relabels a single node: a `tool` becomes an `action`, an `llm_request` an
+// `inference`. `node` is the tree node (it carries the position-dependent message
+// deltas an inference's label reads); `canonical` is its data from the table.
+function enrichGraphNode(
+  node: ExecutionNode,
+  canonical: GraphNode,
+  config: SemanticsConfig,
+): GraphNode {
   if (canonical.type === 'tool') {
     const input = parseToolInput(canonical.tool_input);
     const comment = toolComment(config, canonical.name, input);
     return {
-      ...node,
-      canonical: {
-        ...canonical,
-        type: 'action',
-        what: toolPhrases(config, canonical.name, input),
-        ...(comment != null ? { comment } : {}),
-      },
+      ...canonical,
+      type: 'action',
+      what: toolPhrases(config, canonical.name, input),
+      ...(comment != null ? { comment } : {}),
     };
   }
   if (canonical.type === 'llm_request') {
-    return {
-      ...node,
-      canonical: { ...canonical, type: 'inference', what: inferenceLabel(node, canonical, config) },
-    };
+    return { ...canonical, type: 'inference', what: inferenceLabel(node, canonical, config) };
   }
-  return node;
+  return canonical;
 }
 
 // ── Public entry point ────────────────────────────────────────────────────────
@@ -92,13 +93,18 @@ function enrichNode(node: ExecutionNode, config: SemanticsConfig): ExecutionNode
  * semantically-labeled action/inference nodes. Pure and deterministic — every
  * label comes from the injected SemanticsConfig.
  *
- * The graph structure (hierarchy, ids, edges) is preserved exactly — only the
- * tool/llm_request node payloads change; all other node types pass through
- * unchanged.
+ * The graph structure (tree, ids, edges) is preserved exactly by reference — only
+ * the `nodes` table changes: tool/llm_request entries are relabeled in place
+ * (same id), all other node types pass through unchanged. The tree is walked only
+ * to read each node's position-dependent message deltas.
  */
 export function enrichExecutionGraph(
   graph: ExecutionGraph,
   config: SemanticsConfig,
 ): ExecutionGraph {
-  return mapExecutionNodes(graph, (node) => enrichNode(node, config));
+  const nodes: Record<string, GraphNode> = { ...graph.nodes };
+  forEachExecutionNode(graph, (node) => {
+    nodes[node.id] = enrichGraphNode(node, resolveNode(graph, node.id), config);
+  });
+  return { ...graph, nodes };
 }
