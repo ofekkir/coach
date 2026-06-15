@@ -96,16 +96,23 @@ function edge(edges: readonly GraphEdge[], fromId: string, toId: string): GraphE
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe('buildCausalEdges', () => {
-  it('fans out from an inference to each tool it emitted', () => {
+  it('fans out from one inference to each parallel tool it emitted (no tool→tool chain)', () => {
     const edges = causalEdgesOf(fixture({ withToolUseIds: true }));
-    expect(edge(edges, 'inf1', 'toolA')?.kind).toBe('causal');
-    expect(edge(edges, 'inf1', 'toolB')?.kind).toBe('causal');
+    expect(edge(edges, 'inf1', 'toolA')).toBeDefined();
+    expect(edge(edges, 'inf1', 'toolB')).toBeDefined();
+    // Parallel tools branch from the inference — they are NOT chained to each other.
+    expect(edge(edges, 'toolA', 'toolB')).toBeUndefined();
   });
 
   it('fans in from each tool result to the consuming inference', () => {
     const edges = causalEdgesOf(fixture({ withToolUseIds: true }));
-    expect(edge(edges, 'toolA', 'inf2')?.kind).toBe('causal');
-    expect(edge(edges, 'toolB', 'inf2')?.kind).toBe('causal');
+    expect(edge(edges, 'toolA', 'inf2')).toBeDefined();
+    expect(edge(edges, 'toolB', 'inf2')).toBeDefined();
+  });
+
+  it('makes the user prompt the head of the spine', () => {
+    const edges = causalEdgesOf(fixture({ withToolUseIds: true }));
+    expect(edge(edges, 'root__prompt', 'inf1')).toBeDefined();
   });
 
   it('carries a negative fan-out gap when a tool starts before the inference ends', () => {
@@ -122,7 +129,10 @@ describe('buildCausalEdges', () => {
     expect(edge(edges, 'toolA', 'inf2')?.gapMs).toBe(50);
   });
 
-  it('produces no causal edges when no tool carries a tool_use_id', () => {
-    expect(causalEdgesOf(fixture({ withToolUseIds: false }))).toEqual([]);
+  it('falls back to a positional chain when no tool carries a tool_use_id', () => {
+    const edges = causalEdgesOf(fixture({ withToolUseIds: false }));
+    // No id correlation → no fan-in branching; the spine degrades to time order.
+    expect(edge(edges, 'toolA', 'toolB')).toBeDefined();
+    expect(edge(edges, 'toolA', 'inf2')).toBeUndefined();
   });
 });

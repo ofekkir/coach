@@ -3,7 +3,6 @@ import type {
   AgentExecution,
   ExecutionGraph,
   ExecutionNode,
-  GraphEdge,
   InteractionExecution,
   SessionExecution,
   Thread,
@@ -38,26 +37,11 @@ function toExecutionNode(
 ): ExecutionNode {
   const rawChildren = childrenOf.get(node.id);
   if (rawChildren == null || rawChildren.length === 0) {
-    return { id: node.id, canonical: node, children: [], innerEdges: [] };
+    return { id: node.id, canonical: node, children: [] };
   }
 
   const childNodes = sortByStart(rawChildren).map((child) => toExecutionNode(child, childrenOf));
-  const innerEdges = sequenceEdges(childNodes.map((child) => child.id));
-  return { id: node.id, canonical: node, children: childNodes, innerEdges };
-}
-
-// Edges between consecutive steps, in time order. `sequence` carries NO gap: a
-// gap between two time-adjacent steps is not a causal latency (see GraphEdge).
-// The meaningful signed gap now lives on the causal edges instead.
-function sequenceEdges(ids: readonly string[]): GraphEdge[] {
-  const edges: GraphEdge[] = [];
-  for (let i = 0; i < ids.length - 1; i += 1) {
-    const fromId = ids[i];
-    const toId = ids[i + 1];
-    if (fromId == null || toId == null) continue;
-    edges.push({ fromId, toId, kind: 'sequence' });
-  }
-  return edges;
+  return { id: node.id, canonical: node, children: childNodes };
 }
 
 // ── Interaction level ───────────────────────────────────────────────────────
@@ -101,19 +85,19 @@ export function buildInteractionExecution(
     id: interaction.id,
     canonical: interaction,
     children: [],
-    innerEdges: [],
   };
 
   const threads = sortedSources.map((source) =>
     buildThread(source, threadMembers.get(source) ?? [], childrenOf),
   );
+  const userPrompt = toUserPromptNode(interaction);
 
   return {
     root,
-    userPrompt: toUserPromptNode(interaction),
+    userPrompt,
     threads,
     rootToThreadIds: threads.map((t) => t.id),
-    causalEdges: buildCausalEdges(threads),
+    causalEdges: buildCausalEdges(threads, userPrompt),
   };
 }
 
@@ -127,7 +111,7 @@ function toUserPromptNode(interaction: InteractionNode): ExecutionNode | null {
     parent: interaction.id,
     prompt: interaction.prompt,
   };
-  return { id: canonical.id, canonical, children: [], innerEdges: [] };
+  return { id: canonical.id, canonical, children: [] };
 }
 
 function buildThread(
@@ -151,13 +135,12 @@ function buildThread(
     id: `thread_${source.replace(/\W+/g, '_')}`,
     source,
     members: builtMembers,
-    edges: sequenceEdges(builtMembers.map((m) => m.id)),
   };
 }
 
 function emptyInteractionExecution(interaction: InteractionNode): InteractionExecution {
   return {
-    root: { id: interaction.id, canonical: interaction, children: [], innerEdges: [] },
+    root: { id: interaction.id, canonical: interaction, children: [] },
     userPrompt: toUserPromptNode(interaction),
     threads: [],
     rootToThreadIds: [],
@@ -195,7 +178,7 @@ function buildSessionExecution(nodes: readonly CanonicalNode[]): SessionExecutio
   const interactions = sortByStart((childrenOf.get(session.id) ?? []).filter(isInteraction));
   if (interactions.length === 0) return null;
 
-  const root: ExecutionNode = { id: session.id, canonical: session, children: [], innerEdges: [] };
+  const root: ExecutionNode = { id: session.id, canonical: session, children: [] };
   const interactionExecutions = interactions.map((interaction) => {
     const interactionNodes = nodeSubtree(nodes, interaction.id);
     return buildInteractionExecution(interactionNodes) ?? emptyInteractionExecution(interaction);
@@ -206,7 +189,7 @@ function buildSessionExecution(nodes: readonly CanonicalNode[]): SessionExecutio
 
 function emptySessionExecution(session: CanonicalNode): SessionExecution {
   return {
-    root: { id: session.id, canonical: session, children: [], innerEdges: [] },
+    root: { id: session.id, canonical: session, children: [] },
     interactions: [],
   };
 }
@@ -222,7 +205,7 @@ function buildAgentExecution(nodes: readonly CanonicalNode[]): AgentExecution | 
   const sessions = sortByStart(directSessions);
   if (sessions.length === 0) return null;
 
-  const root: ExecutionNode = { id: agent.id, canonical: agent, children: [], innerEdges: [] };
+  const root: ExecutionNode = { id: agent.id, canonical: agent, children: [] };
   const sessionExecutions = sessions.map((session) => {
     const sessionNodes = nodeSubtree(nodes, session.id);
     return buildSessionExecution(sessionNodes) ?? emptySessionExecution(session);

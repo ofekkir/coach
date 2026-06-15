@@ -33,7 +33,7 @@ function placeInteraction(
   y += estimateNodeH(buildNodeCard(root.canonical)) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
-  const threadParent = placeUserPrompt(interaction.userPrompt, root.id, y, ctx);
+  placeUserPrompt(interaction.userPrompt, root.id, y, ctx);
   if (interaction.userPrompt != null) {
     y += estimateNodeH(buildNodeCard(interaction.userPrompt.canonical)) + VG;
   }
@@ -43,7 +43,7 @@ function placeInteraction(
   let maxEndY = y;
 
   for (const thread of threads) {
-    const endY = placeThread(thread, threadParent, tx, y, ctx);
+    const endY = placeThread(thread, tx, y, ctx);
     maxEndY = Math.max(maxEndY, endY);
     tx += NW + HG;
   }
@@ -52,9 +52,9 @@ function placeInteraction(
   return maxEndY + VG;
 }
 
-// Overlays the interaction's causal dataflow DAG onto the placed nodes. Only
-// edges whose both endpoints are placed (visible in the expanded interaction) are
-// drawn — a collapsed member would otherwise leave a dangling edge.
+// Draws the interaction's causal flow between the placed nodes. Only edges whose
+// both endpoints are placed (visible in the expanded interaction) are drawn — a
+// collapsed member would otherwise leave a dangling edge.
 function placeCausalEdges(interaction: InteractionExecution, ctx: Ctx): void {
   const placed = new Set(ctx.nodes.map((n) => n.id));
   interaction.causalEdges

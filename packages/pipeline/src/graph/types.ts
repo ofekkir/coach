@@ -10,25 +10,17 @@ import type { GraphNode, RequestMessage, ResponseMessage } from '../types.ts';
 // The app derives all display text from the structured data.
 // ════════════════════════════════════════════════════════════════════════════
 
-/** What a `GraphEdge` represents (structural containment is implicit in
- *  `ExecutionNode.children`, so it is not an edge kind):
- *  - `sequence`  — adjacent steps in time order (thread members, or a node's
- *                  ordered children). Carries NO `gapMs`: time-adjacency between
- *                  two steps is not causality, so a gap drawn there ("tool B
- *                  waited for tool A") is misleading.
- *  - `causal`    — the real dataflow DAG: an inference fanning out to a tool it
- *                  emitted, or a tool fanning in to the inference that consumed its
- *                  result. The signed `gapMs` lives here, where it means something
- *                  (and is often negative for fan-out under streamed dispatch). */
-export type GraphEdgeKind = 'sequence' | 'causal';
-
-/** A directed edge between two nodes. `gapMs` is the signed time gap (ms) — set
- *  only on `causal` edges; the app formats it ("+12ms"). Ids are plain canonical
- *  ids — the app maps them to its own container/subgraph ids for layout. */
+/** A directed edge in the causal graph — the only edge layer. Time-adjacency
+ *  ("step B is drawn under step A") is NOT modeled as an edge: it carries no
+ *  causal meaning. Every edge here is a real dependency — an inference emitted
+ *  this tool, a tool result fed this inference, a wait gated this execution, the
+ *  prompt triggered this turn. `gapMs` is the signed gap between cause-end and
+ *  effect-start (often negative for fan-out, when a tool is dispatched before its
+ *  inference finishes streaming). Ids are plain canonical ids — the app maps them
+ *  to its own container/subgraph ids for layout. */
 export interface GraphEdge {
   readonly fromId: string;
   readonly toId: string;
-  readonly kind: GraphEdgeKind;
   readonly gapMs?: number;
 }
 
@@ -49,7 +41,6 @@ export interface ExecutionNode {
   // relabel (a SemanticNode), which is not canonical. Not renamed to avoid churn.
   readonly canonical: GraphNode;
   readonly children: readonly ExecutionNode[];
-  readonly innerEdges: readonly GraphEdge[];
   readonly requestMessagesDelta?: readonly RequestMessage[];
   readonly responseMessagesDelta?: readonly ResponseMessage[];
 }
@@ -58,13 +49,13 @@ export interface ExecutionNode {
 
 /** A thread is a mechanical execution lane within an interaction. `source` is
  *  the loop that emitted its inferences (e.g. "repl_main_thread"); the app
- *  renders the title from it. `members` are the steps (inference|action) in
- *  time order. */
+ *  renders the title from it. `members` are the steps (inference|action|hook) in
+ *  time order — a layout grouping; the flow between them is the causal graph
+ *  (`InteractionExecution.causalEdges`), not member order. */
 export interface Thread {
   readonly id: string;
   readonly source: string;
   readonly members: readonly ExecutionNode[];
-  readonly edges: readonly GraphEdge[];
 }
 
 /** One interaction's execution skeleton. `root` is the interaction node (its
@@ -77,12 +68,14 @@ export interface InteractionExecution {
   readonly userPrompt: ExecutionNode | null;
   readonly threads: readonly Thread[];
   readonly rootToThreadIds: readonly string[];
-  /** The causal dataflow overlay for this interaction: `inference → tool` (an
-   *  inference emitted this tool call) and `tool → inference` (an inference
-   *  consumed this tool's result). A DAG — one inference fans out to many tools
-   *  and many tool results fan back into the next inference. Edges are derived
-   *  from `tool_use_id` correlation, not timing; `gapMs` decorates them. Empty
-   *  when the trace carries no tool-call ids. */
+  /** The causal flow for this interaction — the complete spine, not an overlay:
+   *  `userPrompt → first inference`, fan-out `inference → tool` (it emitted the
+   *  call) and fan-in `tool → inference` (it consumed the result, by tool_use_id
+   *  not timing), `inference → inference` continuation when no tool bridges them,
+   *  within-tool `wait → execution`, and tool hooks woven in
+   *  (`inference → PreToolUse → tool → PostToolUse → inference`). A DAG: one
+   *  inference fans out to many parallel tools, which fan back into the next.
+   *  `gapMs` decorates each edge. */
   readonly causalEdges: readonly GraphEdge[];
 }
 

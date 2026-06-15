@@ -13,7 +13,7 @@ import { CANVAS_TOP, CENTERING_DIVISOR, NW, HG } from './types.ts';
 import type { Edge } from '@xyflow/react';
 
 function synthetic(canonical: AgentNode | SessionNode): ExecutionNode {
-  return { id: canonical.id, canonical, children: [], innerEdges: [] };
+  return { id: canonical.id, canonical, children: [] };
 }
 
 function syntheticAgent(): ExecutionNode {

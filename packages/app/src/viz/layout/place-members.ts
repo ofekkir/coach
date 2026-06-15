@@ -2,7 +2,7 @@ import { MarkerType } from '@xyflow/react';
 import type { ExecutionNode, Thread } from '@coach/pipeline';
 import { colorOf, fillOf } from './colors.ts';
 import { estimateNodeH } from './estimate.ts';
-import { buildNodeCard, threadTitle } from '../format/format.ts';
+import { buildNodeCard } from '../format/format.ts';
 import type { Ctx, TraceRFNodeData } from './types.ts';
 import { VG } from './types.ts';
 
@@ -34,10 +34,11 @@ export function link(src: string, tgt: string, label: string | undefined, ctx: C
   });
 }
 
-// The causal dataflow overlay (inference → tool fan-out, tool → inference fan-in).
-// Drawn distinct from the grey structural/sequence links: dashed amber, carrying
-// the signed gap ("+12ms" / "-3ms" — negative when a tool was dispatched before
-// its inference finished streaming). Higher zIndex so it reads on top of the lane.
+// The causal flow edge — the primary connective tissue of an expanded interaction
+// (inference → tool fan-out, tool → inference fan-in, prompt/continuation, hooks,
+// wait → exec). Amber to read distinct from the grey containment hierarchy, and
+// carrying the signed gap ("+12ms" / "-3ms" — negative when a tool was dispatched
+// before its inference finished streaming).
 export function causalLink(src: string, tgt: string, label: string | undefined, ctx: Ctx): void {
   ctx.edges.push({
     id: `causal-${src}-${tgt}`,
@@ -52,8 +53,8 @@ export function causalLink(src: string, tgt: string, label: string | undefined, 
           labelBgStyle: { fill: '#fffbeb', fillOpacity: 0.95 },
         }
       : {}),
-    style: { stroke: '#f59e0b', strokeWidth: 1.5, strokeDasharray: '5 3' },
-    markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b', width: 14, height: 14 },
+    style: { stroke: '#f59e0b', strokeWidth: 2 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b', width: 16, height: 16 },
   });
 }
 
@@ -113,68 +114,32 @@ function pushExecNode(
   );
 }
 
-// Recursively places a node's children when expanded — each child that itself has
-// expanded children drills in further (e.g. tool ▸ tool.execution ▸ llm_request).
-// Returns the bottom y and the last-placed id so the next sibling chains from it.
-function placeSubtree(
-  node: ExecutionNode,
-  tx: number,
-  startY: number,
-  ctx: Ctx,
-): { y: number; lastId: string } {
+// Recursively POSITIONS a node's children when expanded (e.g. tool ▸ execution ▸
+// nested inference). It draws no connecting edges — the flow between nodes is the
+// causal graph, laid down separately in place-graph. Returns the bottom y.
+function placeSubtree(node: ExecutionNode, tx: number, startY: number, ctx: Ctx): number {
   let y = startY;
-  let lastId = node.id;
   for (const child of node.children) {
     const hasKids = child.children.length > 0;
     const isExpanded = hasKids && ctx.expanded.has(child.id);
     pushExecNode(child, 'member', tx, y, hasKids, isExpanded, ctx);
-    link(lastId, child.id, undefined, ctx);
     y += estimateNodeH(buildNodeCard(child.canonical)) + VG;
-    lastId = child.id;
-    if (!isExpanded) continue;
-    const sub = placeSubtree(child, tx, y, ctx);
-    y = sub.y;
-    lastId = sub.lastId;
+    if (isExpanded) y = placeSubtree(child, tx, y, ctx);
   }
-  return { y, lastId };
+  return y;
 }
 
-// Sequence edges no longer carry a gap (time-adjacency is not causality — the
-// signed gap lives on the causal overlay). Only the first edge is labelled, with
-// the thread's title.
-function edgeLabelFor(thread: Thread, index: number): string | undefined {
-  return index === 0 ? threadTitle(thread.source) : undefined;
-}
-
-export function placeThread(
-  thread: Thread,
-  parentId: string,
-  tx: number,
-  startY: number,
-  ctx: Ctx,
-): number {
+// Stacks a thread's members in a column (layout only). No member-to-member edges:
+// member order is not causality — the causal flow is drawn by place-graph.
+export function placeThread(thread: Thread, tx: number, startY: number, ctx: Ctx): number {
   let y = startY;
-  let prevId = parentId;
-
-  for (let i = 0; i < thread.members.length; i++) {
-    const member = thread.members[i];
-    if (member == null) continue;
+  for (const member of thread.members) {
     const hasSubNodes = member.children.length > 0;
     const isExpandedMember = hasSubNodes && ctx.expanded.has(member.id);
 
     pushExecNode(member, 'member', tx, y, hasSubNodes, isExpandedMember, ctx);
-    link(prevId, member.id, edgeLabelFor(thread, i), ctx);
     y += estimateNodeH(buildNodeCard(member.canonical)) + VG;
-
-    let lastId = member.id;
-    if (isExpandedMember) {
-      const sub = placeSubtree(member, tx, y, ctx);
-      y = sub.y;
-      lastId = sub.lastId;
-    }
-
-    prevId = lastId;
+    if (isExpandedMember) y = placeSubtree(member, tx, y, ctx);
   }
-
   return y;
 }

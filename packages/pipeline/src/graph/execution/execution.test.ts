@@ -149,18 +149,17 @@ describe('buildExecutionGraph', () => {
     everyNode(agent).forEach(assertClean);
   });
 
-  it('marks thread edges as sequence and carries no gap on them', () => {
+  it('carries the signed gap on causal edges (not on member ordering)', () => {
     const graph = buildExecutionGraph(agentForest());
     if (graph.kind !== 'agent') throw new Error('expected agent');
 
-    const edges = graph.data.sessions[0]?.interactions[0]?.threads[0]?.edges ?? [];
-    const edge = edges.find((e) => e.fromId === 'llm1' && e.toId === 'toolA');
-    // Time-adjacency is not causality: the gap belongs on causal edges, not here.
-    expect(edge?.kind).toBe('sequence');
-    expect(edge?.gapMs).toBeUndefined();
+    const causal = graph.data.sessions[0]?.interactions[0]?.causalEdges ?? [];
+    // llm1 ends at 200ms, toolA starts at 210ms → +10ms on the causal edge.
+    const edge = causal.find((e) => e.fromId === 'llm1' && e.toId === 'toolA');
+    expect(edge?.gapMs).toBe(10);
   });
 
-  it('uses plain canonical ids on edges (no sg_ prefix)', () => {
+  it('uses plain canonical ids on causal edges (no sg_ prefix)', () => {
     const toolWithChild: CanonicalNode = {
       id: 'twc',
       type: 'tool',
@@ -175,12 +174,9 @@ describe('buildExecutionGraph', () => {
       ...span(215, 220),
     };
     const inter = buildInteractionExecution([interaction, llm1, toolWithChild, child]);
-    const thread = inter?.threads.find((t) => t.id === 'thread_repl_main_thread');
-    const edge = thread?.edges.find((e) => e.toId === 'twc');
-    expect(edge?.fromId).toBe('llm1');
-    expect(thread?.edges.some((e) => e.fromId.startsWith('sg_') || e.toId.startsWith('sg_'))).toBe(
-      false,
-    );
+    const edges = inter?.causalEdges ?? [];
+    expect(edges.some((e) => e.toId === 'twc')).toBe(true);
+    expect(edges.some((e) => e.fromId.startsWith('sg_') || e.toId.startsWith('sg_'))).toBe(false);
   });
 
   it('preserves nested children on container nodes', () => {

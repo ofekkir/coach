@@ -43,7 +43,7 @@ describe('pipeline e2e', () => {
         s.interactions.flatMap((i) => i.causalEdges),
       );
       expect(causal.length).toBeGreaterThan(0);
-      expect(causal.every((e) => e.kind === 'causal')).toBe(true);
+      expect(causal.every((e) => e.fromId !== e.toId)).toBe(true);
     },
   );
 });
