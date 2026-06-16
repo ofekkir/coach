@@ -88,7 +88,7 @@ if (unsupported.length > 0) {
   log.warn({ files: unsupported.map((u) => u.file.name) }, 'unsupported inputs ignored');
 }
 log.info(
-  { sessions: result.sessions.length, agentGraphNodes: result.agentGraph.length },
+  { sessions: result.sessions.length, agentGraphNodes: result.agentGraph.nodes.length },
   `done → ${outDir}`,
 );
 log.info(`To visualize: pnpm --filter @coach/app dev  (then upload the files from ${outDir})`);

@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { CanonicalNode } from '../../types.ts';
-import type { GraphEdge } from '../types.ts';
-import { buildInteractionExecution } from './execution.ts';
+import { sessionEntityId } from '../../types.ts';
+import { aggregate } from '../../aggregate/aggregate.ts';
+import type { CausalEdge, InteractionExecution } from '../types.ts';
+import { buildExecutionGraph } from './execution.ts';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
+
+const SID = sessionEntityId('s-1');
 
 function span(startMs: number, endMs: number) {
   return {
@@ -16,6 +20,7 @@ function span(startMs: number, endMs: number) {
 const interaction: CanonicalNode = {
   id: 'root',
   type: 'interaction',
+  sessionId: SID,
   session_id: 's-1',
   user_id: 'u-1',
   sequence: 0,
@@ -32,6 +37,7 @@ function fixture(opts: { withToolUseIds: boolean }): CanonicalNode[] {
     id: 'inf1',
     type: 'llm_request',
     parent: 'root',
+    sessionId: SID,
     source: 'repl_main_thread',
     model: '',
     tokens_in: 0,
@@ -47,6 +53,7 @@ function fixture(opts: { withToolUseIds: boolean }): CanonicalNode[] {
     id: 'toolA',
     type: 'tool',
     parent: 'root',
+    sessionId: SID,
     name: 'Read',
     ...useId('tu_a'),
     ...span(150, 250),
@@ -55,6 +62,7 @@ function fixture(opts: { withToolUseIds: boolean }): CanonicalNode[] {
     id: 'toolB',
     type: 'tool',
     parent: 'root',
+    sessionId: SID,
     name: 'Grep',
     ...useId('tu_b'),
     ...span(210, 260),
@@ -63,6 +71,7 @@ function fixture(opts: { withToolUseIds: boolean }): CanonicalNode[] {
     id: 'inf2',
     type: 'llm_request',
     parent: 'root',
+    sessionId: SID,
     source: 'repl_main_thread',
     model: '',
     tokens_in: 0,
@@ -83,13 +92,19 @@ function fixture(opts: { withToolUseIds: boolean }): CanonicalNode[] {
   return [interaction, inf1, toolA, toolB, inf2];
 }
 
-function causalEdgesOf(nodes: CanonicalNode[]): readonly GraphEdge[] {
-  const ix = buildInteractionExecution(nodes);
+function soleInteraction(nodes: CanonicalNode[]): InteractionExecution {
+  const graph = buildExecutionGraph(aggregate([nodes]));
+  if (graph.kind !== 'agent') throw new Error('expected agent graph');
+  const ix = graph.data.sessions[0]?.interactions[0];
   if (ix == null) throw new Error('expected interaction execution');
-  return ix.causalEdges;
+  return ix;
 }
 
-function edge(edges: readonly GraphEdge[], fromId: string, toId: string): GraphEdge | undefined {
+function causalEdgesOf(nodes: CanonicalNode[]): readonly CausalEdge[] {
+  return soleInteraction(nodes).causalEdges;
+}
+
+function edge(edges: readonly CausalEdge[], fromId: string, toId: string): CausalEdge | undefined {
   return edges.find((e) => e.fromId === fromId && e.toId === toId);
 }
 
@@ -144,6 +159,7 @@ describe('buildCausalEdges', () => {
       id: 'mainInf',
       type: 'llm_request',
       parent: 'root',
+      sessionId: SID,
       source: 'repl_main_thread',
       model: '',
       tokens_in: 0,
@@ -155,6 +171,7 @@ describe('buildCausalEdges', () => {
       id: 'toolX',
       type: 'tool',
       parent: 'root',
+      sessionId: SID,
       name: 'Read',
       tool_use_id: 'tu_x',
       ...span(210, 250),
@@ -163,6 +180,7 @@ describe('buildCausalEdges', () => {
       id: 'bgInf',
       type: 'llm_request',
       parent: 'root',
+      sessionId: SID,
       source: 'away_summary',
       model: '',
       tokens_in: 0,
@@ -183,6 +201,7 @@ describe('buildCausalEdges', () => {
       id: 'inf',
       type: 'llm_request',
       parent: 'root',
+      sessionId: SID,
       source: 'repl_main_thread',
       model: '',
       tokens_in: 0,
@@ -194,6 +213,7 @@ describe('buildCausalEdges', () => {
       id: 'toolX',
       type: 'tool',
       parent: 'root',
+      sessionId: SID,
       name: 'Read',
       tool_use_id: 'tu_x',
       ...span(210, 260),
@@ -202,12 +222,14 @@ describe('buildCausalEdges', () => {
       id: 'waitX',
       type: 'tool.blocked_on_user',
       parent: 'toolX',
+      sessionId: SID,
       ...span(211, 212),
     };
     const exec: CanonicalNode = {
       id: 'execX',
       type: 'tool.execution',
       parent: 'toolX',
+      sessionId: SID,
       ...span(212, 260),
     };
     const edges = causalEdgesOf([interaction, inf, tool, wait, exec]);

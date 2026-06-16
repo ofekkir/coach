@@ -1,14 +1,16 @@
 import type {
+  CanonicalNode,
   ExecutionGraph,
   ExecutionNode,
-  GraphNode,
   InteractionExecution,
 } from '@coach/pipeline';
+import { nodeData } from '@coach/pipeline';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Top-bar aggregates — app-side presentation derived from the ExecutionGraph (the
 // "presentation lives in the app" rule). Sums the loaded run's wall-clock, cost
-// and step count for the stat group.
+// and step count for the stat group. Node data is resolved from the graph's node
+// table by id (tree/thread nodes are id-only).
 // ════════════════════════════════════════════════════════════════════════════
 
 export interface RunStats {
@@ -26,7 +28,7 @@ function interactionsOf(graph: ExecutionGraph): readonly InteractionExecution[] 
   return graph.data != null ? [graph.data] : [];
 }
 
-function durationOf(node: GraphNode): number {
+function durationOf(node: CanonicalNode): number {
   return 'duration_ms' in node ? node.duration_ms : 0;
 }
 
@@ -40,10 +42,13 @@ function membersOf(interaction: InteractionExecution): ExecutionNode[] {
 
 function sessionShortId(graph: ExecutionGraph): string | null {
   const session =
-    graph.kind === 'agent' ? graph.data.sessions[0] : graph.kind === 'session' ? graph.data : null;
-  const id = session?.root.canonical;
-  if (id?.type === 'session' && id.session_id !== '') {
-    return id.session_id.slice(0, SHORT_ID_LEN);
+    graph.kind === 'agent'
+      ? graph.data.sessions[0]?.session
+      : graph.kind === 'session'
+        ? graph.data.session
+        : null;
+  if (session != null && session.sessionId !== '') {
+    return session.sessionId.slice(0, SHORT_ID_LEN);
   }
   return null;
 }
@@ -59,13 +64,20 @@ function breadcrumbOf(graph: ExecutionGraph, interactionCount: number): string[]
 
 export function summarizeRun(graph: ExecutionGraph): RunStats {
   const interactions = interactionsOf(graph);
-  const allNodes = interactions.flatMap((i) => membersOf(i).flatMap(flatten));
+  const allNodeIds = interactions.flatMap((i) =>
+    membersOf(i)
+      .flatMap(flatten)
+      .map((n) => n.id),
+  );
 
-  const durationMs = interactions.reduce((sum, i) => sum + durationOf(i.root.canonical), 0);
-  const costUsd = allNodes.reduce(
-    (sum, n) => sum + ('cost_usd' in n.canonical ? (n.canonical.cost_usd ?? 0) : 0),
+  const durationMs = interactions.reduce(
+    (sum, i) => sum + durationOf(nodeData(graph, i.interactionId)),
     0,
   );
+  const costUsd = allNodeIds.reduce((sum, id) => {
+    const node = nodeData(graph, id);
+    return sum + ('cost_usd' in node ? (node.cost_usd ?? 0) : 0);
+  }, 0);
   const steps = interactions.reduce((sum, i) => sum + membersOf(i).length, 0);
 
   return { durationMs, costUsd, steps, breadcrumb: breadcrumbOf(graph, interactions.length) };

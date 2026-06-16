@@ -1,45 +1,26 @@
-import { PSEUDO_USER_ID } from '../types.ts';
-import type { CanonicalNode, InteractionNode, SessionNode } from '../types.ts';
+import { agentEntityId, PSEUDO_USER_ID } from '../types.ts';
+import type { Agent, CanonicalNode, InteractionNode, Session } from '../types.ts';
 
-function sessionNodeId(sessionId: string): string {
-  return `session-${sessionId}`;
+// ════════════════════════════════════════════════════════════════════════════
+// Stage 4 — aggregate every session's canonical nodes into one node table plus
+// the owning ENTITIES (one Agent, one Session per harness session). Agent and
+// session are dimension rows referenced by FK, NOT graph nodes: the node table
+// carries no `agent`/`session` rows, only the `sessionId` FK denormalized onto
+// each node by stage 3. Multi-agent is out of scope — every session rolls up
+// under one agent.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Stage 4 output: the node-data table plus the entity tables it references. Maps
+ *  1:1 to `nodes` + `agents` + `sessions`. */
+export interface AgentGraph {
+  readonly nodes: readonly CanonicalNode[];
+  readonly agent: Agent;
+  readonly sessions: readonly Session[];
 }
 
-function agentNodeId(userId: string): string {
-  return `agent-${userId}`;
-}
-
-// Synthesizes a session node and re-parents root interaction nodes under it.
-function isRootInteraction(n: CanonicalNode): n is InteractionNode {
-  return n.type === 'interaction' && n.parent == null;
-}
-
-export function addSessionNode(nodes: readonly CanonicalNode[]): CanonicalNode[] {
-  const interaction = nodes.find(isRootInteraction);
-  if (!interaction?.session_id) return [...nodes];
-
-  const sessionId = interaction.session_id;
-  const sessionId_nodeId = sessionNodeId(sessionId);
-
-  const sessionNode: CanonicalNode = {
-    id: sessionId_nodeId,
-    type: 'session',
-    session_id: sessionId,
-    user_id: interaction.user_id,
-  };
-
-  const updated = nodes.map((n) =>
-    n.type === 'interaction' && n.parent == null ? { ...n, parent: sessionId_nodeId } : n,
-  );
-
-  return [sessionNode, ...updated];
-}
-
-// Merges node arrays from multiple traces into a single session-level forest.
-// All trace arrays must share the same session node id; duplicates are dropped.
-export function aggregateSession(
-  nodesByTrace: readonly (readonly CanonicalNode[])[],
-): CanonicalNode[] {
+// Merges node arrays from multiple traces into a single node table; duplicates
+// (same id) are dropped.
+function dedupeById(nodesByTrace: readonly (readonly CanonicalNode[])[]): CanonicalNode[] {
   const seen = new Set<string>();
   const result: CanonicalNode[] = [];
   for (const node of nodesByTrace.flat()) {
@@ -50,26 +31,34 @@ export function aggregateSession(
   return result;
 }
 
-// Synthesizes an agent node and re-parents root session nodes under it.
-// Multi-agent is out of scope — every session rolls up under one agent.
-function isRootSession(n: CanonicalNode): n is SessionNode {
-  return n.type === 'session' && n.parent == null;
+function interactionNodes(nodes: readonly CanonicalNode[]): InteractionNode[] {
+  return nodes.filter((n): n is InteractionNode => n.type === 'interaction');
 }
 
-export function aggregateAgent(sessionNodes: readonly CanonicalNode[]): CanonicalNode[] {
-  const session = sessionNodes.find(isRootSession);
-  const userId = session?.user_id ?? PSEUDO_USER_ID;
-  const agentId = agentNodeId(userId);
+function buildAgent(interactions: readonly InteractionNode[]): Agent {
+  const userId = interactions[0]?.user_id ?? PSEUDO_USER_ID;
+  return { id: agentEntityId(userId), userId };
+}
 
-  const agentNode: CanonicalNode = {
-    id: agentId,
-    type: 'agent',
-    user_id: userId,
-  };
+// One Session per distinct harness session id. The entity `id` is the value
+// stamped on every node's `sessionId` FK (so node.sessionId === Session.id).
+function buildSessions(interactions: readonly InteractionNode[], agentId: string): Session[] {
+  const byHarnessId = new Map<string, Session>();
+  for (const node of interactions) {
+    if (byHarnessId.has(node.session_id)) continue;
+    byHarnessId.set(node.session_id, {
+      id: node.sessionId,
+      agentId,
+      userId: node.user_id,
+      sessionId: node.session_id,
+    });
+  }
+  return [...byHarnessId.values()];
+}
 
-  const updated = sessionNodes.map((n) =>
-    n.type === 'session' && n.parent == null ? { ...n, parent: agentId } : n,
-  );
-
-  return [agentNode, ...updated];
+export function aggregate(nodesByTrace: readonly (readonly CanonicalNode[])[]): AgentGraph {
+  const nodes = dedupeById(nodesByTrace);
+  const interactions = interactionNodes(nodes);
+  const agent = buildAgent(interactions);
+  return { nodes, agent, sessions: buildSessions(interactions, agent.id) };
 }

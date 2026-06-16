@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import type { GraphNode } from '@coach/pipeline';
+import type { ExecutionGraph } from '@coach/pipeline';
 import type { NodeCard } from '../format/format.ts';
 
 export const NW = 240;
@@ -35,11 +35,10 @@ type NodeKind = 'root' | 'session' | 'interaction' | 'member';
 
 export interface TraceRFNodeData extends Record<string, unknown> {
   kind: NodeKind;
-  /** Curated, structural-only view-model computed app-side from canonical. */
+  /** Curated, structural-only view-model computed app-side from the resolved node.
+   *  Node data is NOT copied onto the React Flow node — the details panel resolves
+   *  the selected id against the graph tables on demand. */
   card: NodeCard;
-  /** The node behind this card — canonical, or its semantic relabel after
-   *  enrichment (absent on synthetic nodes). Fed raw to the details JSON viewer. */
-  canonical?: GraphNode;
   /** `main` rides the spine; `background` is an off-spine housekeeping thread,
    *  rendered dimmed and set aside. */
   lane: 'main' | 'background';
@@ -78,6 +77,9 @@ export type BandRFNode = Node<BandData, 'band'>;
 export type RFNode = TraceRFNode | BandRFNode;
 
 export interface Ctx {
+  /** The execution graph — the source of truth for resolving a node id to its
+   *  canonical data (+ semantics overlay) when building a card. */
+  graph: ExecutionGraph;
   cx: number;
   expanded: Set<string>;
   selected: string | null;

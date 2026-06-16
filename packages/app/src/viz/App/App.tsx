@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { ExecutionGraph } from '@coach/pipeline';
+import type { ExecutionGraph, ResolvedNode } from '@coach/pipeline';
+import { resolve } from '@coach/pipeline';
 import { allExpandableIds, agentRoot, buildElements, initialExpanded } from '../layout/queries.ts';
 import type { Elements } from '../FlowInner/FlowInner.tsx';
 import { FlowInner } from '../FlowInner/FlowInner.tsx';
@@ -13,6 +14,16 @@ function selectedData(elements: Elements, selectedId: string | null): TraceRFNod
   if (selectedId == null) return null;
   const node = elements.nodes.find((n) => n.id === selectedId);
   return node?.type === 'trace' ? node.data : null;
+}
+
+// Resolves the selected id against the node table — entity selections (agent /
+// session containers) carry no node-table row, so they resolve to undefined.
+function selectedResolved(
+  graph: ExecutionGraph,
+  selectedId: string | null,
+): ResolvedNode | undefined {
+  if (selectedId == null || !(selectedId in graph.nodes)) return undefined;
+  return resolve(graph, selectedId);
 }
 
 export function App({ data, title }: { data: ExecutionGraph; title: string }) {
@@ -31,6 +42,7 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
   const stats = useMemo(() => summarizeRun(data), [data]);
 
   const selected = selectedData(elements, selectedId);
+  const selectedNode = useMemo(() => selectedResolved(data, selectedId), [data, selectedId]);
 
   const onExpandAll = useCallback(() => {
     setExpanded(new Set(allExpandable));
@@ -66,7 +78,7 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
           <DetailsPanel
             key={selectedId}
             card={selected.card}
-            canonical={selected.canonical}
+            resolved={selectedNode}
             isLongest={selected.isLongest}
             hiddenSubCall={selected.hiddenSubCall}
             nested={selected.nested}

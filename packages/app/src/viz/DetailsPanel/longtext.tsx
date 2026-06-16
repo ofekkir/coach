@@ -1,4 +1,4 @@
-import type { GraphNode } from '@coach/pipeline';
+import type { ResolvedNode } from '@coach/pipeline';
 import { fonts, monoLabel, tokens } from '../theme.ts';
 
 const LONG_TEXT_THRESHOLD = 180;
@@ -11,18 +11,15 @@ interface LongText {
   quote: boolean;
 }
 
-function commentOf(canonical: GraphNode): string | undefined {
-  return 'comment' in canonical ? canonical.comment : undefined;
-}
-
-// The one long-text value worth surfacing in full: a prompt's full text, or a
-// tool's instruction to its weak model. Truncated on the card; whole here.
-export function longTextOf(canonical: GraphNode | undefined): LongText | null {
-  if (canonical == null) return null;
-  if (canonical.type === 'user_prompt') {
-    return { label: 'PROMPT', text: canonical.prompt, quote: false };
+// The one long-text value worth surfacing in full: a prompt's full text (from the
+// node), or a tool's instruction to its weak model (the semantic `comment`).
+// Truncated on the card; whole here.
+export function longTextOf(resolved: ResolvedNode | undefined): LongText | null {
+  if (resolved == null) return null;
+  if (resolved.node.type === 'user_prompt') {
+    return { label: 'PROMPT', text: resolved.node.prompt, quote: false };
   }
-  const comment = commentOf(canonical);
+  const comment = resolved.semantics?.comment;
   if (comment != null) return { label: 'INSTRUCTION TO WEAK MODEL', text: comment, quote: true };
   return null;
 }

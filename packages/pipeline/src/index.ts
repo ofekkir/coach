@@ -2,26 +2,24 @@
 export { enrichTrace } from './canonical/enrich/enrich.ts';
 export { transformTrace } from './canonical/transform/transform.ts';
 export { TempoTraceSchema } from './canonical/tempo.schema.ts';
-export { PSEUDO_USER_ID } from './types.ts';
+export { agentEntityId, PSEUDO_USER_ID, sessionEntityId } from './types.ts';
 export type {
-  ActionNode,
-  AgentNode,
+  Agent,
   CanonicalNode,
-  GraphNode,
   HookNode,
-  InferenceNode,
   InputType,
   InteractionNode,
   LlmRequestNode,
   LogEntry,
+  MessageDeltas,
   NodeType,
   OtlpAttribute,
   OtlpBatch,
   OtlpSpan,
   RequestMessage,
   ResponseMessage,
-  SemanticNode,
-  SessionNode,
+  SemanticFields,
+  Session,
   TempoTrace,
   ToolBlockedOnUserNode,
   ToolExecutionNode,
@@ -30,17 +28,19 @@ export type {
   UserPromptNode,
 } from './types.ts';
 
-// Graph contract — execution graph (mechanical skeleton)
+// Graph contract — execution graph (normalized, stage-layered, id-keyed)
 export type {
   AgentExecution,
+  CausalEdge,
   ExecutionGraph,
   ExecutionNode,
-  GraphEdge,
   InteractionExecution,
+  ResolvedNode,
   SessionExecution,
   Thread,
   VizResult,
 } from './graph/types.ts';
+export { deltasOf, nodeData, resolve, semanticsOf } from './graph/types.ts';
 
 // Semantic enrichment stage (deterministic; semantic vocabulary supplied by
 // @coach/semantics — import config types from there).

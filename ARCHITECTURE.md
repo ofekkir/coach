@@ -54,13 +54,31 @@ both call it. Stage 6 enrichment is deterministic and always runs (using `config
 bundled `defaultSemanticsConfig`). `buildVizResults` is a thin adapter that wraps the execution graph
 for the renderer.
 
-The pipeline **organizes** data; it does not decide how to render it. Graph nodes are **lossless**
-(each carries its full `CanonicalNode`) and carry **no formatted presentation** — no `labelLines`,
-no "+12ms" strings, no truncated titles. Presentation/label formatting was de-leaked out of the
-pipeline and into the app: the app derives all display text from the structured graph data.
-Beside `canonical`, execution nodes may carry **derived structural fields** that need thread
-ordering to compute — `requestMessagesDelta` / `responseMessagesDelta` on `llm_request` steps,
-the messages new to that step relative to the previous request in the same thread.
+The pipeline **organizes** data; it does not decide how to render it. The execution graph is a
+**normalized, stage-layered, id-keyed model** that maps 1:1 to a relational DB, so persistence is a
+later drop-in with no reshaping. Three concerns are kept strictly separate:
+
+- **Node data is additive per stage, keyed by a shared node id.** Three id-keyed tables hang off the
+  `ExecutionGraph`: `nodes` (stage 3 canonical data — the value type is `CanonicalNode`), `deltas`
+  (stage 5 — per-`llm_request` `requestMessagesDelta` / `responseMessagesDelta`, the messages new to
+  that step vs. the previous request in the same thread), and `semantics` (stage 6 — per-node `what`
+  plus an optional `comment`). `node.id == data.id` across every layer (1:1 joins). A node "points
+  to" its data **by id, resolved through a table** (`nodeData` / `deltasOf` / `semanticsOf` /
+  `resolve`) — never an embedded object, so nothing re-duplicates on serialize/DB. There is **no
+  `action`/`inference` node type**: "is this node enriched?" is answered by "does a `semantics[id]`
+  row exist".
+- **Edges are two different relations over the same nodes.** _Containment_ ("child is contained in
+  time by parent") is the `parent` self-FK, surfaced per interaction as `tree` (an id-only
+  `ExecutionNode` = `{ id, children }`). _Causal_ ("effect triggered by cause") is its own DAG edge
+  set (`causalEdges`), introduced in stage 5 and reused unchanged by stage 6.
+- **Agent and session are ENTITIES, not nodes** — dimension rows referenced by FK (`sessionId`
+  denormalized onto every node; `agentId` on each session). They never appear in the node table.
+
+Carrying no embedded copies, no classes and no cycles, the whole `ExecutionGraph` is plain
+JSON-serializable data that round-trips through `JSON.stringify`/`parse`. Each in-memory structure
+maps to one table: `agents`, `sessions`, `nodes(parent self-FK, session_id FK)`, `node_deltas(1:1)`,
+`node_semantics(1:1)`, `causal_edges(from_id, to_id, gap_ms)`. Presentation/label formatting lives in
+the app, which derives all display text from the structured graph data.
 
 ```
 Input files (accumulating — user stages N files/folders before submitting)
@@ -80,20 +98,27 @@ Input files (accumulating — user stages N files/folders before submitting)
    toCanonical(session) per session, independent:
      otel:   join traces → enrichTrace(logs) → transformTrace   (one unified OTLP pass)
      native: nativeSessionToTrace → transformTrace              (OTLP round-trip, behind facade)
-     both:   addSessionNode()
+     both:   transformTrace stamps each node's sessionId FK (no session NODE is added)
         │
-        ▼  Stage 4 — aggregate/aggregate.ts      → agentGraph: CanonicalNode[]
-   aggregateSession()   merge all sessions → forest (dedupe by id)
-   aggregateAgent()     add the single agent root (multi-agent is out of scope)
+        ▼  Stage 4 — aggregate/aggregate.ts      → agentGraph: AgentGraph
+   aggregate()          merge all sessions → one `nodes` table (dedupe by id) plus the
+                          owning ENTITIES synthesized from the interaction nodes: one
+                          `agent` and one `session` per harness session. Entities are
+                          dimension rows (FK targets), NOT nodes (multi-agent is out of
+                          scope — every session rolls up under one agent).
         │
         ▼  Stage 5 — graph/execution/execution.ts  → executionGraph: ExecutionGraph
-   buildExecutionGraph()  the mechanical skeleton from the trace, no interpretation:
-                            agent ▸ session ▸ interaction ▸ thread ▸ step
-                            each interaction has a synthesized user_prompt head node
-                            (its input / goal source) carrying the full prompt — not a step
-                            llm_request steps carry requestMessagesDelta /
-                            responseMessagesDelta — the messages new to that step
-                            vs. the previous request in the same thread
+   buildExecutionGraph()  the mechanical, layered skeleton from the trace, no
+                            interpretation. Entities own the structure (agent ▸ sessions
+                            ▸ interactions); the node-graph lives in each interaction as
+                            an id-only containment `tree`, `threads` (layout grouping),
+                            and `causalEdges`. The `nodes` table is carried at the graph
+                            level; a synthesized user_prompt head node (its input / goal
+                            source, NOT a step) is added to it and referenced by
+                            `userPromptId`. Message deltas are emitted into the
+                            graph-level `deltas` table keyed by id — for each
+                            `llm_request`, the messages new to that step vs. the previous
+                            request in the same thread.
                             threads/members are a LAYOUT grouping only — there is no
                             time-ordering edge layer (adjacency ≠ causality). The sole
                             edge layer is the causal flow (graph/execution/causal.ts,
@@ -113,9 +138,12 @@ Input files (accumulating — user stages N files/folders before submitting)
                             OTEL gets it via enrich (from the tool decision log).
         │
         ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
-   enrichExecutionGraph(graph, config)  converts tool → action and llm_request →
-                            inference nodes. tool-intent.ts + derive.ts label each
-                            node deterministically (tool intent, path conventions,
+   enrichExecutionGraph(graph, config)  a PURE TABLE PASS: iterates the `nodes`
+                            table and, for each `tool` / `llm_request`, writes a
+                            `semantics[id]` row (`what` + optional `comment`). No tree
+                            walk — a node's label depends only on its own data and its
+                            stage-5 deltas (read by id). tool-intent.ts + derive.ts label
+                            each node deterministically (tool intent, path conventions,
                             thinking→plan, tool_use→invoke, session-title,
                             suggestion-mode) by interpreting the injected SemanticsConfig
                             — no hardcoded tool tables, no model. A genuine terminal
@@ -126,8 +154,9 @@ Input files (accumulating — user stages N files/folders before submitting)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)
 ```
 
-`agentGraph` is itself a visualisable graph (the canonical node forest). The execution graph is the
-deterministic skeleton from the trace. `VizResult.data` is the `ExecutionGraph` directly.
+`agentGraph` is the stage-4 `AgentGraph` — the `nodes` table plus the `agent`/`sessions` entity
+tables. The execution graph is the deterministic, layered skeleton from the trace. `VizResult.data`
+is the `ExecutionGraph` directly.
 
 **Semantics config lives in `@coach/semantics`, injected into the pipeline.** Stage 6's
 deterministic labels come from a `SemanticsConfig` — the typed form of two bundled artifacts under
@@ -146,22 +175,29 @@ generic `respond` act; a weak-model labeler that classified that act more finely
 `ontology.messageActs`) was removed for now — the vocabulary stays in the ontology, reserved for
 reintroducing it. The interpreter (`graph/semantic`) is agent-agnostic, so a different domain/agent is
 a config swap, not a code change. See `packages/semantics/README.md` for the resolution order and
-what is deliberately out of scope (composition/inference roll-up).
+what is deliberately out of scope (composition/inference roll-up). Enrichment writes into the
+`semantics` table (one row per relabeled node) and leaves the `nodes`/`deltas`/edges untouched — the
+old copied twin types (`ActionNode`/`InferenceNode`) are retired.
 
 All sessions roll up under one agent; `buildVizResults` emits exactly one `VizResult` carrying the
 execution graph, and sessions are navigated by expand/collapse inside the graph. Unsupported files
 are carried through `classified` (never silently dropped) and surfaced as a count. The graph is
 consumed only by the renderer — no raw `CanonicalNode[]` reaches the visualization layer.
 
-**Display derives from structure, never content.** `viz/format/format.ts` turns each node's
-`canonical` into a typed `NodeCard` — a curated, at-a-glance summary (display type, title,
-structural key/values, numeric metrics) drawn on the node. The card reads only fields the
-canonical model guarantees; it never interprets harness-shaped content (response content blocks,
-`tool_input` JSON). That content flows untouched into a generic JSON tree (`viz/JsonView`,
-backed by `@uiw/react-json-view`) shown in the details panel. Net effect: new node types or
-content shapes from the pipeline render in the viewer for free; only the curated card touches
-`format.ts`. The renderer consumes the typed `NodeCard` (and raw `canonical` for the viewer) —
-no stringly-typed label arrays.
+**Display derives from structure, never content.** Tree/thread nodes the layout walks are **id-only**
+(`{ id, children }`); the layout resolves each id against the graph tables through one seam
+(`layout/place-members.ts :: cardOf` / `nodeOf`, backed by `graph.nodes` + the `semantics` overlay,
+threaded via `Ctx.graph`). `viz/format/format.ts :: buildNodeCard` takes a **`ResolvedNode`** (the
+canonical row + its optional semantic fields) and returns a typed `NodeCard` — a curated, at-a-glance
+summary (display type, title, structural key/values, numeric metrics). Entities render as container
+cards from `buildAgentCard` / `buildSessionCard` (the degraded-graph synthesizer in `layout/queries.ts`
+produces synthetic `Agent`/`Session` **entities**), never from the node table. The card reads only
+fields the canonical model guarantees; it never interprets harness-shaped content (response content
+blocks, `tool_input` JSON). That content flows untouched into a generic JSON tree (`viz/JsonView`,
+backed by `@uiw/react-json-view`) in the details panel. Node data is **not** copied onto every React
+Flow node: on selection, `App.tsx` resolves the one selected id (`resolve(graph, id)`) and passes the
+node + deltas + semantics to `DetailsPanel`. Net effect: new node types or content shapes from the
+pipeline render in the viewer for free; only the curated card touches `format.ts`.
 
 **Structure encodes role; color is reserved.** The renderer is a warm, low-saturation system
 (`viz/theme.ts` — the single token/glyph source, replacing the old per-type color maps). A node's
@@ -228,14 +264,14 @@ pipeline output format being reworked.
 `scripts/viz.ts`, `scripts/enrich.ts`, `scripts/etl.ts` — were removed; `e2e` covers the full
 pipeline.)
 
-| Member file                    | Stage | Contents                                                    |
-| ------------------------------ | ----- | ----------------------------------------------------------- |
-| `01-classified.json`           | 1     | each file's name/path/type                                  |
-| `02-sessions.json`             | 2     | session id, kind, and member filenames per session          |
-| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session                               |
-| `04-agent-graph.json`          | 4     | the single-agent `CanonicalNode[]` forest                   |
-| `05-execution-graph.json`      | 5     | `ExecutionGraph` (the mechanical skeleton)                  |
-| `06-enriched-graph.json`       | 6     | `ExecutionGraph` with deterministic action/inference labels |
+| Member file                    | Stage | Contents                                                             |
+| ------------------------------ | ----- | -------------------------------------------------------------------- |
+| `01-classified.json`           | 1     | each file's name/path/type                                           |
+| `02-sessions.json`             | 2     | session id, kind, and member filenames per session                   |
+| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session (each node carries its `sessionId` FK) |
+| `04-agent-graph.json`          | 4     | `AgentGraph` — the `nodes` table + `agent`/`sessions` entities       |
+| `05-execution-graph.json`      | 5     | `ExecutionGraph` (id-keyed skeleton; `semantics` table empty)        |
+| `06-enriched-graph.json`       | 6     | `ExecutionGraph` with the `semantics` table populated                |
 
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one upload all flow through
 the same five stages. The CLI populates `UploadedFile.path` relative to the gather root so the

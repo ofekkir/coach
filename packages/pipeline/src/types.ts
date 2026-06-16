@@ -100,20 +100,47 @@ export interface LogEntry {
   readonly total_duration_ms?: number | string | null;
 }
 
+// ── Entities — dimension rows, NOT graph nodes ────────────────────────────────
+// Agent and session are owning entities referenced by foreign key, never nodes in
+// the node-data table. Each maps 1:1 to a relational table (`agents`, `sessions`).
+
+export interface Agent {
+  readonly id: string;
+  readonly userId: string;
+}
+
+export interface Session {
+  readonly id: string;
+  readonly agentId: string; // FK → Agent
+  readonly userId: string;
+  readonly sessionId: string; // the harness's own session id
+  readonly title?: string;
+}
+
+/** The `Agent` entity id for a user. The single id namespace shared everywhere. */
+export function agentEntityId(userId: string): string {
+  return `agent-${userId}`;
+}
+
+/** The `Session` entity id for a harness session id — the value carried as the
+ *  `sessionId` FK on every node. */
+export function sessionEntityId(harnessSessionId: string): string {
+  return `session-${harnessSessionId}`;
+}
+
 // ── Transformed node (ETL output) ────────────────────────────────────────────
+// Agent and session are entities (above), not node types. "Is this node
+// enriched?" is answered by the presence of a `semantics[id]` row, so there is no
+// `action`/`inference` node type either — the node type stays mechanical.
 
 export type NodeType =
-  | 'agent'
-  | 'session'
   | 'interaction'
   | 'user_prompt'
   | 'llm_request'
   | 'tool'
   | 'tool.execution'
   | 'tool.blocked_on_user'
-  | 'hook'
-  | 'action' // enriched: tool → semantically-labeled action
-  | 'inference'; // enriched: llm_request → semantically-labeled inference
+  | 'hook';
 
 export interface RequestMessage {
   role: string;
@@ -127,11 +154,13 @@ export interface ResponseMessage {
 
 /** Fields shared by every node. `type` is the discriminant; concrete members
  *  narrow it to a literal. Read it directly (`switch (node.type)`) without
- *  narrowing first. */
+ *  narrowing first. `sessionId` is the FK → `Session` (denormalized onto every
+ *  node so per-session aggregation is a flat filter, not a parent-walk). */
 interface BaseNode {
   id: string;
   type: NodeType;
-  parent?: string;
+  parent?: string; // containment FK (self-FK → another node)
+  sessionId: string; // FK → Session entity
 }
 
 /** Span-derived nodes always carry real OTLP timing — `parse.ts` computes all
@@ -145,19 +174,6 @@ interface SpannedNode extends BaseNode {
 /** Sentinel injected by the native builder when no real user identity exists.
  *  Consumers can filter on this to distinguish real sessions from local ones. */
 export const PSEUDO_USER_ID = 'pseudo_user_id';
-
-// ── Synthesized aggregation nodes (no span, no timing) ────────────────────────
-
-export interface AgentNode extends BaseNode {
-  type: 'agent';
-  user_id: string;
-}
-
-export interface SessionNode extends BaseNode {
-  type: 'session';
-  session_id: string;
-  user_id: string;
-}
 
 // ── Span-derived nodes ────────────────────────────────────────────────────────
 
@@ -212,11 +228,10 @@ export interface UserPromptNode extends BaseNode {
   prompt: string;
 }
 
-// Canonical = the mechanical pipeline's output. No LLM is in this loop; every
-// field is read or derived from the trace. Stays harness-agnostic.
+// Canonical = the mechanical pipeline's output, the value type of the node-data
+// table. No LLM is in this loop; every field is read or derived from the trace.
+// Stays harness-agnostic.
 export type CanonicalNode =
-  | AgentNode
-  | SessionNode
   | InteractionNode
   | LlmRequestNode
   | ToolNode
@@ -225,34 +240,29 @@ export type CanonicalNode =
   | HookNode
   | UserPromptNode;
 
-// ── Semantic nodes — produced by the semantic stage, NOT canonical ────────────
-// A canonical step relabeled by an LLM: a `tool` becomes an `action`, an
-// `llm_request` becomes an `inference`, each carrying a generated `what`. `what`
-// is an ordered list of atomic action phrases (a node often does several things
-// in sequence — e.g. ["fetch ynet.co.il", "summarize headlines"]); a single-
-// action node carries a one-element array. These only exist after enrichment, so
-// they are a distinct type from CanonicalNode.
-//
-// `comment` is an OPTIONAL agent-authored annotation harvested verbatim from a
-// per-agent-configured input field (e.g. Claude Code's Bash `description`). It is
-// free text — a display/explanation signal only, never part of the closed `what`
-// vocabulary, so it is kept separate and never feeds aggregation. The gap between
-// the agent's stated `comment` and the derived `what` is itself a coach signal.
+// ── Node-data layers — sparse, additive, all keyed by node id ──────────────────
+// Each layer is its own id-keyed table (`node_deltas`, `node_semantics`) joined
+// 1:1 to the node by id. A node "points to" its data through these tables — never
+// an embedded object, so nothing re-duplicates on serialize/DB.
 
-export type InferenceNode = Omit<LlmRequestNode, 'type'> & {
-  type: 'inference';
-  what: readonly string[];
-  comment?: string;
-};
+/** Stage 5 — the messages new to an `llm_request` relative to the previous request
+ *  in the same thread. `requestMessagesDelta` is the suffix beyond the previous
+ *  request (the first carries its full array); `responseMessagesDelta` is the full
+ *  response (each response is all-new). Sparse: only `llm_request` nodes get a row. */
+export interface MessageDeltas {
+  readonly requestMessagesDelta?: readonly RequestMessage[];
+  readonly responseMessagesDelta?: readonly ResponseMessage[];
+}
 
-export type ActionNode = Omit<ToolNode, 'type'> & {
-  type: 'action';
-  what: readonly string[];
-  comment?: string;
-};
-
-export type SemanticNode = ActionNode | InferenceNode;
-
-// What an execution-graph step carries: a mechanical node, or — once the
-// semantic stage has run — its relabeled counterpart.
-export type GraphNode = CanonicalNode | SemanticNode;
+/** Stage 6 — the semantic label for a relabeled node. `what` is an ordered list of
+ *  atomic action phrases (a node often does several things in sequence — e.g.
+ *  ["fetch ynet.co.il", "summarize headlines"]); a single-action node carries a
+ *  one-element array. `comment` is an OPTIONAL agent-authored annotation harvested
+ *  verbatim from a per-agent-configured input field (e.g. Claude Code's Bash
+ *  `description`) — free text, a display signal only, never part of the closed
+ *  `what` vocabulary. Sparse: only relabeled (`tool`/`llm_request`) nodes get a row.
+ *  The presence of a row IS the "is this enriched?" flag — there is no node type. */
+export interface SemanticFields {
+  readonly what: readonly string[];
+  readonly comment?: string;
+}

@@ -1,9 +1,22 @@
-import type { ExecutionNode, GraphNode, Thread } from '@coach/pipeline';
+import type { CanonicalNode, ExecutionNode, Thread } from '@coach/pipeline';
+import { nodeData, resolve } from '@coach/pipeline';
 import { estimateNodeH } from './estimate.ts';
-import { buildNodeCard } from '../format/format.ts';
+import { buildNodeCard, type NodeCard } from '../format/format.ts';
 import { isWeakModel } from '../theme.ts';
 import type { Ctx, HiddenSubCall, TraceRFNodeData } from './types.ts';
 import { NESTED_INDENT, VG } from './types.ts';
+
+// ── Resolvers (the seam to the node table) ──────────────────────────────────────
+// A tree/thread node is an id; its data lives in the graph's `nodes` table and its
+// label overlay in `semantics`. These resolve an id to what the layout needs.
+
+export function nodeOf(ctx: Ctx, id: string): CanonicalNode {
+  return nodeData(ctx.graph, id);
+}
+
+export function cardOf(ctx: Ctx, id: string, index = 0): NodeCard {
+  return buildNodeCard(resolve(ctx.graph, id), index);
+}
 
 function push(id: string, x: number, y: number, data: TraceRFNodeData, ctx: Ctx): void {
   ctx.nodes.push({
@@ -21,9 +34,12 @@ const STRUCTURAL_FLAGS: Pick<TraceRFNodeData, 'lane' | 'nested' | 'isLongest'> =
   isLongest: false,
 };
 
-/** Reusable card push for a structural execution node (agent/session/interaction/prompt). */
+/** Card push for a structural container (agent/session entity, interaction or
+ *  prompt node). The card is pre-resolved by the caller — entities build theirs
+ *  from `buildAgentCard`/`buildSessionCard`, nodes from `cardOf`. */
 export function pushStructural(
-  node: ExecutionNode,
+  id: string,
+  card: NodeCard,
   kind: TraceRFNodeData['kind'],
   x: number,
   y: number,
@@ -31,36 +47,35 @@ export function pushStructural(
   ctx: Ctx,
 ): void {
   push(
-    node.id,
+    id,
     x,
     y,
     {
       kind,
-      card: buildNodeCard(node.canonical),
-      canonical: node.canonical,
+      card,
       ...STRUCTURAL_FLAGS,
       hasRFChildren: hasKids,
-      isExpanded: ctx.expanded.has(node.id),
-      selected: node.id === ctx.selected,
+      isExpanded: ctx.expanded.has(id),
+      selected: id === ctx.selected,
     },
     ctx,
   );
 }
 
-function durationOf(node: GraphNode): number {
+function durationOf(node: CanonicalNode): number {
   return 'duration_ms' in node ? node.duration_ms : 0;
 }
 
-// Recursively finds a weak-model inference nested inside a tool/action (the call
-// lives under the tool's `execution` child), so the details panel can surface the
-// hidden sub-call that often dominates the tool's wall-clock.
-function hiddenSubCallOf(node: ExecutionNode): HiddenSubCall | undefined {
+// Recursively finds a weak-model inference nested inside a tool (the call lives
+// under the tool's `execution` child), so the details panel can surface the hidden
+// sub-call that often dominates the tool's wall-clock.
+function hiddenSubCallOf(node: ExecutionNode, ctx: Ctx): HiddenSubCall | undefined {
   for (const child of node.children) {
-    const c = child.canonical;
-    if ((c.type === 'inference' || c.type === 'llm_request') && isWeakModel(c.model)) {
+    const c = nodeOf(ctx, child.id);
+    if (c.type === 'llm_request' && isWeakModel(c.model)) {
       return { model: c.model, durationMs: durationOf(c) };
     }
-    const nested = hiddenSubCallOf(child);
+    const nested = hiddenSubCallOf(child, ctx);
     if (nested != null) return nested;
   }
   return undefined;
@@ -73,7 +88,7 @@ function shareFlags(
   ctx: Ctx,
 ): Pick<TraceRFNodeData, 'isLongest' | 'shareOfRun'> {
   if (node.id !== ctx.longestId) return { isLongest: false };
-  const dur = durationOf(node.canonical);
+  const dur = durationOf(nodeOf(ctx, node.id));
   const total = ctx.interactionDurMs ?? 0;
   return { isLongest: true, ...(total > 0 ? { shareOfRun: Math.min(1, dur / total) } : {}) };
 }
@@ -92,15 +107,14 @@ export function pushExecNode(
   ctx: Ctx,
   flags: ParallelFlags = {},
 ): void {
-  const hiddenSubCall = hiddenSubCallOf(node);
+  const hiddenSubCall = hiddenSubCallOf(node, ctx);
   push(
     node.id,
     x,
     y,
     {
       kind: 'member',
-      card: buildNodeCard(node.canonical),
-      canonical: node.canonical,
+      card: cardOf(ctx, node.id),
       lane,
       nested,
       ...shareFlags(node, ctx),
@@ -117,11 +131,10 @@ export function pushExecNode(
 // The one meaningful child of a tool: the weak model running *inside* it (e.g.
 // WebFetch's `web_fetch_apply` → claude-haiku). Found by descending through the
 // mechanical `execution`/`blocked_on_user` sub-spans, which are never carded.
-function nestedInferenceNode(node: ExecutionNode): ExecutionNode | undefined {
+function nestedInferenceNode(node: ExecutionNode, ctx: Ctx): ExecutionNode | undefined {
   for (const child of node.children) {
-    const t = child.canonical.type;
-    if (t === 'inference' || t === 'llm_request') return child;
-    const deeper = nestedInferenceNode(child);
+    if (nodeOf(ctx, child.id).type === 'llm_request') return child;
+    const deeper = nestedInferenceNode(child, ctx);
     if (deeper != null) return deeper;
   }
   return undefined;
@@ -137,11 +150,11 @@ export function placeStep(
   ctx: Ctx,
 ): number {
   pushExecNode(member, tx, y, lane, false, ctx);
-  let next = y + estimateNodeH(buildNodeCard(member.canonical)) + VG;
-  const nested = nestedInferenceNode(member);
+  let next = y + estimateNodeH(cardOf(ctx, member.id)) + VG;
+  const nested = nestedInferenceNode(member, ctx);
   if (nested != null) {
     pushExecNode(nested, tx + NESTED_INDENT, next, lane, true, ctx);
-    next += estimateNodeH(buildNodeCard(nested.canonical)) + VG;
+    next += estimateNodeH(cardOf(ctx, nested.id)) + VG;
   }
   return next;
 }

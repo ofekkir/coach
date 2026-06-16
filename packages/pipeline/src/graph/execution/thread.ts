@@ -1,6 +1,5 @@
-import type { CanonicalNode, GraphNode, RequestMessage, ResponseMessage } from '../../types.ts';
+import type { CanonicalNode, MessageDeltas, RequestMessage, ResponseMessage } from '../../types.ts';
 import { NS_PER_MS } from '../../types.ts';
-import type { ExecutionNode } from '../types.ts';
 
 /** Sentinel "later than any real timestamp" seed for an earliest-start min-search. */
 const FAR_FUTURE_NS = 99999999999999999999n;
@@ -27,18 +26,18 @@ function requestMessagesDelta(
   return current.filter((msg) => !seenKeys.has(messageKey(msg)));
 }
 
-/** Annotates a base ExecutionNode with llm_request delta fields when the node
- *  is an llm_request. Non-llm_request nodes are returned unchanged. */
-export function withLlmDeltas(
-  base: ExecutionNode,
+/** The stage-5 message deltas for a node, or undefined when the node is not an
+ *  `llm_request` (or carries no messages). Feeds the graph-level `deltas` table
+ *  keyed by node id — the delta lives in its own layer, not on the tree node. */
+export function llmDeltas(
   node: CanonicalNode,
   seenMessageKeys: ReadonlySet<string>,
-): ExecutionNode {
-  if (node.type !== 'llm_request') return base;
+): MessageDeltas | undefined {
+  if (node.type !== 'llm_request') return undefined;
   const reqDelta = requestMessagesDelta(node.request_messages, seenMessageKeys);
   const resDelta = node.response_messages as readonly ResponseMessage[] | undefined;
+  if (reqDelta === undefined && resDelta === undefined) return undefined;
   return {
-    ...base,
     ...(reqDelta !== undefined ? { requestMessagesDelta: reqDelta } : {}),
     ...(resDelta !== undefined ? { responseMessagesDelta: resDelta } : {}),
   };
@@ -53,14 +52,13 @@ function nsOf(ns: string | undefined): bigint {
   return ns != null ? BigInt(ns) : 0n;
 }
 
-// Timing lives on span-derived nodes (and optionally on the synthesized
-// user_prompt); aggregation nodes (agent/session) have none. These accessors
-// read it across the whole union without forcing a narrow at every call site.
-export function startNs(node: GraphNode): string | undefined {
+// Timing lives on span-derived nodes; the synthesized user_prompt has none. These
+// accessors read it across the whole union without forcing a narrow at every call.
+export function startNs(node: CanonicalNode): string | undefined {
   return 'start_time_ns' in node ? node.start_time_ns : undefined;
 }
 
-function endNs(node: GraphNode): string | undefined {
+function endNs(node: CanonicalNode): string | undefined {
   return 'end_time_ns' in node ? node.end_time_ns : undefined;
 }
 
@@ -91,7 +89,7 @@ function toMs(deltaNs: bigint): number | null {
 
 /** Signed gap between two SEQUENTIAL steps (ms): next.start − prev.end. Null when
  *  either timestamp is missing or the gap is zero/non-finite. Raw — no format. */
-export function gapMsBetween(prev: GraphNode, next: GraphNode): number | null {
+export function gapMsBetween(prev: CanonicalNode, next: CanonicalNode): number | null {
   const prevEnd = endNs(prev);
   const nextStart = startNs(next);
   if (prevEnd == null || nextStart == null) return null;
@@ -101,7 +99,7 @@ export function gapMsBetween(prev: GraphNode, next: GraphNode): number | null {
 /** Signed gap for a NESTED child (ms): child.start − parent.start. The child runs
  *  within the parent's span, so measuring from the parent's end would be
  *  misleading (it would read negative). Null when a timestamp is missing or zero. */
-export function startGapMsBetween(parent: GraphNode, child: GraphNode): number | null {
+export function startGapMsBetween(parent: CanonicalNode, child: CanonicalNode): number | null {
   const parentStart = startNs(parent);
   const childStart = startNs(child);
   if (parentStart == null || childStart == null) return null;

@@ -26,23 +26,25 @@ UploadedFile[]   (*.jsonl · logs.json + trace*.json)
         │
         ▼ 1. classify        every file tagged: otel-trace | otel-log | native | unsupported
         ▼ 2. route           supported inputs grouped by session id (logs fall back to dir)
-        ▼ 3. canonical       per session → CanonicalNode[]
+        ▼ 3. canonical       per session → CanonicalNode[]  (each node carries a sessionId FK)
                                otel:   join traces → enrich with logs → transform (one pass)
                                native: jsonl → CanonicalNode[]  (OTLP round-trip behind a facade)
-        ▼ 4. aggregate       all sessions under one agent → agentGraph (CanonicalNode[])
+        ▼ 4. aggregate       all sessions → agentGraph = nodes table + agent/sessions entities
         ▼ 5. execution graph buildExecutionGraph → executionGraph (ExecutionGraph)
-                               the mechanical skeleton: agent ▸ session ▸ interaction ▸ thread ▸ step
+                               id-keyed, stage-layered: nodes/deltas/semantics tables + entities;
+                               edges are containment (tree) and causal (causalEdges)
         ▼ 6. semantic graph  enrichExecutionGraph → ExecutionGraph
-                               tool → action  ·  llm_request → inference
-                               pure & deterministic; labels come from @coach/semantics (no model)
+                               pure table pass: writes a semantics[id] row per tool / llm_request
+                               deterministic; labels come from @coach/semantics (no model)
         │
         ▼ React Flow graph   (@coach/app, via the buildVizResults adapter)
 ```
 
-`agentGraph` is itself a visualisable graph. The **execution graph** is the deterministic skeleton.
+The **execution graph** is the deterministic skeleton — a normalized, id-keyed model that maps 1:1
+to a relational DB (`agents`, `sessions`, `nodes`, `node_deltas`, `node_semantics`, `causal_edges`).
 `VizResult.data` is the `ExecutionGraph` directly. The pipeline organizes data losslessly and
-carries no presentation — the app derives all display text. The graph is consumed only by the
-renderer; no raw `CanonicalNode[]` reaches the visualization layer.
+carries no presentation — the app resolves each node id against the graph tables and derives all
+display text. The graph is consumed only by the renderer.
 
 ### Upload model
 

@@ -1,42 +1,42 @@
-import type { GraphNode } from '../../types.ts';
-import type { ExecutionNode, GraphEdge, Thread } from '../types.ts';
+import type { CanonicalNode, MessageDeltas } from '../../types.ts';
+import type { CausalEdge, ExecutionNode, Thread } from '../types.ts';
 import { gapMsBetween, startGapMsBetween } from './thread.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
-// Causal-flow builder — THE edge layer of the execution graph (there is no
-// "timeline"/sequence layer; member order is a layout grouping only).
+// Causal-flow builder — THE causal edge layer (a DAG). Containment is a separate
+// relation (the `tree`); time-adjacency is a layout grouping, not an edge.
 //
-// Every step is linked to what actually CAUSED it, recovered structurally —
-// never from raw timestamps:
+// Tree/thread nodes are id-only, so this module resolves each node's data and
+// message deltas through a `NodeResolver` (backed by the graph's `nodes`/`deltas`
+// tables). Every step is linked to what CAUSED it, recovered structurally — never
+// from raw timestamps:
 //
 //   userPrompt ─▶ inference                  the prompt triggered the turn
 //   inference  ─▶ tool        (fan-out)      the response emitted this tool_use id
 //   tool       ─▶ inference   (fan-in)       the request consumed this tool_result
 //   inference  ─▶ inference   (continuation) a turn with no tool to bridge it
-//   tool       ─▶ wait, exec  (within tool)  parallel sub-spans (they overlap —
-//                                            the wait does not precede execution)
+//   tool       ─▶ wait, exec  (within tool)  parallel sub-spans (they overlap)
 //   inference ─▶ PreToolUse ─▶ tool ─▶ PostToolUse ─▶ inference   (hooks woven in)
 //
-// One inference fans out to many parallel tools, which fan back into the next —
-// a DAG, not a tree. `gapMs` (signed; negative fan-out = dispatched mid-stream)
-// decorates each edge.
-//
-// The spine is ONE recursive walk over time-ordered sibling groups: each node's
-// predecessor is either id-based (tool↔inference, tool↔hook) or, failing that,
-// the previous sibling in time (the prompt/continuation/wait→exec cases). A
-// node's children are walked as a sub-group headed by that node, so within-tool
-// sub-spans and nested sub-agent inferences are covered by the same rules.
+// One inference fans out to many parallel tools, which fan back into the next.
+// `gapMs` (signed; negative fan-out = dispatched mid-stream) decorates each edge.
 // ════════════════════════════════════════════════════════════════════════════
 
-function isInference(node: GraphNode): boolean {
-  return node.type === 'llm_request' || node.type === 'inference';
+/** Resolves a tree/thread node id to its canonical data and (stage-5) deltas. */
+export interface NodeResolver {
+  node(id: string): CanonicalNode;
+  deltas(id: string): MessageDeltas | undefined;
 }
 
-function isToolLike(node: GraphNode): boolean {
-  return node.type === 'tool' || node.type === 'action';
+function isInference(node: CanonicalNode): boolean {
+  return node.type === 'llm_request';
 }
 
-function toolUseIdOf(node: GraphNode): string | undefined {
+function isToolLike(node: CanonicalNode): boolean {
+  return node.type === 'tool';
+}
+
+function toolUseIdOf(node: CanonicalNode): string | undefined {
   return 'tool_use_id' in node ? node.tool_use_id : undefined;
 }
 
@@ -45,7 +45,7 @@ interface HookEvent {
   readonly toolName: string | null;
 }
 
-function parseHook(node: GraphNode): HookEvent | null {
+function parseHook(node: CanonicalNode): HookEvent | null {
   if (node.type !== 'hook') return null;
   const i = node.name.indexOf(':');
   if (i === -1) return { event: node.name, toolName: null };
@@ -64,12 +64,14 @@ function isToolResultBlock(block: unknown): block is { type: 'tool_result'; tool
   return candidate.type === 'tool_result' && typeof candidate.tool_use_id === 'string';
 }
 
-function emittedToolUseIds(inference: ExecutionNode): string[] {
-  return (inference.responseMessagesDelta ?? []).filter(isToolUseBlock).map((block) => block.id);
+function emittedToolUseIds(inference: ExecutionNode, r: NodeResolver): string[] {
+  return (r.deltas(inference.id)?.responseMessagesDelta ?? [])
+    .filter(isToolUseBlock)
+    .map((block) => block.id);
 }
 
-function consumedToolUseIds(inference: ExecutionNode): string[] {
-  return (inference.requestMessagesDelta ?? []).flatMap((message) =>
+function consumedToolUseIds(inference: ExecutionNode, r: NodeResolver): string[] {
+  return (r.deltas(inference.id)?.requestMessagesDelta ?? []).flatMap((message) =>
     Array.isArray(message.content)
       ? message.content.filter(isToolResultBlock).map((block) => block.tool_use_id)
       : [],
@@ -102,11 +104,12 @@ function flatten(nodes: readonly ExecutionNode[]): ExecutionNode[] {
 function pairPostHooksInGroup(
   group: readonly ExecutionNode[],
   postHookOf: Map<string, ExecutionNode>,
+  r: NodeResolver,
 ): void {
   const recentToolByName = new Map<string, ExecutionNode>();
   for (const node of group) {
-    if (isCallableTool(node)) recentToolByName.set(toolName(node) ?? '', node);
-    const hook = parseHook(node.canonical);
+    if (isCallableTool(node, r)) recentToolByName.set(toolName(node, r) ?? '', node);
+    const hook = parseHook(r.node(node.id));
     if (hook?.event !== 'PostToolUse' || hook.toolName == null) continue;
     const tool = recentToolByName.get(hook.toolName);
     if (tool != null) postHookOf.set(tool.id, node);
@@ -115,45 +118,51 @@ function pairPostHooksInGroup(
 
 function indexPostHooks(
   orderedGroups: readonly (readonly ExecutionNode[])[],
+  r: NodeResolver,
 ): Map<string, ExecutionNode> {
   const postHookOf = new Map<string, ExecutionNode>();
-  for (const group of orderedGroups) pairPostHooksInGroup(group, postHookOf);
+  for (const group of orderedGroups) pairPostHooksInGroup(group, postHookOf, r);
   return postHookOf;
 }
 
 // The tool node that issues the call (carries tool_use_id), as opposed to its
-// `tool.execution` sub-span.
-function isCallableTool(node: ExecutionNode): boolean {
-  return isToolLike(node.canonical) && node.canonical.type !== 'tool.execution';
+// `tool.execution` sub-span (a distinct node type, already excluded by isToolLike).
+function isCallableTool(node: ExecutionNode, r: NodeResolver): boolean {
+  return isToolLike(r.node(node.id));
 }
 
-function toolName(node: ExecutionNode): string | undefined {
-  return 'name' in node.canonical ? node.canonical.name : undefined;
+function toolName(node: ExecutionNode, r: NodeResolver): string | undefined {
+  const canonical = r.node(node.id);
+  return 'name' in canonical ? canonical.name : undefined;
 }
 
-function buildIndex(threads: readonly Thread[]): CausalIndex {
+function buildIndex(threads: readonly Thread[], r: NodeResolver): CausalIndex {
   const all = flatten(threads.flatMap((t) => t.members));
   const emitterOf = new Map<string, ExecutionNode>();
   const toolOf = new Map<string, ExecutionNode>();
   for (const node of all) {
-    const useId = isToolLike(node.canonical) ? toolUseIdOf(node.canonical) : undefined;
+    const canonical = r.node(node.id);
+    const useId = isToolLike(canonical) ? toolUseIdOf(canonical) : undefined;
     if (useId != null) toolOf.set(useId, node);
-    if (!isInference(node.canonical)) continue;
-    for (const id of emittedToolUseIds(node)) emitterOf.set(id, node);
+    if (!isInference(canonical)) continue;
+    for (const id of emittedToolUseIds(node, r)) emitterOf.set(id, node);
   }
   return {
     emitterOf,
     toolOf,
-    postHookOf: indexPostHooks(threads.map((t) => t.members)),
+    postHookOf: indexPostHooks(
+      threads.map((t) => t.members),
+      r,
+    ),
     threadOf: indexThreadMembership(threads),
   };
 }
 
 // ── Predecessor rules ───────────────────────────────────────────────────────────
 
-function isPreHookFor(prev: ExecutionNode, tool: ExecutionNode): boolean {
-  const hook = parseHook(prev.canonical);
-  return hook?.event === 'PreToolUse' && hook.toolName === toolName(tool);
+function isPreHookFor(prev: ExecutionNode, tool: ExecutionNode, r: NodeResolver): boolean {
+  const hook = parseHook(r.node(prev.id));
+  return hook?.event === 'PreToolUse' && hook.toolName === toolName(tool, r);
 }
 
 // What caused `node`. Tools: their PreToolUse hook if it directly precedes, else
@@ -164,15 +173,17 @@ function predecessorsOf(
   node: ExecutionNode,
   prev: ExecutionNode | null,
   index: CausalIndex,
+  r: NodeResolver,
 ): ExecutionNode[] {
-  if (isCallableTool(node)) {
-    if (prev != null && isPreHookFor(prev, node)) return [prev];
-    const useId = toolUseIdOf(node.canonical);
+  const canonical = r.node(node.id);
+  if (isCallableTool(node, r)) {
+    if (prev != null && isPreHookFor(prev, node, r)) return [prev];
+    const useId = toolUseIdOf(canonical);
     const emitter = useId != null ? index.emitterOf.get(useId) : undefined;
     return emitter != null ? [emitter] : continuation(prev);
   }
-  if (isInference(node.canonical)) {
-    const fanIn = fanInPredecessors(node, index);
+  if (isInference(canonical)) {
+    const fanIn = fanInPredecessors(node, index, r);
     return fanIn.length > 0 ? fanIn : continuation(prev);
   }
   return continuation(prev);
@@ -186,9 +197,13 @@ function continuation(prev: ExecutionNode | null): ExecutionNode[] {
 // when both live in the same thread. A background loop (session-title, away-
 // summary, …) carries the main thread's history in its requests, but it doesn't
 // *consume* those tool results to continue — so cross-thread matches are skipped.
-function fanInPredecessors(inference: ExecutionNode, index: CausalIndex): ExecutionNode[] {
+function fanInPredecessors(
+  inference: ExecutionNode,
+  index: CausalIndex,
+  r: NodeResolver,
+): ExecutionNode[] {
   const thread = index.threadOf.get(inference.id);
-  return consumedToolUseIds(inference).flatMap((useId) => {
+  return consumedToolUseIds(inference, r).flatMap((useId) => {
     const tool = index.toolOf.get(useId);
     if (tool == null || index.threadOf.get(tool.id) !== thread) return [];
     return [index.postHookOf.get(tool.id) ?? tool];
@@ -200,11 +215,13 @@ function fanInPredecessors(inference: ExecutionNode, index: CausalIndex): Execut
 // Containment edges (parent → its own child, e.g. tool → wait/execution) measure
 // the gap from the parent's START — the child runs WITHIN the parent, so end-to-
 // start would read misleadingly negative. Sequential edges use end-to-start.
-function edgeBetween(from: ExecutionNode, to: ExecutionNode): GraphEdge {
-  const nested = 'parent' in to.canonical && to.canonical.parent === from.id;
+function edgeBetween(from: ExecutionNode, to: ExecutionNode, r: NodeResolver): CausalEdge {
+  const fromCanonical = r.node(from.id);
+  const toCanonical = r.node(to.id);
+  const nested = toCanonical.parent === from.id;
   const gapMs = nested
-    ? startGapMsBetween(from.canonical, to.canonical)
-    : gapMsBetween(from.canonical, to.canonical);
+    ? startGapMsBetween(fromCanonical, toCanonical)
+    : gapMsBetween(fromCanonical, toCanonical);
   return { fromId: from.id, toId: to.id, ...(gapMs !== null ? { gapMs } : {}) };
 }
 
@@ -218,23 +235,28 @@ function spineEdges(
   group: readonly ExecutionNode[],
   head: ExecutionNode | null,
   index: CausalIndex,
+  r: NodeResolver,
   chainSiblings = true,
-): GraphEdge[] {
-  const edges: GraphEdge[] = [];
+): CausalEdge[] {
+  const edges: CausalEdge[] = [];
   let prev = head;
   for (const node of group) {
-    for (const pred of predecessorsOf(node, prev, index)) edges.push(edgeBetween(pred, node));
-    edges.push(...spineEdges(node.children, node, index, !isCallableTool(node)));
+    for (const pred of predecessorsOf(node, prev, index, r)) edges.push(edgeBetween(pred, node, r));
+    edges.push(...spineEdges(node.children, node, index, r, !isCallableTool(node, r)));
     if (chainSiblings) prev = node;
   }
   return edges;
 }
 
-/** The causal flow for one interaction (see InteractionExecution.causalEdges). */
+/** The causal flow for one interaction (see InteractionExecution.causalEdges).
+ *  `userPromptId` seeds the spine head — resolved through the node table. */
 export function buildCausalEdges(
   threads: readonly Thread[],
-  userPrompt: ExecutionNode | null,
-): GraphEdge[] {
-  const index = buildIndex(threads);
-  return threads.flatMap((thread) => spineEdges(thread.members, userPrompt, index));
+  userPromptId: string | null,
+  r: NodeResolver,
+): CausalEdge[] {
+  const index = buildIndex(threads, r);
+  const head: ExecutionNode | null =
+    userPromptId != null ? { id: userPromptId, children: [] } : null;
+  return threads.flatMap((thread) => spineEdges(thread.members, head, index, r));
 }

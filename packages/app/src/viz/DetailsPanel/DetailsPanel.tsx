@@ -1,21 +1,28 @@
 import { useState } from 'react';
-import type { GraphNode } from '@coach/pipeline';
+import type { ResolvedNode } from '@coach/pipeline';
 import { fonts, tokens } from '../theme.ts';
 import { formatMetrics, type NodeCard } from '../format/format.ts';
 import type { HiddenSubCall } from '../layout/types.ts';
 import { isActionType, panelBody } from './sections.tsx';
 import { panelFooter, panelHeader } from './chrome.tsx';
 
+// The flattened view fed to the raw JSON viewer: the node row with its semantic
+// overlay and message deltas merged in (the shape a single DB join would yield).
+function rawView(resolved: ResolvedNode | undefined): Record<string, unknown> | undefined {
+  if (resolved == null) return undefined;
+  return { ...resolved.node, ...(resolved.semantics ?? {}), ...(resolved.deltas ?? {}) };
+}
+
 export function DetailsPanel({
   card,
-  canonical,
+  resolved,
   isLongest,
   hiddenSubCall,
   nested,
   onClose,
 }: {
   card: NodeCard;
-  canonical: GraphNode | undefined;
+  resolved: ResolvedNode | undefined;
   isLongest: boolean;
   hiddenSubCall: HiddenSubCall | undefined;
   nested: boolean;
@@ -26,6 +33,7 @@ export function DetailsPanel({
   const { duration } = formatMetrics(card.metrics);
   const headerAccent = isLongest || isActionType(card.type);
   const typeWord = card.tag.split(' · ')[0] ?? card.type.toUpperCase();
+  const raw = rawView(resolved);
 
   return (
     <div
@@ -42,7 +50,8 @@ export function DetailsPanel({
       {panelHeader(card, nested, headerAccent, typeWord, onClose)}
       {panelBody({
         card,
-        canonical,
+        resolved,
+        raw,
         isLongest,
         hiddenSubCall,
         duration,
@@ -52,7 +61,7 @@ export function DetailsPanel({
           setExpanded((v) => !v);
         },
       })}
-      {panelFooter(canonical, showRaw, () => {
+      {panelFooter(resolved?.node.id, showRaw, () => {
         setShowRaw((v) => !v);
       })}
     </div>
