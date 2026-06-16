@@ -26,6 +26,17 @@ export interface HiddenSubCall {
   readonly durationMs: number;
 }
 
+/** Handle ids for cross-lane edges that exit/enter a card's side instead of the
+ *  default top/bottom handles (which serve the vertical spine). The default
+ *  top (target) and bottom (source) handles carry no id so unspecified edges
+ *  keep using them. */
+export const SIDE_HANDLE = {
+  leftTarget: 'lt',
+  leftSource: 'ls',
+  rightTarget: 'rt',
+  rightSource: 'rs',
+} as const;
+
 /** Top margin of the whole graph on the canvas, in px. */
 export const CANVAS_TOP = 50;
 /** Divisor for centering a width around a center-x (`cx - width / CENTERING_DIVISOR`). */

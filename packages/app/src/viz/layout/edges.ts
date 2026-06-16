@@ -1,8 +1,39 @@
 import { tokens } from '../theme.ts';
-import type { Ctx } from './types.ts';
+import { SIDE_HANDLE, type Ctx } from './types.ts';
 
 const EDGE_W = 1.5;
 const ACCENT_EDGE_W = 2;
+
+// Which lane a placed node rides, or undefined for non-trace nodes (bands).
+function laneOf(id: string, ctx: Ctx): 'main' | 'background' | undefined {
+  const node = ctx.nodes.find((n) => n.id === id);
+  return node?.type === 'trace' ? node.data.lane : undefined;
+}
+
+function posXOf(id: string, ctx: Ctx): number | undefined {
+  return ctx.nodes.find((n) => n.id === id)?.position.x;
+}
+
+// A causal edge that crosses between the spine and the background lane exits/enters
+// the cards' sides (at center height) instead of bottom→top, so the junction lines
+// up with the cards rather than jogging at an unrelated mid-height. Same-lane edges
+// keep the default top/bottom handles (the vertical spine). Returns the handle pair,
+// or `{}` to leave the edge on its defaults.
+function crossLaneHandles(
+  src: string,
+  tgt: string,
+  ctx: Ctx,
+): { sourceHandle?: string; targetHandle?: string } {
+  const srcLane = laneOf(src, ctx);
+  const tgtLane = laneOf(tgt, ctx);
+  if (srcLane == null || tgtLane == null || srcLane === tgtLane) return {};
+  const srcX = posXOf(src, ctx);
+  const tgtX = posXOf(tgt, ctx);
+  if (srcX == null || tgtX == null) return {};
+  return tgtX >= srcX
+    ? { sourceHandle: SIDE_HANDLE.rightSource, targetHandle: SIDE_HANDLE.leftTarget }
+    : { sourceHandle: SIDE_HANDLE.leftSource, targetHandle: SIDE_HANDLE.rightTarget };
+}
 
 // The neutral containment rail (agent ▸ session ▸ interaction ▸ prompt). Hairline,
 // no arrowhead — it reads as a spine, not a directed dependency.
@@ -29,6 +60,7 @@ export function causalLink(src: string, tgt: string, label: string | undefined, 
     id: `causal-${src}-${tgt}`,
     source: src,
     target: tgt,
+    ...crossLaneHandles(src, tgt, ctx),
     type: 'smoothstep',
     zIndex: 1,
     ...(label != null
