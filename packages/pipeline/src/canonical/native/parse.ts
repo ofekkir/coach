@@ -39,13 +39,24 @@ export function buildToolResultUserIndex(entries: NativeEntry[]): Map<string, Na
   return toolResultUser;
 }
 
+// The CLI tags each inference with a top-level `requestId`; the Claude Desktop
+// format omits it, so fall back to the assistant `message.id` — both are 1:1 with
+// a single LLM turn and serve equally as the request-grouping key.
+function requestGroupKey(e: NativeEntry): string | null {
+  if (e.type !== 'assistant' || !e.timestamp) return null;
+  if (typeof e.requestId === 'string') return e.requestId;
+  if (typeof e.message?.id === 'string') return e.message.id;
+  return null;
+}
+
 export function buildRequestGroups(entries: NativeEntry[]): Map<string, NativeEntry[]> {
   const requestGroups = new Map<string, NativeEntry[]>();
   for (const e of entries) {
-    if (e.type !== 'assistant' || typeof e.requestId !== 'string' || !e.timestamp) continue;
-    const group = requestGroups.get(e.requestId) ?? [];
+    const key = requestGroupKey(e);
+    if (key == null) continue;
+    const group = requestGroups.get(key) ?? [];
     group.push(e);
-    requestGroups.set(e.requestId, group);
+    requestGroups.set(key, group);
   }
   return requestGroups;
 }
