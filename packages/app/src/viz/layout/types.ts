@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import type { ExecutionGraph } from '@coach/pipeline';
+import type { ExecutionGraph, InteractionFindings } from '@coach/pipeline';
 import type { NodeCard } from '../format/format.ts';
 
 export const NW = 240;
@@ -96,6 +96,10 @@ export interface Ctx {
   selected: string | null;
   nodes: RFNode[];
   edges: Edge[];
+  /** Stage-7 findings keyed by interaction id — the source of the longest-step
+   *  accent (and any future finding the renderer surfaces). Derived once in
+   *  `buildElements`, not recomputed in the layout. */
+  findingsByInteraction: ReadonlyMap<string, InteractionFindings>;
   /** The longest step in the interaction currently being placed — it (and the
    *  edge into it) wears the accent. `interactionDurMs` is that interaction's
    *  wall-clock, for the share-of-run bar. Reset around each interaction. */

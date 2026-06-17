@@ -40,19 +40,20 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 | Package / dir        | Purpose                                                                                                                                                                                                                                |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                          |
-| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                      |
+| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → findings, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.           |
 | `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                 |
 | `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README. |
 | `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                         |
 
 ## Data flow
 
-`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — six
+`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — seven
 named stages, each surfaced as a member: `classified`, `sessions`, `canonicalBySession`,
-`agentGraph`, `executionGraph`, `enrichedGraph`. It is pure and file-system-free; the CLI and the app
-both call it. Stage 6 enrichment is deterministic and always runs (using `config`, defaulting to the
-bundled `defaultSemanticsConfig`). `buildVizResults` is a thin adapter that wraps the execution graph
-for the renderer.
+`agentGraph`, `executionGraph`, `enrichedGraph`, `findings`. It is pure and file-system-free; the CLI
+and the app both call it. Stage 6 enrichment is deterministic and always runs (using `config`,
+defaulting to the bundled `defaultSemanticsConfig`). Stage 7 derives mechanical findings from the
+enriched graph alone. `buildVizResults` is a thin adapter that wraps the execution graph for the
+renderer.
 
 The pipeline **organizes** data; it does not decide how to render it. The execution graph is a
 **normalized, stage-layered, id-keyed model** that maps 1:1 to a relational DB, so persistence is a
@@ -148,7 +149,25 @@ Input files (accumulating — user stages N files/folders before submitting)
                             suggestion-mode) by interpreting the injected SemanticsConfig
                             — no hardcoded tool tables, no model. A genuine terminal
                             assistant message is labeled with the generic `respond`
-                            act. Always runs as the final stage of runPipeline.
+                            act.
+        │
+        ▼  Stage 7 — graph/findings/findings.ts  → findings: FindingSet
+   deriveFindings(graph)    mechanical findings over the ENRICHED graph and
+                            NOTHING ELSE — per interaction: shape (query/agentic),
+                            cost/token/latency rollup, longest step, critical path
+                            (slowest route through causalEdges), redundant tool
+                            calls, and a (currently empty) failures list; rolled up
+                            per session and agent. A function of the
+                            `ExecutionGraph` alone, so the live pipeline, the MCP
+                            reading a persisted graph, and the app's pre-computed-
+                            load path share one derivation. `longestStep` and the
+                            critical path moved here OUT of the app's
+                            `viz/layout` pass — the moment a second, non-rendering
+                            consumer exists, findings-derivation can't live in the
+                            renderer. Findings that aren't yet mechanical (failed
+                            tool calls — no status field on ToolNode; retry vs.
+                            benign re-read) are surfaced in `gaps`, never dropped.
+                            Always runs as the final stage of runPipeline.
         │
         ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)
@@ -272,9 +291,10 @@ pipeline.)
 | `04-agent-graph.json`          | 4     | `AgentGraph` — the `nodes` table + `agent`/`sessions` entities       |
 | `05-execution-graph.json`      | 5     | `ExecutionGraph` (id-keyed skeleton; `semantics` table empty)        |
 | `06-enriched-graph.json`       | 6     | `ExecutionGraph` with the `semantics` table populated                |
+| `07-findings.json`             | 7     | `FindingSet` — mechanical findings derived from the enriched graph   |
 
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one upload all flow through
-the same five stages. The CLI populates `UploadedFile.path` relative to the gather root so the
+the same pipeline. The CLI populates `UploadedFile.path` relative to the gather root so the
 same session-id routing (with directory fallback for logs) that powers the browser upload applies.
 
 ## Deploying to Vercel (static SPA)

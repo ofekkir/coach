@@ -4,9 +4,11 @@ import type {
   ExecutionGraph,
   ExecutionNode,
   InteractionExecution,
+  InteractionFindings,
   Session,
   SessionExecution,
 } from '@coach/pipeline';
+import { deriveFindings } from '@coach/pipeline';
 import { placeAgent, sessionWidth } from './place-graph.ts';
 import type { Ctx, RFNode } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, NW, HG } from './types.ts';
@@ -49,6 +51,7 @@ export function buildElements(
   }, 0);
   const ctx: Ctx = {
     graph,
+    findingsByInteraction: findingsByInteraction(graph),
     cx: Math.max(NW, totalSessionsW) / CENTERING_DIVISOR + CANVAS_TOP,
     expanded,
     selected,
@@ -57,6 +60,12 @@ export function buildElements(
   };
   placeAgent(agent, ctx);
   return { nodes: ctx.nodes, edges: ctx.edges };
+}
+
+// Stage-7 findings, indexed by interaction id for O(1) lookup during placement.
+function findingsByInteraction(graph: ExecutionGraph): Map<string, InteractionFindings> {
+  const interactions = deriveFindings(graph).sessions.flatMap((s) => s.interactions);
+  return new Map(interactions.map((i) => [i.interactionId, i]));
 }
 
 export function initialExpanded(): Set<string> {

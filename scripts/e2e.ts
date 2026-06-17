@@ -61,7 +61,7 @@ function dump(stepLabel: string, data: unknown): void {
 const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
-// runPipeline runs all six stages, including deterministic semantic enrichment.
+// runPipeline runs all seven stages, including deterministic enrichment + findings.
 const result = runPipeline(files);
 
 // Input-bearing members are projected to names/types so the dumps stay readable;
@@ -82,6 +82,7 @@ dump('03-canonical-by-session', result.canonicalBySession);
 dump('04-agent-graph', result.agentGraph);
 dump('05-execution-graph', result.executionGraph);
 dump('06-enriched-graph', { executionGraph: result.enrichedGraph });
+dump('07-findings', result.findings);
 
 const unsupported = result.classified.filter((c) => c.type === 'unsupported');
 if (unsupported.length > 0) {

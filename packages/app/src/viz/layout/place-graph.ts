@@ -30,20 +30,12 @@ function durationOf(node: CanonicalNode): number | undefined {
   return 'duration_ms' in node ? node.duration_ms : undefined;
 }
 
-// The interaction's longest step — the one (and the edge into it) that wears the
-// accent — taken over the main thread's top-level members.
-function longestStepId(thread: Thread | undefined, ctx: Ctx): string | undefined {
-  if (thread == null) return undefined;
-  let id: string | undefined;
-  let maxMs = 0;
-  for (const member of thread.members) {
-    const ms = durationOf(nodeOf(ctx, member.id)) ?? 0;
-    if (ms > maxMs) {
-      maxMs = ms;
-      id = member.id;
-    }
-  }
-  return maxMs > 0 ? id : undefined;
+// The longest step (and its share-of-run) comes from stage-7 findings, not the
+// layout — set on the ctx for the interaction currently being placed.
+function applyLongestStep(interactionId: string, ctx: Ctx): void {
+  const findings = ctx.findingsByInteraction.get(interactionId);
+  ctx.longestId = findings?.longestStep?.node.id;
+  ctx.interactionDurMs = findings?.rollup.wallMs;
 }
 
 function placeInteraction(
@@ -70,8 +62,7 @@ function placeInteraction(
 
   const mainThread = threads.find((t) => t.source === MAIN_THREAD_SOURCE) ?? threads[0];
   const backgroundThreads = threads.filter((t) => t !== mainThread);
-  ctx.longestId = longestStepId(mainThread, ctx);
-  ctx.interactionDurMs = durationOf(nodeOf(ctx, rootId));
+  applyLongestStep(rootId, ctx);
 
   const levels = mainThread != null ? parallelLevelsOf(mainThread, interaction, ctx) : [];
   ctx.criticalIds = new Set(levels.map((l) => l.criticalId));

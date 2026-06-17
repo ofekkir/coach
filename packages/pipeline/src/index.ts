@@ -46,6 +46,20 @@ export { deltasOf, nodeData, resolve, semanticsOf } from './graph/types.ts';
 // @coach/semantics — import config types from there).
 export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 
+// Findings stage — mechanical derivations over the enriched graph (stage 7).
+export { deriveFindings } from './graph/findings/findings.ts';
+export type {
+  CriticalPath,
+  FindingSet,
+  Hotspot,
+  InteractionFindings,
+  NodeRef,
+  Repetition,
+  Rollup,
+  SessionFindings,
+  Shape,
+} from './graph/findings/types.ts';
+
 // Orchestration
 export { buildVizResultFromExecutionGraph, buildVizResults, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';
