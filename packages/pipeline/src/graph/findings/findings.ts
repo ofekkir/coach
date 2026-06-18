@@ -1,13 +1,66 @@
 import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import { collectTreeIds, durationMs } from './access.ts';
-import { criticalPath } from './critical-path.ts';
-import { longestStep } from './hotspots.ts';
-import { repetitions } from './repetition.ts';
-import type { FindingSet, InteractionFindings, Rollup, SessionFindings, Shape } from './types.ts';
+import { collectTreeIds, durationMs, type NodeRef } from './access.ts';
+import { criticalPath, type CriticalPath } from './critical-path.ts';
+import { longestStep, type Hotspot } from './hotspots.ts';
+import { repetitions, type Repetition } from './repetition.ts';
+
+// ════════════════════════════════════════════════════════════════════════════
+// Findings — mechanical, curated derivations over the ENRICHED execution graph
+// (stage 6 output). Every finding points back into the node table BY ID
+// (`NodeRef`); it never embeds a `CanonicalNode`, so a finding set stays small
+// enough to drop into an agent's context. The shape mirrors the graph's
+// `agent ▸ session ▸ interaction` levels.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Cost/latency/token rollup over a scope (interaction, session, or agent). Only
+ *  `llm_request` nodes carry cost/tokens; `llm_request` and `tool` carry duration. */
+export interface Rollup {
+  readonly wallMs: number; // the scope's wall-clock
+  readonly llmCallDurationMs: number; // Σ llm_request.duration_ms
+  readonly costUsd: number; // Σ llm_request.cost_usd
+  readonly tokensIn: number; // Σ llm_request.tokens_in
+  readonly tokensOut: number; // Σ llm_request.tokens_out
+  readonly llmCalls: number;
+  readonly toolCalls: number;
+}
+
+/** A query turn has no tool nodes; an agentic turn has ≥1. */
+export type Shape = 'query' | 'agentic';
+
+export interface InteractionFindings {
+  readonly interactionId: string;
+  readonly sequence: number;
+  readonly shape: Shape;
+  readonly rollup: Rollup;
+  readonly longestStep: Hotspot | null;
+  readonly criticalPath: CriticalPath | null;
+  readonly repetitions: readonly Repetition[];
+  /** Failed tool calls. Empty until `ToolNode` gains an error/status field — until
+   *  then failures live only in the consuming inference's `tool_result` content,
+   *  which the curated layer does not parse. See `FindingSet.gaps`. */
+  readonly failures: readonly NodeRef[];
+}
+
+export interface SessionFindings {
+  readonly sessionId: string;
+  readonly rollup: Rollup;
+  readonly shapeMix: Readonly<Record<Shape, number>>; // interaction counts per shape
+  readonly interactions: readonly InteractionFindings[];
+}
+
+/** The full finding set for one execution graph. `kind` mirrors the graph's
+ *  (possibly degraded) top level. `gaps` names findings that are not yet
+ *  mechanically derivable — surfaced, never silently dropped. */
+export interface FindingSet {
+  readonly kind: ExecutionGraph['kind'];
+  readonly rollup: Rollup; // agent-level rollup
+  readonly sessions: readonly SessionFindings[];
+  readonly gaps: readonly string[];
+}
 
 const EMPTY_ROLLUP: Rollup = {
   wallMs: 0,
-  llmMs: 0,
+  llmCallDurationMs: 0,
   costUsd: 0,
   tokensIn: 0,
   tokensOut: 0,
@@ -105,7 +158,7 @@ function addNode(acc: Rollup, graph: ExecutionGraph, id: string): Rollup {
   if (node.type !== 'llm_request') return acc;
   return {
     ...acc,
-    llmMs: acc.llmMs + node.duration_ms,
+    llmCallDurationMs: acc.llmCallDurationMs + node.duration_ms,
     costUsd: acc.costUsd + (node.cost_usd ?? 0),
     tokensIn: acc.tokensIn + node.tokens_in,
     tokensOut: acc.tokensOut + node.tokens_out,
@@ -124,7 +177,7 @@ function mergeRollups(rollups: readonly Rollup[]): Rollup {
   return rollups.reduce<Rollup>(
     (acc, r) => ({
       wallMs: acc.wallMs + r.wallMs,
-      llmMs: acc.llmMs + r.llmMs,
+      llmCallDurationMs: acc.llmCallDurationMs + r.llmCallDurationMs,
       costUsd: acc.costUsd + r.costUsd,
       tokensIn: acc.tokensIn + r.tokensIn,
       tokensOut: acc.tokensOut + r.tokensOut,

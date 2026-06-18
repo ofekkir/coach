@@ -1,6 +1,14 @@
 import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import { durationMs, toNodeRef } from './access.ts';
-import type { Hotspot } from './types.ts';
+import { durationMs, toNodeRef, type NodeRef } from './access.ts';
+
+/** The heaviest node by a metric, with its share of the scope total — `shareOfScope`
+ *  is the fill fraction of the accent share-of-run bar the renderer draws. */
+export interface Hotspot {
+  readonly node: NodeRef;
+  readonly metric: 'latency' | 'cost' | 'tokens';
+  readonly value: number;
+  readonly shareOfScope: number; // value / scope total, 0..1
+}
 
 // The loop that emits the spine; every other thread is off-spine housekeeping.
 const MAIN_THREAD_SOURCE = 'repl_main_thread';

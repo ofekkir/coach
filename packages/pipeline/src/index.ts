@@ -47,18 +47,19 @@ export { deltasOf, nodeData, resolve, semanticsOf } from './graph/types.ts';
 export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 
 // Findings stage — mechanical derivations over the enriched graph (stage 7).
-export { deriveFindings } from './graph/findings/findings.ts';
-export type {
-  CriticalPath,
-  FindingSet,
-  Hotspot,
-  InteractionFindings,
-  NodeRef,
-  Repetition,
-  Rollup,
-  SessionFindings,
-  Shape,
-} from './graph/findings/types.ts';
+// Types live in the module that derives them.
+export {
+  deriveFindings,
+  type FindingSet,
+  type InteractionFindings,
+  type Rollup,
+  type SessionFindings,
+  type Shape,
+} from './graph/findings/findings.ts';
+export type { NodeRef } from './graph/findings/access.ts';
+export type { Hotspot } from './graph/findings/hotspots.ts';
+export type { CriticalPath } from './graph/findings/critical-path.ts';
+export type { Repetition } from './graph/findings/repetition.ts';
 
 // Orchestration
 export { buildVizResultFromExecutionGraph, buildVizResults, runPipeline } from './orchestrate.ts';

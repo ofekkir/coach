@@ -1,18 +1,23 @@
 import { type ExecutionGraph, type InteractionExecution } from '../types.ts';
 import { durationMs } from './access.ts';
-import type { CriticalPath } from './types.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Critical path — the slowest route through one interaction's causal DAG
 // (`causalEdges`), summing node durations along the way. Parallel branches
 // overlap in wall-clock, so the path follows only the slowest at each fork; the
 // summed duration of the chosen route approximates the interaction's wall-clock
-// spine. A longest-weighted-path DP over the DAG (memoized, source → sink).
+// spine.
+//
+// A longest-weighted-path over the DAG, computed iteratively: Kahn topological
+// order, then a single reverse-order sweep where each node takes the best of its
+// successors. Maps 1:1 to the recursive CTE this becomes once the graph is in a
+// relational store.
 // ════════════════════════════════════════════════════════════════════════════
 
-interface Route {
-  readonly dist: number;
-  readonly path: readonly string[];
+/** The slowest path through one interaction's causal DAG, summing node durations. */
+export interface CriticalPath {
+  readonly nodeIds: readonly string[]; // ordered cause → effect
+  readonly durationMs: number;
 }
 
 function weightOf(graph: ExecutionGraph, id: string): number {
@@ -20,7 +25,7 @@ function weightOf(graph: ExecutionGraph, id: string): number {
   return node != null ? durationMs(node) : 0;
 }
 
-function successors(interaction: InteractionExecution): Map<string, string[]> {
+function successorsOf(interaction: InteractionExecution): Map<string, string[]> {
   const succ = new Map<string, string[]>();
   for (const edge of interaction.causalEdges) {
     const list = succ.get(edge.fromId);
@@ -30,29 +35,83 @@ function successors(interaction: InteractionExecution): Map<string, string[]> {
   return succ;
 }
 
-function longestFrom(
-  graph: ExecutionGraph,
-  succ: Map<string, string[]>,
+function indegrees(
+  nodeIds: ReadonlySet<string>,
+  succ: ReadonlyMap<string, string[]>,
+): Map<string, number> {
+  const degree = new Map<string, number>([...nodeIds].map((id) => [id, 0]));
+  for (const targets of succ.values()) {
+    targets.forEach((to) => degree.set(to, (degree.get(to) ?? 0) + 1));
+  }
+  return degree;
+}
+
+// Decrement each successor's indegree; those that hit zero are ready to emit.
+function release(
   id: string,
-  memo: Map<string, Route>,
-): Route {
-  const cached = memo.get(id);
-  if (cached != null) return cached;
+  succ: ReadonlyMap<string, string[]>,
+  indegree: Map<string, number>,
+  ready: string[],
+): void {
+  for (const to of succ.get(id) ?? []) {
+    const left = (indegree.get(to) ?? 0) - 1;
+    indegree.set(to, left);
+    if (left === 0) ready.push(to);
+  }
+}
 
-  const placeholder: Route = { dist: weightOf(graph, id), path: [id] };
-  memo.set(id, placeholder); // guards against a stray cycle
+// Kahn's algorithm — node ids in topological order. Cycle nodes (none in a valid
+// DAG) are simply omitted, leaving them with the default best of 0.
+function topologicalOrder(
+  nodeIds: ReadonlySet<string>,
+  succ: ReadonlyMap<string, string[]>,
+): string[] {
+  const indegree = indegrees(nodeIds, succ);
+  const ready = [...nodeIds].filter((id) => indegree.get(id) === 0);
+  const order: string[] = [];
+  while (ready.length > 0) {
+    const id = ready.pop();
+    if (id == null) break;
+    order.push(id);
+    release(id, succ, indegree, ready);
+  }
+  return order;
+}
 
-  const best = (succ.get(id) ?? []).reduce<Route>(
-    (acc, next) => {
-      const tail = longestFrom(graph, succ, next, memo);
-      return tail.dist > acc.dist ? tail : acc;
-    },
-    { dist: 0, path: [] },
-  );
+interface Best {
+  readonly dist: number;
+  readonly next: string | undefined;
+}
 
-  const route: Route = { dist: weightOf(graph, id) + best.dist, path: [id, ...best.path] };
-  memo.set(id, route);
-  return route;
+// One reverse-topological sweep: each node's best route is its own weight plus the
+// heaviest successor's route. `next` threads the chosen route for reconstruction.
+function bestRoutes(
+  graph: ExecutionGraph,
+  order: readonly string[],
+  succ: ReadonlyMap<string, string[]>,
+): Map<string, Best> {
+  const best = new Map<string, Best>();
+  for (const id of [...order].reverse()) {
+    const heaviest = (succ.get(id) ?? []).reduce<Best>(
+      (acc, to) => {
+        const dist = best.get(to)?.dist ?? 0;
+        return dist > acc.dist ? { dist, next: to } : acc;
+      },
+      { dist: 0, next: undefined },
+    );
+    best.set(id, { dist: weightOf(graph, id) + heaviest.dist, next: heaviest.next });
+  }
+  return best;
+}
+
+function reconstruct(start: string, best: ReadonlyMap<string, Best>): string[] {
+  const path: string[] = [];
+  let id: string | undefined = start;
+  while (id != null) {
+    path.push(id);
+    id = best.get(id)?.next;
+  }
+  return path;
 }
 
 /** The slowest causal route through the interaction. Null when there are no causal
@@ -64,21 +123,16 @@ export function criticalPath(
 ): CriticalPath | null {
   if (interaction.causalEdges.length === 0) return null;
 
-  const succ = successors(interaction);
+  const nodeIds = new Set(interaction.causalEdges.flatMap((e) => [e.fromId, e.toId]));
   const targets = new Set(interaction.causalEdges.map((e) => e.toId));
-  const sources = [...new Set(interaction.causalEdges.map((e) => e.fromId))].filter(
-    (id) => !targets.has(id),
-  );
+  const sources = [...nodeIds].filter((id) => !targets.has(id));
   if (sources.length === 0) return null; // a pure cycle — no entry point
 
-  const memo = new Map<string, Route>();
-  const best = sources.reduce<Route>(
-    (acc, src) => {
-      const route = longestFrom(graph, succ, src, memo);
-      return route.dist > acc.dist ? route : acc;
-    },
-    { dist: 0, path: [] },
+  const succ = successorsOf(interaction);
+  const best = bestRoutes(graph, topologicalOrder(nodeIds, succ), succ);
+  const start = sources.reduce((a, b) =>
+    (best.get(b)?.dist ?? 0) > (best.get(a)?.dist ?? 0) ? b : a,
   );
 
-  return { nodeIds: best.path, durationMs: best.dist };
+  return { nodeIds: reconstruct(start, best), durationMs: best.get(start)?.dist ?? 0 };
 }
