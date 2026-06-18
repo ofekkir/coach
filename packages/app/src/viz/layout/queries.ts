@@ -98,3 +98,52 @@ export function allExpandableIds(graph: ExecutionGraph): Set<string> {
 export function agentRoot(graph: ExecutionGraph): string {
   return toAgent(graph).agent.id;
 }
+
+// The path of expandable ancestor ids — from the matched node up to the agent
+// root — within a member's containment subtree, or null when the target is not
+// in this subtree. Includes the target itself so focusing also opens its children.
+function nodeSubtreePath(node: ExecutionNode, targetId: string): string[] | null {
+  if (node.id === targetId) return [node.id];
+  for (const child of node.children) {
+    const sub = nodeSubtreePath(child, targetId);
+    if (sub != null) return [node.id, ...sub];
+  }
+  return null;
+}
+
+function memberForestPath(members: readonly ExecutionNode[], targetId: string): string[] | null {
+  for (const member of members) {
+    const sub = nodeSubtreePath(member, targetId);
+    if (sub != null) return sub;
+  }
+  return null;
+}
+
+function interactionPath(interaction: InteractionExecution, targetId: string): string[] | null {
+  if (interaction.interactionId === targetId) return [interaction.interactionId];
+  const members = interaction.threads.flatMap((thread) => thread.members);
+  const sub = memberForestPath(members, targetId);
+  return sub == null ? null : [interaction.interactionId, ...sub];
+}
+
+function sessionPath(session: SessionExecution, targetId: string): string[] | null {
+  if (session.session.id === targetId) return [session.session.id];
+  for (const interaction of session.interactions) {
+    const sub = interactionPath(interaction, targetId);
+    if (sub != null) return [session.session.id, ...sub];
+  }
+  return null;
+}
+
+/** Every expandable ancestor that must be open for `targetId` to render, plus the
+ *  target itself — the set "focus" merges into the expanded state to reveal a node
+ *  before centering on it. Returns null when the id is not in the graph. */
+export function revealPath(graph: ExecutionGraph, targetId: string): Set<string> | null {
+  const agent = toAgent(graph);
+  if (agent.agent.id === targetId) return new Set([agent.agent.id]);
+  for (const session of agent.sessions) {
+    const sub = sessionPath(session, targetId);
+    if (sub != null) return new Set([agent.agent.id, ...sub]);
+  }
+  return null;
+}
