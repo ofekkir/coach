@@ -125,9 +125,10 @@ describe('buildCausalEdges', () => {
     expect(edge(edges, 'toolB', 'inf2')).toBeDefined();
   });
 
-  it('makes the user prompt the head of the spine', () => {
+  it('makes the first inference a spine root — no prompt node feeds it', () => {
     const edges = causalEdgesOf(fixture({ withToolUseIds: true }));
-    expect(edge(edges, 'root__prompt', 'inf1')).toBeDefined();
+    expect(edges.some((e) => e.toId === 'inf1')).toBe(false);
+    expect(edges.some((e) => e.fromId === 'root__prompt')).toBe(false);
   });
 
   it('carries a negative fan-out gap when a tool starts before the inference ends', () => {

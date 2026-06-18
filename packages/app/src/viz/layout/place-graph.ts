@@ -7,7 +7,8 @@ import type {
   Thread,
 } from '@coach/pipeline';
 import { estimateNodeH } from './estimate.ts';
-import { buildAgentCard, buildSessionCard, formatGap } from '../format/format.ts';
+import { buildAgentCard, buildPromptCard, buildSessionCard, formatGap } from '../format/format.ts';
+import type { NodeCard } from '../format/format.ts';
 import { causalLink, link } from './edges.ts';
 import { cardOf, nodeOf, placeThread, pushStructural } from './place-members.ts';
 import { placeSpine } from './parallel-place.ts';
@@ -30,20 +31,12 @@ function durationOf(node: CanonicalNode): number | undefined {
   return 'duration_ms' in node ? node.duration_ms : undefined;
 }
 
-// The interaction's longest step — the one (and the edge into it) that wears the
-// accent — taken over the main thread's top-level members.
-function longestStepId(thread: Thread | undefined, ctx: Ctx): string | undefined {
-  if (thread == null) return undefined;
-  let id: string | undefined;
-  let maxMs = 0;
-  for (const member of thread.members) {
-    const ms = durationOf(nodeOf(ctx, member.id)) ?? 0;
-    if (ms > maxMs) {
-      maxMs = ms;
-      id = member.id;
-    }
-  }
-  return maxMs > 0 ? id : undefined;
+// The longest step (and its share-of-run) comes from stage-7 analysis, not the
+// layout — set on the ctx for the interaction currently being placed.
+function applyLongestStep(interactionId: string, ctx: Ctx): void {
+  const analysis = ctx.analysisByInteraction.get(interactionId);
+  ctx.longestId = analysis?.longestStep?.nodeId;
+  ctx.interactionDurMs = analysis?.rollup.wallMs;
 }
 
 function placeInteraction(
@@ -55,7 +48,8 @@ function placeInteraction(
   const rootId = interaction.interactionId;
   const threads: readonly Thread[] = interaction.threads;
   const isExpanded = ctx.expanded.has(rootId);
-  const hasKids = threads.some((t) => t.members.length > 0) || interaction.userPromptId != null;
+  const promptCard = promptCardOf(ctx, rootId);
+  const hasKids = threads.some((t) => t.members.length > 0) || promptCard != null;
   const rootCard = cardOf(ctx, rootId);
 
   pushStructural(rootId, rootCard, 'interaction', ctx.cx - NW / CENTERING_DIVISOR, y, hasKids, ctx);
@@ -63,15 +57,14 @@ function placeInteraction(
   y += estimateNodeH(rootCard) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
-  placeUserPrompt(interaction.userPromptId, rootId, y, ctx);
-  if (interaction.userPromptId != null) {
-    y += estimateNodeH(cardOf(ctx, interaction.userPromptId)) + VG;
+  if (promptCard != null) {
+    placeUserPrompt(promptCard, rootId, y, ctx);
+    y += estimateNodeH(promptCard) + VG;
   }
 
   const mainThread = threads.find((t) => t.source === MAIN_THREAD_SOURCE) ?? threads[0];
   const backgroundThreads = threads.filter((t) => t !== mainThread);
-  ctx.longestId = longestStepId(mainThread, ctx);
-  ctx.interactionDurMs = durationOf(nodeOf(ctx, rootId));
+  applyLongestStep(rootId, ctx);
 
   const levels = mainThread != null ? parallelLevelsOf(mainThread, interaction, ctx) : [];
   ctx.criticalIds = new Set(levels.map((l) => l.criticalId));
@@ -146,21 +139,21 @@ function placeCausalEdges(interaction: InteractionExecution, ctx: Ctx): void {
     });
 }
 
-// Places the synthesized user-prompt node as the interaction's first child and
-// returns the id threads should descend from (the prompt when present).
-function placeUserPrompt(userPromptId: string | null, rootId: string, y: number, ctx: Ctx): string {
-  if (userPromptId == null) return rootId;
-  pushStructural(
-    userPromptId,
-    cardOf(ctx, userPromptId),
-    'member',
-    ctx.cx - NW / CENTERING_DIVISOR,
-    y,
-    false,
-    ctx,
-  );
-  link(rootId, userPromptId, ctx);
-  return userPromptId;
+// The spine-head anchor, derived from `InteractionNode.prompt` (there is no prompt
+// node). Null when the interaction has no prompt text.
+function promptCardOf(ctx: Ctx, interactionId: string): NodeCard | null {
+  const node = nodeOf(ctx, interactionId);
+  const prompt = node.type === 'interaction' ? node.prompt : '';
+  return prompt.trim() !== '' ? buildPromptCard(prompt) : null;
+}
+
+// Places the synthesized prompt anchor as the interaction's first child. Its id is
+// render-only (`${rootId}__prompt`) — it has no backing node, so it resolves to no
+// row in the details panel, exactly like the agent/session entity cards.
+function placeUserPrompt(card: NodeCard, rootId: string, y: number, ctx: Ctx): void {
+  const id = `${rootId}__prompt`;
+  pushStructural(id, card, 'member', ctx.cx - NW / CENTERING_DIVISOR, y, false, ctx);
+  link(rootId, id, ctx);
 }
 
 function placeSession(session: SessionExecution, parentId: string, y: number, ctx: Ctx): number {

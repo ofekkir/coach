@@ -25,7 +25,6 @@ export type {
   ToolExecutionNode,
   ToolNode,
   UploadedFile,
-  UserPromptNode,
 } from './types.ts';
 
 // Graph contract — execution graph (normalized, stage-layered, id-keyed)
@@ -45,6 +44,20 @@ export { deltasOf, nodeData, resolve, semanticsOf } from './graph/types.ts';
 // Semantic enrichment stage (deterministic; semantic vocabulary supplied by
 // @coach/semantics — import config types from there).
 export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
+
+// Analysis stage — mechanical derivations over the enriched graph (stage 7).
+// Types live in the module that derives them.
+export {
+  analyzeGraph,
+  type GraphAnalysis,
+  type InteractionAnalysis,
+  type Rollup,
+  type SessionAnalysis,
+  type Shape,
+} from './graph/analysis/analysis.ts';
+export type { Hotspot } from './graph/analysis/hotspots.ts';
+export type { CriticalPath } from './graph/analysis/critical-path.ts';
+export type { Repetition } from './graph/analysis/repetition.ts';
 
 // Orchestration
 export { buildVizResultFromExecutionGraph, buildVizResults, runPipeline } from './orchestrate.ts';

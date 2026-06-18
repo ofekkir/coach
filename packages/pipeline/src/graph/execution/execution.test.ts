@@ -3,7 +3,7 @@ import type { CanonicalNode, RequestMessage, ResponseMessage } from '../../types
 import { agentEntityId, sessionEntityId } from '../../types.ts';
 import { aggregate } from '../../aggregate/aggregate.ts';
 import type { AgentExecution, ExecutionGraph, ExecutionNode, Thread } from '../types.ts';
-import { deltasOf, nodeData, resolve } from '../types.ts';
+import { deltasOf, nodeData } from '../types.ts';
 import { buildExecutionGraph } from './execution.ts';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -133,13 +133,12 @@ describe('buildExecutionGraph', () => {
     expect(graph.nodes.toolA).toBe(toolAfterLlm1);
   });
 
-  it('synthesizes a user_prompt node, referenced by id and stored in the table', () => {
+  it('does not synthesize a prompt node — the prompt is InteractionNode.prompt', () => {
     const graph = buildGraph(forest());
-    const inter = soleAgent(graph).sessions[0]?.interactions[0];
-    expect(inter?.userPromptId).toBe('root__prompt');
-    const resolved = resolve(graph, 'root__prompt');
-    expect(resolved.node.type).toBe('user_prompt');
-    expect(resolved.node).toMatchObject({ prompt: 'hello', sessionId: SID });
+    expect(graph.nodes.root__prompt).toBeUndefined();
+    expect(Object.values(graph.nodes).some((n) => n.type === ('user_prompt' as string))).toBe(
+      false,
+    );
   });
 
   it('makes every tree/thread node id-only — data resolves through the node table', () => {

@@ -135,7 +135,6 @@ export function sessionEntityId(harnessSessionId: string): string {
 
 export type NodeType =
   | 'interaction'
-  | 'user_prompt'
   | 'llm_request'
   | 'tool'
   | 'tool.execution'
@@ -155,12 +154,17 @@ export interface ResponseMessage {
 /** Fields shared by every node. `type` is the discriminant; concrete members
  *  narrow it to a literal. Read it directly (`switch (node.type)`) without
  *  narrowing first. `sessionId` is the FK → `Session` (denormalized onto every
- *  node so per-session aggregation is a flat filter, not a parent-walk). */
+ *  node so per-session aggregation is a flat filter, not a parent-walk).
+ *  `interactionId` is the same idea one level down — the FK → owning
+ *  `InteractionNode` (its own id, for an interaction node). Unlike `sessionId`
+ *  (a constant for the whole stage-3 pass), it needs the parent-closure, so it is
+ *  added in stage 4 (`aggregate`); absent on raw stage-3 nodes. */
 interface BaseNode {
   id: string;
   type: NodeType;
   parent?: string; // containment FK (self-FK → another node)
   sessionId: string; // FK → Session entity
+  interactionId?: string; // FK → owning InteractionNode; stamped by stage 4
 }
 
 /** Span-derived nodes always carry real OTLP timing — `parse.ts` computes all
@@ -221,24 +225,18 @@ export interface HookNode extends SpannedNode {
   name: string;
 }
 
-// ── Synthesized spine node (carries the interaction's prompt, no full span) ───
-
-export interface UserPromptNode extends BaseNode {
-  type: 'user_prompt';
-  prompt: string;
-}
-
 // Canonical = the mechanical pipeline's output, the value type of the node-data
 // table. No LLM is in this loop; every field is read or derived from the trace.
-// Stays harness-agnostic.
+// Stays harness-agnostic. The interaction's prompt is `InteractionNode.prompt` —
+// there is no separate prompt node; the renderer derives the spine-head anchor
+// from that field, the way it derives the agent/session cards from entities.
 export type CanonicalNode =
   | InteractionNode
   | LlmRequestNode
   | ToolNode
   | ToolExecutionNode
   | ToolBlockedOnUserNode
-  | HookNode
-  | UserPromptNode;
+  | HookNode;
 
 // ── Node-data layers — sparse, additive, all keyed by node id ──────────────────
 // Each layer is its own id-keyed table (`node_deltas`, `node_semantics`) joined
