@@ -57,8 +57,9 @@ function placeInteraction(
   y += estimateNodeH(rootCard) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
+  let promptId: string | null = null;
   if (promptCard != null) {
-    placeUserPrompt(promptCard, rootId, y, ctx);
+    promptId = placeUserPrompt(promptCard, rootId, y, ctx);
     y += estimateNodeH(promptCard) + VG;
   }
 
@@ -74,6 +75,7 @@ function placeInteraction(
   const laneEndY = placeBackgroundLane(backgroundThreads, spineX + NW + LANE_GAP, y, ctx);
 
   placeCausalEdges(interaction, ctx);
+  linkPromptToThreadHeads(promptId, threads, ctx);
   ctx.longestId = undefined;
   ctx.interactionDurMs = undefined;
   ctx.criticalIds = undefined;
@@ -147,13 +149,34 @@ function promptCardOf(ctx: Ctx, interactionId: string): NodeCard | null {
   return prompt.trim() !== '' ? buildPromptCard(prompt) : null;
 }
 
-// Places the synthesized prompt anchor as the interaction's first child. Its id is
-// render-only (`${rootId}__prompt`) — it has no backing node, so it resolves to no
-// row in the details panel, exactly like the agent/session entity cards.
-function placeUserPrompt(card: NodeCard, rootId: string, y: number, ctx: Ctx): void {
+// Places the synthesized prompt anchor as the interaction's first child and returns
+// its render-only id (`${rootId}__prompt`) — it has no backing node, so it resolves
+// to no row in the details panel, exactly like the agent/session entity cards.
+function placeUserPrompt(card: NodeCard, rootId: string, y: number, ctx: Ctx): string {
   const id = `${rootId}__prompt`;
   pushStructural(id, card, 'member', ctx.cx - NW / CENTERING_DIVISOR, y, false, ctx);
   link(rootId, id, ctx);
+  return id;
+}
+
+// Restores the prompt → first-member edge for every thread. The dropped user_prompt
+// node used to seed each thread's spine head; with it gone, the render-only prompt
+// anchor takes over, so background threads (and the main spine) read as triggered by
+// the prompt instead of floating. Cross-lane handles route the background edges
+// through the cards' sides; the same-lane main edge stays a vertical spine link.
+function linkPromptToThreadHeads(
+  promptId: string | null,
+  threads: readonly Thread[],
+  ctx: Ctx,
+): void {
+  if (promptId == null) return;
+  const placed = new Set(ctx.nodes.map((n) => n.id));
+  threads
+    .map((thread) => thread.members[0]?.id)
+    .filter((id): id is string => id != null && placed.has(id))
+    .forEach((headId) => {
+      causalLink(promptId, headId, undefined, ctx);
+    });
 }
 
 function placeSession(session: SessionExecution, parentId: string, y: number, ctx: Ctx): number {
