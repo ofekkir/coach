@@ -1,7 +1,13 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ExecutionGraph, ResolvedNode } from '@coach/pipeline';
 import { resolve } from '@coach/pipeline';
-import { allExpandableIds, agentRoot, buildElements, initialExpanded } from '../layout/queries.ts';
+import {
+  allExpandableIds,
+  agentRoot,
+  buildElements,
+  initialExpanded,
+  revealPath,
+} from '../layout/queries.ts';
 import type { Elements } from '../FlowInner/FlowInner.tsx';
 import { FlowInner } from '../FlowInner/FlowInner.tsx';
 import { DetailsPanel } from '../DetailsPanel/DetailsPanel.tsx';
@@ -26,9 +32,34 @@ function selectedResolved(
   return resolve(graph, selectedId);
 }
 
+// A focus request — the node to center on plus a monotonic nonce so refocusing the
+// same id (already selected/expanded) still re-triggers the viewport animation.
+export interface FocusRequest {
+  id: string;
+  nonce: number;
+}
+
 export function App({ data, title }: { data: ExecutionGraph; title: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => initialExpanded());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [focus, setFocus] = useState<FocusRequest | null>(null);
+  const focusNonce = useRef(0);
+
+  // Reveals (expands ancestors of), selects, and centers the viewport on a node by
+  // id. Returns false when no such node exists so the caller can flag the input.
+  const onFocusId = useCallback(
+    (rawId: string): boolean => {
+      const id = rawId.trim();
+      const reveal = id === '' ? null : revealPath(data, id);
+      if (reveal == null) return false;
+      setExpanded((prev) => new Set([...prev, ...reveal]));
+      setSelectedId(id);
+      focusNonce.current += 1;
+      setFocus({ id, nonce: focusNonce.current });
+      return true;
+    },
+    [data],
+  );
 
   const build = useCallback(
     (exp: Set<string>, sel: string | null): Elements => buildElements(data, exp, sel),
@@ -63,7 +94,13 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
         fontFamily: fonts.sans,
       }}
     >
-      <TopBar title={title} stats={stats} onExpandAll={onExpandAll} onCollapseAll={onCollapseAll} />
+      <TopBar
+        title={title}
+        stats={stats}
+        onExpandAll={onExpandAll}
+        onCollapseAll={onCollapseAll}
+        onFocus={onFocusId}
+      />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <FlowInner
@@ -72,6 +109,7 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
             onExpandedChange={setExpanded}
             selectedId={selectedId}
             onSelectId={setSelectedId}
+            focus={focus}
           />
         </div>
         {selected != null && (

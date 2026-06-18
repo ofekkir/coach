@@ -1,5 +1,6 @@
 import { fonts, tokens } from '../theme.ts';
 import { formatRunCost, formatRunDuration } from '../format/format.ts';
+import { FocusInput } from './FocusInput.tsx';
 import type { RunStats } from './stats.ts';
 
 function breadcrumb(segments: readonly string[]): React.ReactNode {
@@ -61,11 +62,13 @@ export function TopBar({
   stats,
   onExpandAll,
   onCollapseAll,
+  onFocus,
 }: {
   title: string;
   stats: RunStats;
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  onFocus: (id: string) => boolean;
 }) {
   return (
     <div
@@ -99,6 +102,7 @@ export function TopBar({
       {breadcrumb(stats.breadcrumb)}
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 18 }}>
+        <FocusInput onFocus={onFocus} />
         <div style={{ display: 'flex', gap: 4 }}>
           <button style={textBtn} onClick={onExpandAll}>
             expand all
