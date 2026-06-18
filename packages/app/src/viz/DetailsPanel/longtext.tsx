@@ -1,4 +1,5 @@
 import type { ResolvedNode } from '@coach/pipeline';
+import type { NodeCard } from '../format/format.ts';
 import { fonts, monoLabel, tokens } from '../theme.ts';
 
 const LONG_TEXT_THRESHOLD = 180;
@@ -11,15 +12,12 @@ interface LongText {
   quote: boolean;
 }
 
-// The one long-text value worth surfacing in full: a prompt's full text (from the
-// node), or a tool's instruction to its weak model (the semantic `comment`).
-// Truncated on the card; whole here.
-export function longTextOf(resolved: ResolvedNode | undefined): LongText | null {
-  if (resolved == null) return null;
-  if (resolved.node.type === 'user_prompt') {
-    return { label: 'PROMPT', text: resolved.node.prompt, quote: false };
-  }
-  const comment = resolved.semantics?.comment;
+// The one long-text value worth surfacing in full: the prompt anchor's full text
+// (carried on the synthesized card, which has no node), or a tool's instruction to
+// its weak model (the semantic `comment`). Truncated on the card; whole here.
+export function longTextOf(card: NodeCard, resolved: ResolvedNode | undefined): LongText | null {
+  if (card.prompt != null) return { label: 'PROMPT', text: card.prompt, quote: false };
+  const comment = resolved?.semantics?.comment;
   if (comment != null) return { label: 'INSTRUCTION TO WEAK MODEL', text: comment, quote: true };
   return null;
 }

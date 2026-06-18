@@ -41,7 +41,9 @@ export interface CardMetrics {
  *  the renderer keys its glyph/role on (e.g. `tool.execution` → `execution`).
  *  `tag` is the mono type tag shown above the title (e.g. `ACTION · WEBFETCH`);
  *  `title` is the verb that leads the card (`what[0]`); `subtitle` the second
- *  `what[]` line; `model` the machine id shown at the card's foot. */
+ *  `what[]` line; `model` the machine id shown at the card's foot. `prompt` is the
+ *  full prompt text, set only on the synthesized spine-head anchor (no backing
+ *  node), so the details panel can show it in full. */
 export interface NodeCard {
   readonly type: string;
   readonly tag: string;
@@ -50,6 +52,7 @@ export interface NodeCard {
   readonly model?: string;
   readonly fields: readonly CardField[];
   readonly metrics: CardMetrics;
+  readonly prompt?: string;
 }
 
 // Truncation limits (chars) for title lines, and decimal precision for metrics.
@@ -199,11 +202,6 @@ const TYPE_SHAPE_BUILDERS: ShapeBuilders = {
     tag: 'INTERACTION',
     title: interactionTitle(n, i),
   }),
-  user_prompt: (n) => ({
-    type: 'user_prompt',
-    tag: 'USER PROMPT · GOAL SOURCE',
-    title: truncate(collapseWhitespace(n.prompt).trim(), PROMPT_TITLE_MAX),
-  }),
   llm_request: (n) => llmRequestShape(n),
   tool: (n) => ({ type: 'tool', tag: toolTag(n.name), title: n.name }),
   'tool.blocked_on_user': () => ({ type: 'blocked_on_user', tag: 'WAIT' }),
@@ -255,6 +253,17 @@ function finishCard(shape: CardShape, metrics: CardMetrics): NodeCard {
  *  overlay). `index` supplies positional fallbacks for interaction titles. */
 export function buildNodeCard(resolved: ResolvedNode, index = 0): NodeCard {
   return finishCard(shapeOf(resolved.node, resolved.semantics, index), metricsOf(resolved.node));
+}
+
+/** The spine-head anchor card, derived from `InteractionNode.prompt` — there is no
+ *  prompt node, so this is synthesized like the agent/session entity cards. The
+ *  title clamps; the full prompt rides on `prompt` for the details panel. */
+export function buildPromptCard(prompt: string): NodeCard {
+  const title = truncate(collapseWhitespace(prompt).trim(), PROMPT_TITLE_MAX);
+  return {
+    ...finishCard({ type: 'user_prompt', tag: 'USER PROMPT · GOAL SOURCE', title }, {}),
+    prompt,
+  };
 }
 
 /** The container card for the agent ENTITY (not a node). */

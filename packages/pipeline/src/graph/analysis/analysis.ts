@@ -1,5 +1,6 @@
 import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import { collectTreeIds, durationMs, type NodeRef } from './access.ts';
+import type { CanonicalNode } from '../../types.ts';
+import { durationMs, interactionNodes, type NodeRef } from './access.ts';
 import { criticalPath, type CriticalPath } from './critical-path.ts';
 import { longestStep, type Hotspot } from './hotspots.ts';
 import { repetitions, type Repetition } from './repetition.ts';
@@ -130,13 +131,13 @@ function interactionAnalysis(
   graph: ExecutionGraph,
   interaction: InteractionExecution,
 ): InteractionAnalysis {
-  const ids = collectTreeIds(interaction.tree);
+  const nodes = interactionNodes(graph, interaction.interactionId);
   const node = nodeData(graph, interaction.interactionId);
   return {
     interactionId: interaction.interactionId,
     sequence: node.type === 'interaction' ? node.sequence : 0,
-    shape: shapeOf(graph, ids),
-    rollup: rollupOf(graph, ids, durationMs(node)),
+    shape: shapeOf(nodes),
+    rollup: rollupOf(nodes, durationMs(node)),
     longestStep: longestStep(graph, interaction),
     criticalPath: criticalPath(graph, interaction),
     repetitions: repetitions(graph, interaction),
@@ -144,16 +145,15 @@ function interactionAnalysis(
   };
 }
 
-function shapeOf(graph: ExecutionGraph, ids: readonly string[]): Shape {
-  return ids.some((id) => nodeData(graph, id).type === 'tool') ? 'agentic' : 'query';
+function shapeOf(nodes: readonly CanonicalNode[]): Shape {
+  return nodes.some((n) => n.type === 'tool') ? 'agentic' : 'query';
 }
 
-function rollupOf(graph: ExecutionGraph, ids: readonly string[], wallMs: number): Rollup {
-  return ids.reduce<Rollup>((acc, id) => addNode(acc, graph, id), { ...EMPTY_ROLLUP, wallMs });
+function rollupOf(nodes: readonly CanonicalNode[], wallMs: number): Rollup {
+  return nodes.reduce<Rollup>(addNode, { ...EMPTY_ROLLUP, wallMs });
 }
 
-function addNode(acc: Rollup, graph: ExecutionGraph, id: string): Rollup {
-  const node = nodeData(graph, id);
+function addNode(acc: Rollup, node: CanonicalNode): Rollup {
   if (node.type === 'tool') return { ...acc, toolCalls: acc.toolCalls + 1 };
   if (node.type !== 'llm_request') return acc;
   return {

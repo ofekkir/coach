@@ -71,12 +71,17 @@ later drop-in with no reshaping. Three concerns are kept strictly separate:
   time by parent") is the `parent` self-FK, surfaced per interaction as `tree` (an id-only
   `ExecutionNode` = `{ id, children }`). _Causal_ ("effect triggered by cause") is its own DAG edge
   set (`causalEdges`), introduced in stage 5 and reused unchanged by stage 6.
+- **Scope FKs are denormalized onto every node so aggregation is a flat filter, not a parent-walk.**
+  `sessionId` is stamped at construction (stage 3, a constant for the pass); `interactionId` (the
+  `parent`-closure root — its own id for an interaction node) needs the closure, so it is stamped in
+  stage 4 (`aggregate`). Per-interaction analysis filters `nodes` by `interactionId` instead of
+  walking the containment `tree`.
 - **Agent and session are ENTITIES, not nodes** — dimension rows referenced by FK (`sessionId`
   denormalized onto every node; `agentId` on each session). They never appear in the node table.
 
 Carrying no embedded copies, no classes and no cycles, the whole `ExecutionGraph` is plain
 JSON-serializable data that round-trips through `JSON.stringify`/`parse`. Each in-memory structure
-maps to one table: `agents`, `sessions`, `nodes(parent self-FK, session_id FK)`, `node_deltas(1:1)`,
+maps to one table: `agents`, `sessions`, `nodes(parent self-FK, session_id FK, interaction_id FK)`, `node_deltas(1:1)`,
 `node_semantics(1:1)`, `causal_edges(from_id, to_id, gap_ms)`. Presentation/label formatting lives in
 the app, which derives all display text from the structured graph data.
 
@@ -105,7 +110,9 @@ Input files (accumulating — user stages N files/folders before submitting)
                           owning ENTITIES synthesized from the interaction nodes: one
                           `agent` and one `session` per harness session. Entities are
                           dimension rows (FK targets), NOT nodes (multi-agent is out of
-                          scope — every session rolls up under one agent).
+                          scope — every session rolls up under one agent). Also stamps
+                          the `interactionId` FK on every node (the parent-closure
+                          root) so per-interaction aggregation is a flat filter.
         │
         ▼  Stage 5 — graph/execution/execution.ts  → executionGraph: ExecutionGraph
    buildExecutionGraph()  the mechanical, layered skeleton from the trace, no
@@ -113,9 +120,10 @@ Input files (accumulating — user stages N files/folders before submitting)
                             ▸ interactions); the node-graph lives in each interaction as
                             an id-only containment `tree`, `threads` (layout grouping),
                             and `causalEdges`. The `nodes` table is carried at the graph
-                            level; a synthesized user_prompt head node (its input / goal
-                            source, NOT a step) is added to it and referenced by
-                            `userPromptId`. Message deltas are emitted into the
+                            level. There is NO prompt node — the interaction's input is
+                            `InteractionNode.prompt`, and the renderer derives the
+                            spine-head anchor from it (the first inference is a causal
+                            root). Message deltas are emitted into the
                             graph-level `deltas` table keyed by id — for each
                             `llm_request`, the messages new to that step vs. the previous
                             request in the same thread.
@@ -123,8 +131,8 @@ Input files (accumulating — user stages N files/folders before submitting)
                             time-ordering edge layer (adjacency ≠ causality). The sole
                             edge layer is the causal flow (graph/execution/causal.ts,
                             InteractionExecution.causalEdges): a complete spine where
-                            every step links to its cause — userPrompt → inference,
-                            fan-out inference → tool, fan-in tool → inference, inference
+                            every step links to its cause — the first inference is a
+                            root, fan-out inference → tool, fan-in tool → inference, inference
                             → inference continuation, a tool's overlapping sub-spans as
                             parallel children (tool → wait, tool → execution), and
                             tool hooks woven in (inference → PreToolUse → tool →
@@ -221,9 +229,12 @@ pipeline render in the viewer for free; only the curated card touches `format.ts
 (`viz/theme.ts` — the single token/glyph source, replacing the old per-type color maps). A node's
 type is carried by a CSS **glyph** (hollow = inference, filled = action, solid fills = levels), not
 a hue: levels render as **banners**, the user prompt as an **accent anchor**, everything else as a
-**step card** (`TraceNode/levels.tsx`, `step.tsx`). The lone clay accent is spent only on focus —
-selection, the prompt anchor, and the **longest step** (its share-of-run bar + the edge into it),
-derived app-side in the layout pass (`layout/place-graph.ts`). The main thread rides a spine;
+**step card** (`TraceNode/levels.tsx`, `step.tsx`). The prompt anchor is **not a node** — it is
+synthesized in the layout from `InteractionNode.prompt` (`buildPromptCard`), the way agent/session
+cards are synthesized from entities; selecting it resolves to no node row, and its full text rides on
+the card for the details panel. The lone clay accent is spent only on focus — selection, the prompt
+anchor, and the **longest step** (its share-of-run bar + the edge into it), derived app-side in the
+layout pass (`layout/place-graph.ts`). The main thread rides a spine;
 off-spine threads (`source !== 'repl_main_thread'`) move to a dimmed background lane, a tool's raw
 sub-spans (`tool.execution` / `tool.blocked_on_user`) are collapsed (only its one nested weak-model
 inference surfaces, indented), and the top bar (`viz/TopBar`) shows the breadcrumb + run aggregates.

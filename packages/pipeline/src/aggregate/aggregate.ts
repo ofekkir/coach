@@ -6,8 +6,9 @@ import type { Agent, CanonicalNode, InteractionNode, Session } from '../types.ts
 // the owning ENTITIES (one Agent, one Session per harness session). Agent and
 // session are dimension rows referenced by FK, NOT graph nodes: the node table
 // carries no `agent`/`session` rows, only the `sessionId` FK denormalized onto
-// each node by stage 3. Multi-agent is out of scope — every session rolls up
-// under one agent.
+// each node by stage 3. Stage 4 also denormalizes the `interactionId` FK (the
+// parent-closure root) so per-interaction aggregation is a flat filter, not a
+// tree walk. Multi-agent is out of scope — every session rolls up under one agent.
 // ════════════════════════════════════════════════════════════════════════════
 
 /** Stage 4 output: the node-data table plus the entity tables it references. Maps
@@ -35,6 +36,24 @@ function interactionNodes(nodes: readonly CanonicalNode[]): InteractionNode[] {
   return nodes.filter((n): n is InteractionNode => n.type === 'interaction');
 }
 
+// The owning interaction is the root of a node's `parent` chain (interaction nodes
+// have no parent, so they are the roots). Denormalized onto every node so analysis
+// can filter the flat table by interaction instead of walking the containment tree.
+function stampInteractionIds(nodes: readonly CanonicalNode[]): void {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  for (const node of nodes) node.interactionId = rootInteractionId(node, byId);
+}
+
+function rootInteractionId(start: CanonicalNode, byId: Map<string, CanonicalNode>): string {
+  let current = start;
+  while (current.parent != null) {
+    const parent = byId.get(current.parent);
+    if (parent == null) break;
+    current = parent;
+  }
+  return current.id;
+}
+
 function buildAgent(interactions: readonly InteractionNode[]): Agent {
   const userId = interactions[0]?.user_id ?? PSEUDO_USER_ID;
   return { id: agentEntityId(userId), userId };
@@ -58,6 +77,7 @@ function buildSessions(interactions: readonly InteractionNode[], agentId: string
 
 export function aggregate(nodesByTrace: readonly (readonly CanonicalNode[])[]): AgentGraph {
   const nodes = dedupeById(nodesByTrace);
+  stampInteractionIds(nodes);
   const interactions = interactionNodes(nodes);
   const agent = buildAgent(interactions);
   return { nodes, agent, sessions: buildSessions(interactions, agent.id) };

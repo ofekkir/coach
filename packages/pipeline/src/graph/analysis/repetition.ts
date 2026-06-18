@@ -1,6 +1,6 @@
 import type { ToolNode } from '../../types.ts';
-import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import { collectTreeIds, durationMs, toNodeRef, type NodeRef } from './access.ts';
+import { type ExecutionGraph, type InteractionExecution } from '../types.ts';
+import { durationMs, interactionNodes, toNodeRef, type NodeRef } from './access.ts';
 
 // A repetition needs the original call plus at least one repeat.
 const MIN_OCCURRENCES = 2;
@@ -16,8 +16,7 @@ export interface Repetition {
 }
 
 function toolNodesInOrder(graph: ExecutionGraph, interaction: InteractionExecution): ToolNode[] {
-  return collectTreeIds(interaction.tree)
-    .map((id) => nodeData(graph, id))
+  return interactionNodes(graph, interaction.interactionId)
     .filter((node): node is ToolNode => node.type === 'tool')
     .sort((a, b) => (a.start_time_ns < b.start_time_ns ? -1 : 1));
 }
