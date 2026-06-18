@@ -30,12 +30,12 @@ function durationOf(node: CanonicalNode): number | undefined {
   return 'duration_ms' in node ? node.duration_ms : undefined;
 }
 
-// The longest step (and its share-of-run) comes from stage-7 findings, not the
+// The longest step (and its share-of-run) comes from stage-7 analysis, not the
 // layout — set on the ctx for the interaction currently being placed.
 function applyLongestStep(interactionId: string, ctx: Ctx): void {
-  const findings = ctx.findingsByInteraction.get(interactionId);
-  ctx.longestId = findings?.longestStep?.node.id;
-  ctx.interactionDurMs = findings?.rollup.wallMs;
+  const analysis = ctx.analysisByInteraction.get(interactionId);
+  ctx.longestId = analysis?.longestStep?.node.id;
+  ctx.interactionDurMs = analysis?.rollup.wallMs;
 }
 
 function placeInteraction(

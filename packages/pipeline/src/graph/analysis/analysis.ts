@@ -5,9 +5,9 @@ import { longestStep, type Hotspot } from './hotspots.ts';
 import { repetitions, type Repetition } from './repetition.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
-// Findings — mechanical, curated derivations over the ENRICHED execution graph
-// (stage 6 output). Every finding points back into the node table BY ID
-// (`NodeRef`); it never embeds a `CanonicalNode`, so a finding set stays small
+// Analysis — mechanical, curated derivations over the ENRICHED execution graph
+// (stage 6 output). Every observation points back into the node table BY ID
+// (`NodeRef`); it never embeds a `CanonicalNode`, so the analysis stays small
 // enough to drop into an agent's context. The shape mirrors the graph's
 // `agent ▸ session ▸ interaction` levels.
 // ════════════════════════════════════════════════════════════════════════════
@@ -27,7 +27,7 @@ export interface Rollup {
 /** A query turn has no tool nodes; an agentic turn has ≥1. */
 export type Shape = 'query' | 'agentic';
 
-export interface InteractionFindings {
+export interface InteractionAnalysis {
   readonly interactionId: string;
   readonly sequence: number;
   readonly shape: Shape;
@@ -37,24 +37,24 @@ export interface InteractionFindings {
   readonly repetitions: readonly Repetition[];
   /** Failed tool calls. Empty until `ToolNode` gains an error/status field — until
    *  then failures live only in the consuming inference's `tool_result` content,
-   *  which the curated layer does not parse. See `FindingSet.gaps`. */
+   *  which the curated layer does not parse. See `GraphAnalysis.gaps`. */
   readonly failures: readonly NodeRef[];
 }
 
-export interface SessionFindings {
+export interface SessionAnalysis {
   readonly sessionId: string;
   readonly rollup: Rollup;
   readonly shapeMix: Readonly<Record<Shape, number>>; // interaction counts per shape
-  readonly interactions: readonly InteractionFindings[];
+  readonly interactions: readonly InteractionAnalysis[];
 }
 
-/** The full finding set for one execution graph. `kind` mirrors the graph's
- *  (possibly degraded) top level. `gaps` names findings that are not yet
- *  mechanically derivable — surfaced, never silently dropped. */
-export interface FindingSet {
+/** The full analysis for one execution graph. `kind` mirrors the graph's
+ *  (possibly degraded) top level. `gaps` names what is not yet mechanically
+ *  derivable — surfaced, never silently dropped. */
+export interface GraphAnalysis {
   readonly kind: ExecutionGraph['kind'];
   readonly rollup: Rollup; // agent-level rollup
-  readonly sessions: readonly SessionFindings[];
+  readonly sessions: readonly SessionAnalysis[];
   readonly gaps: readonly string[];
 }
 
@@ -73,14 +73,14 @@ const GAPS = [
   'retry vs. benign re-read — separating them needs a tool-mutation taxonomy (semantic, not mechanical). Only redundant_tool is emitted today.',
 ];
 
-/** Mechanical findings over the ENRICHED execution graph (stage 6 output). Pure and
+/** Mechanical analysis of the ENRICHED execution graph (stage 6 output). Pure and
  *  graph-only: the live pipeline (stage 7), the MCP reading a persisted
  *  `06-enriched-graph.json`, and the app's pre-computed-load path all call this and
  *  get byte-identical results. Reads `semantics` only for `NodeRef.what`; every
  *  metric comes from the node table. */
-export function deriveFindings(graph: ExecutionGraph): FindingSet {
+export function analyzeGraph(graph: ExecutionGraph): GraphAnalysis {
   const sessions = sessionsOf(graph).map((s) =>
-    sessionFindings(graph, s.sessionId, s.interactions),
+    sessionAnalysis(graph, s.sessionId, s.interactions),
   );
   return {
     kind: graph.kind,
@@ -112,24 +112,24 @@ function sessionsOf(graph: ExecutionGraph): readonly SessionInteractions[] {
   return [{ sessionId, interactions: [graph.data] }];
 }
 
-function sessionFindings(
+function sessionAnalysis(
   graph: ExecutionGraph,
   sessionId: string,
   interactions: readonly InteractionExecution[],
-): SessionFindings {
-  const findings = interactions.map((i) => interactionFindings(graph, i));
+): SessionAnalysis {
+  const analyses = interactions.map((i) => interactionAnalysis(graph, i));
   return {
     sessionId,
-    rollup: mergeRollups(findings.map((f) => f.rollup)),
-    shapeMix: tallyShapes(findings),
-    interactions: findings,
+    rollup: mergeRollups(analyses.map((a) => a.rollup)),
+    shapeMix: tallyShapes(analyses),
+    interactions: analyses,
   };
 }
 
-function interactionFindings(
+function interactionAnalysis(
   graph: ExecutionGraph,
   interaction: InteractionExecution,
-): InteractionFindings {
+): InteractionAnalysis {
   const ids = collectTreeIds(interaction.tree);
   const node = nodeData(graph, interaction.interactionId);
   return {
@@ -166,9 +166,9 @@ function addNode(acc: Rollup, graph: ExecutionGraph, id: string): Rollup {
   };
 }
 
-function tallyShapes(findings: readonly InteractionFindings[]): Record<Shape, number> {
-  return findings.reduce<Record<Shape, number>>(
-    (acc, f) => ({ ...acc, [f.shape]: acc[f.shape] + 1 }),
+function tallyShapes(analyses: readonly InteractionAnalysis[]): Record<Shape, number> {
+  return analyses.reduce<Record<Shape, number>>(
+    (acc, a) => ({ ...acc, [a.shape]: acc[a.shape] + 1 }),
     { query: 0, agentic: 0 },
   );
 }

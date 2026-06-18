@@ -40,7 +40,7 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 | Package / dir        | Purpose                                                                                                                                                                                                                                |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                          |
-| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → findings, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.           |
+| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → analysis, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.           |
 | `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                 |
 | `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README. |
 | `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                         |
@@ -49,11 +49,10 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 `packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — seven
 named stages, each surfaced as a member: `classified`, `sessions`, `canonicalBySession`,
-`agentGraph`, `executionGraph`, `enrichedGraph`, `findings`. It is pure and file-system-free; the CLI
+`agentGraph`, `executionGraph`, `enrichedGraph`, `analysis`. It is pure and file-system-free; the CLI
 and the app both call it. Stage 6 enrichment is deterministic and always runs (using `config`,
-defaulting to the bundled `defaultSemanticsConfig`). Stage 7 derives mechanical findings from the
-enriched graph alone. `buildVizResults` is a thin adapter that wraps the execution graph for the
-renderer.
+defaulting to the bundled `defaultSemanticsConfig`). Stage 7 analyzes the enriched graph alone.
+`buildVizResults` is a thin adapter that wraps the execution graph for the renderer.
 
 The pipeline **organizes** data; it does not decide how to render it. The execution graph is a
 **normalized, stage-layered, id-keyed model** that maps 1:1 to a relational DB, so persistence is a
@@ -151,8 +150,8 @@ Input files (accumulating — user stages N files/folders before submitting)
                             assistant message is labeled with the generic `respond`
                             act.
         │
-        ▼  Stage 7 — graph/findings/findings.ts  → findings: FindingSet
-   deriveFindings(graph)    mechanical findings over the ENRICHED graph and
+        ▼  Stage 7 — graph/analysis/analysis.ts  → analysis: GraphAnalysis
+   analyzeGraph(graph)      mechanical analysis of the ENRICHED graph and
                             NOTHING ELSE — per interaction: shape (query/agentic),
                             cost/token/latency rollup, longest step, critical path
                             (slowest route through causalEdges), redundant tool
@@ -163,8 +162,8 @@ Input files (accumulating — user stages N files/folders before submitting)
                             load path share one derivation. `longestStep` and the
                             critical path moved here OUT of the app's
                             `viz/layout` pass — the moment a second, non-rendering
-                            consumer exists, findings-derivation can't live in the
-                            renderer. Findings that aren't yet mechanical (failed
+                            consumer exists, this derivation can't live in the
+                            renderer. Observations that aren't yet mechanical (failed
                             tool calls — no status field on ToolNode; retry vs.
                             benign re-read) are surfaced in `gaps`, never dropped.
                             Always runs as the final stage of runPipeline.
@@ -283,15 +282,15 @@ pipeline output format being reworked.
 `scripts/viz.ts`, `scripts/enrich.ts`, `scripts/etl.ts` — were removed; `e2e` covers the full
 pipeline.)
 
-| Member file                    | Stage | Contents                                                             |
-| ------------------------------ | ----- | -------------------------------------------------------------------- |
-| `01-classified.json`           | 1     | each file's name/path/type                                           |
-| `02-sessions.json`             | 2     | session id, kind, and member filenames per session                   |
-| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session (each node carries its `sessionId` FK) |
-| `04-agent-graph.json`          | 4     | `AgentGraph` — the `nodes` table + `agent`/`sessions` entities       |
-| `05-execution-graph.json`      | 5     | `ExecutionGraph` (id-keyed skeleton; `semantics` table empty)        |
-| `06-enriched-graph.json`       | 6     | `ExecutionGraph` with the `semantics` table populated                |
-| `07-findings.json`             | 7     | `FindingSet` — mechanical findings derived from the enriched graph   |
+| Member file                    | Stage | Contents                                                              |
+| ------------------------------ | ----- | --------------------------------------------------------------------- |
+| `01-classified.json`           | 1     | each file's name/path/type                                            |
+| `02-sessions.json`             | 2     | session id, kind, and member filenames per session                    |
+| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session (each node carries its `sessionId` FK)  |
+| `04-agent-graph.json`          | 4     | `AgentGraph` — the `nodes` table + `agent`/`sessions` entities        |
+| `05-execution-graph.json`      | 5     | `ExecutionGraph` (id-keyed skeleton; `semantics` table empty)         |
+| `06-enriched-graph.json`       | 6     | `ExecutionGraph` with the `semantics` table populated                 |
+| `07-analysis.json`             | 7     | `GraphAnalysis` — mechanical analysis derived from the enriched graph |
 
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one upload all flow through
 the same pipeline. The CLI populates `UploadedFile.path` relative to the gather root so the
