@@ -1,6 +1,6 @@
 import type { ToolNode } from '../../types.ts';
 import { type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import { durationMs, interactionNodes, toNodeRef, type NodeRef } from './access.ts';
+import { interactionNodes, toNodeRef, type NodeRef } from './access.ts';
 
 // A repetition needs the original call plus at least one repeat.
 const MIN_OCCURRENCES = 2;
@@ -37,7 +37,7 @@ function toRepetition(graph: ExecutionGraph, tools: readonly ToolNode[]): Repeti
   return {
     kind: 'redundant_tool',
     occurrences: tools.map((t) => toNodeRef(graph, t.id)),
-    wastedMs: rest.reduce((sum, t) => sum + durationMs(t), 0),
+    wastedMs: rest.reduce((sum, t) => sum + t.duration_ms, 0),
   };
 }
 

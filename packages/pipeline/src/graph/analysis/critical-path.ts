@@ -1,5 +1,4 @@
 import { type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import { durationMs } from './access.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Critical path — the slowest route through one interaction's causal DAG
@@ -21,8 +20,7 @@ export interface CriticalPath {
 }
 
 function weightOf(graph: ExecutionGraph, id: string): number {
-  const node = graph.nodes[id];
-  return node != null ? durationMs(node) : 0;
+  return graph.nodes[id]?.duration_ms ?? 0;
 }
 
 function successorsOf(interaction: InteractionExecution): Map<string, string[]> {

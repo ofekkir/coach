@@ -10,11 +10,6 @@ export interface NodeRef {
   readonly what?: readonly string[]; // stage-6 action phrases, when enriched
 }
 
-/** The node's wall-clock in ms, or 0 for the synthesized prompt node (no span). */
-export function durationMs(node: CanonicalNode): number {
-  return 'duration_ms' in node ? node.duration_ms : 0;
-}
-
 /** Every node belonging to one interaction — a flat filter on the stage-4
  *  `interactionId` FK, no tree walk (the interaction node carries its own id). */
 export function interactionNodes(graph: ExecutionGraph, interactionId: string): CanonicalNode[] {

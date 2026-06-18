@@ -1,6 +1,6 @@
 import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
 import type { CanonicalNode } from '../../types.ts';
-import { durationMs, interactionNodes, type NodeRef } from './access.ts';
+import { interactionNodes, type NodeRef } from './access.ts';
 import { criticalPath, type CriticalPath } from './critical-path.ts';
 import { longestStep, type Hotspot } from './hotspots.ts';
 import { repetitions, type Repetition } from './repetition.ts';
@@ -137,7 +137,7 @@ function interactionAnalysis(
     interactionId: interaction.interactionId,
     sequence: node.type === 'interaction' ? node.sequence : 0,
     shape: shapeOf(nodes),
-    rollup: rollupOf(nodes, durationMs(node)),
+    rollup: rollupOf(nodes, node.duration_ms),
     longestStep: longestStep(graph, interaction),
     criticalPath: criticalPath(graph, interaction),
     repetitions: repetitions(graph, interaction),

@@ -1,5 +1,5 @@
 import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import { durationMs, toNodeRef, type NodeRef } from './access.ts';
+import { toNodeRef, type NodeRef } from './access.ts';
 
 /** The heaviest node by a metric, with its share of the scope total — `shareOfScope`
  *  is the fill fraction of the accent share-of-run bar the renderer draws. */
@@ -30,14 +30,14 @@ export function longestStep(
   let id: string | undefined;
   let value = 0;
   for (const member of main.members) {
-    const ms = durationMs(nodeData(graph, member.id));
+    const ms = nodeData(graph, member.id).duration_ms;
     if (ms <= value) continue;
     value = ms;
     id = member.id;
   }
   if (id == null || value === 0) return null;
 
-  const wallMs = durationMs(nodeData(graph, interaction.interactionId));
+  const wallMs = nodeData(graph, interaction.interactionId).duration_ms;
   return {
     node: toNodeRef(graph, id),
     metric: 'latency',
