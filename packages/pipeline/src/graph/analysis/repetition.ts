@@ -8,11 +8,13 @@ const MIN_OCCURRENCES = 2;
 /** Repeated identical work in one interaction. `redundant_tool` = same tool name +
  *  identical `tool_input` ≥2×. `wastedMs` sums the duration of every occurrence
  *  after the first. The repeated call is identified by its `occurrenceIds` (resolve
- *  through `graph.nodes`) — no derived signature is kept. */
+ *  through `graph.nodes`); `evidence` carries the matched tool name + input that the
+ *  detection keyed on, so the finding explains itself without that join. */
 export interface Repetition {
   readonly kind: 'redundant_tool' | 'retry_loop';
   readonly occurrenceIds: readonly string[]; // ≥2, in time order
   readonly wastedMs: number;
+  readonly evidence: { readonly name?: string | undefined; readonly input?: string | undefined };
 }
 
 function toolNodesInOrder(graph: ExecutionGraph, interaction: InteractionExecution): ToolNode[] {
@@ -33,11 +35,12 @@ function groupByCall(tools: readonly ToolNode[]): Map<string, ToolNode[]> {
 }
 
 function toRepetition(tools: readonly ToolNode[]): Repetition {
-  const [, ...rest] = tools;
+  const [first, ...rest] = tools;
   return {
     kind: 'redundant_tool',
     occurrenceIds: tools.map((t) => t.id),
     wastedMs: rest.reduce((sum, t) => sum + t.duration_ms, 0),
+    evidence: { name: first?.name, input: first?.tool_input },
   };
 }
 
