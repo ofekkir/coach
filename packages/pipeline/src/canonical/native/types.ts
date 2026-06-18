@@ -10,6 +10,7 @@ export interface ContentBlock {
 }
 
 interface NativeMessage {
+  readonly id?: string;
   readonly model?: string;
   readonly content?: string | readonly ContentBlock[];
   readonly stop_reason?: string;
