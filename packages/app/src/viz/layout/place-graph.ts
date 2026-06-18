@@ -7,7 +7,8 @@ import type {
   Thread,
 } from '@coach/pipeline';
 import { estimateNodeH } from './estimate.ts';
-import { buildAgentCard, buildSessionCard, formatGap } from '../format/format.ts';
+import { buildAgentCard, buildPromptCard, buildSessionCard, formatGap } from '../format/format.ts';
+import type { NodeCard } from '../format/format.ts';
 import { causalLink, link } from './edges.ts';
 import { cardOf, nodeOf, placeThread, pushStructural } from './place-members.ts';
 import { placeSpine } from './parallel-place.ts';
@@ -47,7 +48,8 @@ function placeInteraction(
   const rootId = interaction.interactionId;
   const threads: readonly Thread[] = interaction.threads;
   const isExpanded = ctx.expanded.has(rootId);
-  const hasKids = threads.some((t) => t.members.length > 0) || interaction.userPromptId != null;
+  const promptCard = promptCardOf(ctx, rootId);
+  const hasKids = threads.some((t) => t.members.length > 0) || promptCard != null;
   const rootCard = cardOf(ctx, rootId);
 
   pushStructural(rootId, rootCard, 'interaction', ctx.cx - NW / CENTERING_DIVISOR, y, hasKids, ctx);
@@ -55,9 +57,9 @@ function placeInteraction(
   y += estimateNodeH(rootCard) + (isExpanded && hasKids ? LG : VG);
   if (!isExpanded || !hasKids) return y;
 
-  placeUserPrompt(interaction.userPromptId, rootId, y, ctx);
-  if (interaction.userPromptId != null) {
-    y += estimateNodeH(cardOf(ctx, interaction.userPromptId)) + VG;
+  if (promptCard != null) {
+    placeUserPrompt(promptCard, rootId, y, ctx);
+    y += estimateNodeH(promptCard) + VG;
   }
 
   const mainThread = threads.find((t) => t.source === MAIN_THREAD_SOURCE) ?? threads[0];
@@ -137,21 +139,21 @@ function placeCausalEdges(interaction: InteractionExecution, ctx: Ctx): void {
     });
 }
 
-// Places the synthesized user-prompt node as the interaction's first child and
-// returns the id threads should descend from (the prompt when present).
-function placeUserPrompt(userPromptId: string | null, rootId: string, y: number, ctx: Ctx): string {
-  if (userPromptId == null) return rootId;
-  pushStructural(
-    userPromptId,
-    cardOf(ctx, userPromptId),
-    'member',
-    ctx.cx - NW / CENTERING_DIVISOR,
-    y,
-    false,
-    ctx,
-  );
-  link(rootId, userPromptId, ctx);
-  return userPromptId;
+// The spine-head anchor, derived from `InteractionNode.prompt` (there is no prompt
+// node). Null when the interaction has no prompt text.
+function promptCardOf(ctx: Ctx, interactionId: string): NodeCard | null {
+  const node = nodeOf(ctx, interactionId);
+  const prompt = node.type === 'interaction' ? node.prompt : '';
+  return prompt.trim() !== '' ? buildPromptCard(prompt) : null;
+}
+
+// Places the synthesized prompt anchor as the interaction's first child. Its id is
+// render-only (`${rootId}__prompt`) — it has no backing node, so it resolves to no
+// row in the details panel, exactly like the agent/session entity cards.
+function placeUserPrompt(card: NodeCard, rootId: string, y: number, ctx: Ctx): void {
+  const id = `${rootId}__prompt`;
+  pushStructural(id, card, 'member', ctx.cx - NW / CENTERING_DIVISOR, y, false, ctx);
+  link(rootId, id, ctx);
 }
 
 function placeSession(session: SessionExecution, parentId: string, y: number, ctx: Ctx): number {

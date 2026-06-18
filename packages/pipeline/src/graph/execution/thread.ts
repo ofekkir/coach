@@ -52,8 +52,8 @@ function nsOf(ns: string | undefined): bigint {
   return ns != null ? BigInt(ns) : 0n;
 }
 
-// Timing lives on span-derived nodes; the synthesized user_prompt has none. These
-// accessors read it across the whole union without forcing a narrow at every call.
+// Timing lives on span-derived nodes. These accessors read it across the whole
+// union without forcing a narrow at every call.
 export function startNs(node: CanonicalNode): string | undefined {
   return 'start_time_ns' in node ? node.start_time_ns : undefined;
 }

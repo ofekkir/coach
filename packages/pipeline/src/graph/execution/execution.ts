@@ -1,4 +1,4 @@
-import type { CanonicalNode, InteractionNode, MessageDeltas, UserPromptNode } from '../../types.ts';
+import type { CanonicalNode, InteractionNode, MessageDeltas } from '../../types.ts';
 import type { AgentGraph } from '../../aggregate/aggregate.ts';
 import type {
   AgentExecution,
@@ -68,21 +68,6 @@ function orderSources(
   });
 }
 
-// The user prompt is a synthesized node carrying the interaction's full prompt —
-// its input / head of the spine. Added to the node table (cards resolve by id);
-// referenced from the interaction by id, NOT embedded. Null when there is no text.
-function buildUserPromptNode(interaction: InteractionNode): UserPromptNode | null {
-  if (interaction.prompt.trim() === '') return null;
-  return {
-    id: `${interaction.id}__prompt`,
-    type: 'user_prompt',
-    parent: interaction.id,
-    sessionId: interaction.sessionId,
-    interactionId: interaction.id,
-    prompt: interaction.prompt,
-  };
-}
-
 function buildThread(source: string, members: readonly CanonicalNode[], state: BuildState): Thread {
   const seenMessageKeys = new Set<string>();
   const builtMembers = members.map((m) => {
@@ -119,15 +104,11 @@ function buildInteractionExecution(
     buildThread(source, threadMembers.get(source) ?? [], state),
   );
 
-  const promptNode = buildUserPromptNode(interaction);
-  if (promptNode != null) state.nodes[promptNode.id] = promptNode;
-
   return {
     interactionId: interaction.id,
-    userPromptId: promptNode?.id ?? null,
     tree: buildTree(interaction.id, state.childrenOf),
     threads,
-    causalEdges: buildCausalEdges(threads, promptNode?.id ?? null, resolverOf(state)),
+    causalEdges: buildCausalEdges(threads, resolverOf(state)),
   };
 }
 

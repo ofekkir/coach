@@ -135,7 +135,6 @@ export function sessionEntityId(harnessSessionId: string): string {
 
 export type NodeType =
   | 'interaction'
-  | 'user_prompt'
   | 'llm_request'
   | 'tool'
   | 'tool.execution'
@@ -226,24 +225,18 @@ export interface HookNode extends SpannedNode {
   name: string;
 }
 
-// ── Synthesized spine node (carries the interaction's prompt, no full span) ───
-
-export interface UserPromptNode extends BaseNode {
-  type: 'user_prompt';
-  prompt: string;
-}
-
 // Canonical = the mechanical pipeline's output, the value type of the node-data
 // table. No LLM is in this loop; every field is read or derived from the trace.
-// Stays harness-agnostic.
+// Stays harness-agnostic. The interaction's prompt is `InteractionNode.prompt` —
+// there is no separate prompt node; the renderer derives the spine-head anchor
+// from that field, the way it derives the agent/session cards from entities.
 export type CanonicalNode =
   | InteractionNode
   | LlmRequestNode
   | ToolNode
   | ToolExecutionNode
   | ToolBlockedOnUserNode
-  | HookNode
-  | UserPromptNode;
+  | HookNode;
 
 // ── Node-data layers — sparse, additive, all keyed by node id ──────────────────
 // Each layer is its own id-keyed table (`node_deltas`, `node_semantics`) joined

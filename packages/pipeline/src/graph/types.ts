@@ -58,20 +58,18 @@ export interface Thread {
   readonly members: readonly ExecutionNode[];
 }
 
-/** One interaction's execution skeleton, all keyed by node id.
+/** One interaction's execution skeleton, all keyed by node id. The prompt is not
+ *  a node — it is `InteractionNode.prompt`; the renderer derives the spine-head
+ *  anchor from it.
  *  - `interactionId` — the interaction node (resolve via the `nodes` table).
- *  - `userPromptId` — the synthesized user-prompt node carrying the full prompt
- *    (the interaction's input / head of the spine, NOT a step). Null when the
- *    interaction has no prompt text.
  *  - `tree` — the CONTAINMENT tree rooted at the interaction (ids only).
  *  - `threads` — a LAYOUT grouping only (see `Thread`).
- *  - `causalEdges` — the CAUSAL flow (a DAG): `userPrompt → first inference`,
+ *  - `causalEdges` — the CAUSAL flow (a DAG): the first inference is a root,
  *    fan-out `inference → tool`, fan-in `tool → inference` (by tool_use_id, not
  *    timing), `inference → inference` continuation, a tool's overlapping sub-spans
  *    as parallel children, and tool hooks woven in. */
 export interface InteractionExecution {
   readonly interactionId: string;
-  readonly userPromptId: string | null;
   readonly tree: ExecutionNode;
   readonly threads: readonly Thread[];
   readonly causalEdges: readonly CausalEdge[];

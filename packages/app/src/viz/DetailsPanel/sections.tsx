@@ -155,7 +155,7 @@ export interface PanelContent {
 
 export function panelBody(content: PanelContent): React.ReactNode {
   const { card, resolved, raw, isLongest, hiddenSubCall, duration, showRaw } = content;
-  const longText = longTextOf(resolved);
+  const longText = longTextOf(card, resolved);
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px' }}>
       {metricsGrid(card, duration, isLongest)}
