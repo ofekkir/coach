@@ -1,16 +1,16 @@
 import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
 import type { CanonicalNode } from '../../types.ts';
-import { interactionNodes, type NodeRef } from './access.ts';
+import { interactionNodes } from './access.ts';
 import { criticalPath, type CriticalPath } from './critical-path.ts';
 import { longestStep, type Hotspot } from './hotspots.ts';
 import { repetitions, type Repetition } from './repetition.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Analysis — mechanical, curated derivations over the ENRICHED execution graph
-// (stage 6 output). Every observation points back into the node table BY ID
-// (`NodeRef`); it never embeds a `CanonicalNode`, so the analysis stays small
-// enough to drop into an agent's context. The shape mirrors the graph's
-// `agent ▸ session ▸ interaction` levels.
+// (stage 6 output). Every observation points back into the node table BY ID; it
+// never embeds a `CanonicalNode`, so the analysis stays small enough to drop into
+// an agent's context. The shape mirrors the graph's `agent ▸ session ▸
+// interaction` levels.
 // ════════════════════════════════════════════════════════════════════════════
 
 /** Cost/latency/token rollup over a scope (interaction, session, or agent). Only
@@ -19,10 +19,10 @@ export interface Rollup {
   readonly wallMs: number; // the scope's wall-clock
   readonly llmCallDurationMs: number; // Σ llm_request.duration_ms
   readonly costUsd: number; // Σ llm_request.cost_usd
-  readonly tokensIn: number; // Σ llm_request.tokens_in
-  readonly tokensOut: number; // Σ llm_request.tokens_out
-  readonly llmCalls: number;
-  readonly toolCalls: number;
+  readonly totalTokensIn: number; // Σ llm_request.tokens_in
+  readonly totalTokensOut: number; // Σ llm_request.tokens_out
+  readonly llmCallCount: number;
+  readonly toolCallCount: number;
 }
 
 /** A query turn has no tool nodes; an agentic turn has ≥1. */
@@ -36,10 +36,10 @@ export interface InteractionAnalysis {
   readonly longestStep: Hotspot | null;
   readonly criticalPath: CriticalPath | null;
   readonly repetitions: readonly Repetition[];
-  /** Failed tool calls. Empty until `ToolNode` gains an error/status field — until
-   *  then failures live only in the consuming inference's `tool_result` content,
-   *  which the curated layer does not parse. See `GraphAnalysis.gaps`. */
-  readonly failures: readonly NodeRef[];
+  /** Failed tool-call node ids. Empty until `ToolNode` gains an error/status field
+   *  — until then failures live only in the consuming inference's `tool_result`
+   *  content, which the curated layer does not parse. See `GraphAnalysis.gaps`. */
+  readonly failureIds: readonly string[];
 }
 
 export interface SessionAnalysis {
@@ -63,10 +63,10 @@ const EMPTY_ROLLUP: Rollup = {
   wallMs: 0,
   llmCallDurationMs: 0,
   costUsd: 0,
-  tokensIn: 0,
-  tokensOut: 0,
-  llmCalls: 0,
-  toolCalls: 0,
+  totalTokensIn: 0,
+  totalTokensOut: 0,
+  llmCallCount: 0,
+  toolCallCount: 0,
 };
 
 const GAPS = [
@@ -77,8 +77,8 @@ const GAPS = [
 /** Mechanical analysis of the ENRICHED execution graph (stage 6 output). Pure and
  *  graph-only: the live pipeline (stage 7), the MCP reading a persisted
  *  `06-enriched-graph.json`, and the app's pre-computed-load path all call this and
- *  get byte-identical results. Reads `semantics` only for `NodeRef.what`; every
- *  metric comes from the node table. */
+ *  get byte-identical results. Every metric comes from the node table; findings
+ *  reference nodes by id. */
 export function analyzeGraph(graph: ExecutionGraph): GraphAnalysis {
   const sessions = sessionsOf(graph).map((s) =>
     sessionAnalysis(graph, s.sessionId, s.interactions),
@@ -141,7 +141,7 @@ function interactionAnalysis(
     longestStep: longestStep(graph, interaction),
     criticalPath: criticalPath(graph, interaction),
     repetitions: repetitions(graph, interaction),
-    failures: [],
+    failureIds: [],
   };
 }
 
@@ -154,15 +154,15 @@ function rollupOf(nodes: readonly CanonicalNode[], wallMs: number): Rollup {
 }
 
 function addNode(acc: Rollup, node: CanonicalNode): Rollup {
-  if (node.type === 'tool') return { ...acc, toolCalls: acc.toolCalls + 1 };
+  if (node.type === 'tool') return { ...acc, toolCallCount: acc.toolCallCount + 1 };
   if (node.type !== 'llm_request') return acc;
   return {
     ...acc,
     llmCallDurationMs: acc.llmCallDurationMs + node.duration_ms,
     costUsd: acc.costUsd + (node.cost_usd ?? 0),
-    tokensIn: acc.tokensIn + node.tokens_in,
-    tokensOut: acc.tokensOut + node.tokens_out,
-    llmCalls: acc.llmCalls + 1,
+    totalTokensIn: acc.totalTokensIn + node.tokens_in,
+    totalTokensOut: acc.totalTokensOut + node.tokens_out,
+    llmCallCount: acc.llmCallCount + 1,
   };
 }
 
@@ -179,10 +179,10 @@ function mergeRollups(rollups: readonly Rollup[]): Rollup {
       wallMs: acc.wallMs + r.wallMs,
       llmCallDurationMs: acc.llmCallDurationMs + r.llmCallDurationMs,
       costUsd: acc.costUsd + r.costUsd,
-      tokensIn: acc.tokensIn + r.tokensIn,
-      tokensOut: acc.tokensOut + r.tokensOut,
-      llmCalls: acc.llmCalls + r.llmCalls,
-      toolCalls: acc.toolCalls + r.toolCalls,
+      totalTokensIn: acc.totalTokensIn + r.totalTokensIn,
+      totalTokensOut: acc.totalTokensOut + r.totalTokensOut,
+      llmCallCount: acc.llmCallCount + r.llmCallCount,
+      toolCallCount: acc.toolCallCount + r.toolCallCount,
     }),
     EMPTY_ROLLUP,
   );

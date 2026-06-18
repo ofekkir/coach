@@ -1,10 +1,10 @@
 import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import { toNodeRef, type NodeRef } from './access.ts';
 
 /** The heaviest node by a metric, with its share of the scope total — `shareOfScope`
- *  is the fill fraction of the accent share-of-run bar the renderer draws. */
+ *  is the fill fraction of the accent share-of-run bar the renderer draws.
+ *  `nodeId` resolves through `graph.nodes` (or `inspect_node`, for an MCP). */
 export interface Hotspot {
-  readonly node: NodeRef;
+  readonly nodeId: string;
   readonly metric: 'latency' | 'cost' | 'tokens';
   readonly value: number;
   readonly shareOfScope: number; // value / scope total, 0..1
@@ -39,7 +39,7 @@ export function longestStep(
 
   const wallMs = nodeData(graph, interaction.interactionId).duration_ms;
   return {
-    node: toNodeRef(graph, id),
+    nodeId: id,
     metric: 'latency',
     value,
     shareOfScope: wallMs > 0 ? value / wallMs : 0,

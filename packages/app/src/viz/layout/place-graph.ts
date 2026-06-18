@@ -35,7 +35,7 @@ function durationOf(node: CanonicalNode): number | undefined {
 // layout — set on the ctx for the interaction currently being placed.
 function applyLongestStep(interactionId: string, ctx: Ctx): void {
   const analysis = ctx.analysisByInteraction.get(interactionId);
-  ctx.longestId = analysis?.longestStep?.node.id;
+  ctx.longestId = analysis?.longestStep?.nodeId;
   ctx.interactionDurMs = analysis?.rollup.wallMs;
 }
 

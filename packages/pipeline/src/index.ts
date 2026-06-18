@@ -55,7 +55,6 @@ export {
   type SessionAnalysis,
   type Shape,
 } from './graph/analysis/analysis.ts';
-export type { NodeRef } from './graph/analysis/access.ts';
 export type { Hotspot } from './graph/analysis/hotspots.ts';
 export type { CriticalPath } from './graph/analysis/critical-path.ts';
 export type { Repetition } from './graph/analysis/repetition.ts';

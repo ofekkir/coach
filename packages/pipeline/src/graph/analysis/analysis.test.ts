@@ -33,7 +33,7 @@ describe('analyzeGraph', () => {
     for (const i of interactions) {
       expect(['query', 'agentic']).toContain(i.shape);
       expect(i.rollup.costUsd).toBeGreaterThanOrEqual(0);
-      expect(i.rollup.llmCalls).toBeGreaterThanOrEqual(0);
+      expect(i.rollup.llmCallCount).toBeGreaterThanOrEqual(0);
     }
     const agentCost = analysis.rollup.costUsd;
     const summed = analysis.sessions.reduce((acc, s) => acc + s.rollup.costUsd, 0);
@@ -43,6 +43,6 @@ describe('analyzeGraph', () => {
   it('reports the failed-tool-call coverage gap honestly', () => {
     expect(analysis.gaps.length).toBeGreaterThan(0);
     const interactions = analysis.sessions.flatMap((s) => s.interactions);
-    expect(interactions.every((i) => i.failures.length === 0)).toBe(true);
+    expect(interactions.every((i) => i.failureIds.length === 0)).toBe(true);
   });
 });

@@ -1,17 +1,17 @@
 import type { ToolNode } from '../../types.ts';
 import { type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import { interactionNodes, toNodeRef, type NodeRef } from './access.ts';
+import { interactionNodes } from './access.ts';
 
 // A repetition needs the original call plus at least one repeat.
 const MIN_OCCURRENCES = 2;
 
 /** Repeated identical work in one interaction. `redundant_tool` = same tool name +
  *  identical `tool_input` ≥2×. `wastedMs` sums the duration of every occurrence
- *  after the first. The repeated call is identified by its `occurrences` (resolve
- *  via `inspect_node`) and their stage-6 phrases — no derived signature is kept. */
+ *  after the first. The repeated call is identified by its `occurrenceIds` (resolve
+ *  through `graph.nodes`) — no derived signature is kept. */
 export interface Repetition {
   readonly kind: 'redundant_tool' | 'retry_loop';
-  readonly occurrences: readonly NodeRef[]; // ≥2, in time order
+  readonly occurrenceIds: readonly string[]; // ≥2, in time order
   readonly wastedMs: number;
 }
 
@@ -32,11 +32,11 @@ function groupByCall(tools: readonly ToolNode[]): Map<string, ToolNode[]> {
   return groups;
 }
 
-function toRepetition(graph: ExecutionGraph, tools: readonly ToolNode[]): Repetition {
+function toRepetition(tools: readonly ToolNode[]): Repetition {
   const [, ...rest] = tools;
   return {
     kind: 'redundant_tool',
-    occurrences: tools.map((t) => toNodeRef(graph, t.id)),
+    occurrenceIds: tools.map((t) => t.id),
     wastedMs: rest.reduce((sum, t) => sum + t.duration_ms, 0),
   };
 }
@@ -51,5 +51,5 @@ export function repetitions(
 ): Repetition[] {
   return [...groupByCall(toolNodesInOrder(graph, interaction)).values()]
     .filter((tools) => tools.length >= MIN_OCCURRENCES)
-    .map((tools) => toRepetition(graph, tools));
+    .map((tools) => toRepetition(tools));
 }
