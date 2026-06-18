@@ -249,14 +249,9 @@ function spineEdges(
 }
 
 /** The causal flow for one interaction (see InteractionExecution.causalEdges).
- *  `userPromptId` seeds the spine head — resolved through the node table. */
-export function buildCausalEdges(
-  threads: readonly Thread[],
-  userPromptId: string | null,
-  r: NodeResolver,
-): CausalEdge[] {
+ *  There is no prompt node — each thread's first member is a spine root (no
+ *  incoming edge). */
+export function buildCausalEdges(threads: readonly Thread[], r: NodeResolver): CausalEdge[] {
   const index = buildIndex(threads, r);
-  const head: ExecutionNode | null =
-    userPromptId != null ? { id: userPromptId, children: [] } : null;
-  return threads.flatMap((thread) => spineEdges(thread.members, head, index, r));
+  return threads.flatMap((thread) => spineEdges(thread.members, null, index, r));
 }

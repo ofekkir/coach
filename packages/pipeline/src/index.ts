@@ -25,7 +25,6 @@ export type {
   ToolExecutionNode,
   ToolNode,
   UploadedFile,
-  UserPromptNode,
 } from './types.ts';
 
 // Graph contract — execution graph (normalized, stage-layered, id-keyed)

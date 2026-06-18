@@ -75,10 +75,9 @@ describe('enrichExecutionGraph', () => {
     });
   });
 
-  it('leaves non-relabeled nodes (interaction, user_prompt) without a semantics row', () => {
+  it('leaves the non-relabeled interaction node without a semantics row', () => {
     const enriched = enrich([interaction, llm1, tool1]);
     expect(semanticsOf(enriched, 'inter')).toBeUndefined();
-    expect(semanticsOf(enriched, 'inter__prompt')).toBeUndefined();
   });
 
   it('preserves the node table, deltas, and edges unchanged (only semantics is built)', () => {
