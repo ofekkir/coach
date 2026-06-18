@@ -155,12 +155,17 @@ export interface ResponseMessage {
 /** Fields shared by every node. `type` is the discriminant; concrete members
  *  narrow it to a literal. Read it directly (`switch (node.type)`) without
  *  narrowing first. `sessionId` is the FK → `Session` (denormalized onto every
- *  node so per-session aggregation is a flat filter, not a parent-walk). */
+ *  node so per-session aggregation is a flat filter, not a parent-walk).
+ *  `interactionId` is the same idea one level down — the FK → owning
+ *  `InteractionNode` (its own id, for an interaction node). Unlike `sessionId`
+ *  (a constant for the whole stage-3 pass), it needs the parent-closure, so it is
+ *  added in stage 4 (`aggregate`); absent on raw stage-3 nodes. */
 interface BaseNode {
   id: string;
   type: NodeType;
   parent?: string; // containment FK (self-FK → another node)
   sessionId: string; // FK → Session entity
+  interactionId?: string; // FK → owning InteractionNode; stamped by stage 4
 }
 
 /** Span-derived nodes always carry real OTLP timing — `parse.ts` computes all

@@ -71,12 +71,17 @@ later drop-in with no reshaping. Three concerns are kept strictly separate:
   time by parent") is the `parent` self-FK, surfaced per interaction as `tree` (an id-only
   `ExecutionNode` = `{ id, children }`). _Causal_ ("effect triggered by cause") is its own DAG edge
   set (`causalEdges`), introduced in stage 5 and reused unchanged by stage 6.
+- **Scope FKs are denormalized onto every node so aggregation is a flat filter, not a parent-walk.**
+  `sessionId` is stamped at construction (stage 3, a constant for the pass); `interactionId` (the
+  `parent`-closure root — its own id for an interaction node) needs the closure, so it is stamped in
+  stage 4 (`aggregate`). Per-interaction analysis filters `nodes` by `interactionId` instead of
+  walking the containment `tree`.
 - **Agent and session are ENTITIES, not nodes** — dimension rows referenced by FK (`sessionId`
   denormalized onto every node; `agentId` on each session). They never appear in the node table.
 
 Carrying no embedded copies, no classes and no cycles, the whole `ExecutionGraph` is plain
 JSON-serializable data that round-trips through `JSON.stringify`/`parse`. Each in-memory structure
-maps to one table: `agents`, `sessions`, `nodes(parent self-FK, session_id FK)`, `node_deltas(1:1)`,
+maps to one table: `agents`, `sessions`, `nodes(parent self-FK, session_id FK, interaction_id FK)`, `node_deltas(1:1)`,
 `node_semantics(1:1)`, `causal_edges(from_id, to_id, gap_ms)`. Presentation/label formatting lives in
 the app, which derives all display text from the structured graph data.
 
@@ -105,7 +110,9 @@ Input files (accumulating — user stages N files/folders before submitting)
                           owning ENTITIES synthesized from the interaction nodes: one
                           `agent` and one `session` per harness session. Entities are
                           dimension rows (FK targets), NOT nodes (multi-agent is out of
-                          scope — every session rolls up under one agent).
+                          scope — every session rolls up under one agent). Also stamps
+                          the `interactionId` FK on every node (the parent-closure
+                          root) so per-interaction aggregation is a flat filter.
         │
         ▼  Stage 5 — graph/execution/execution.ts  → executionGraph: ExecutionGraph
    buildExecutionGraph()  the mechanical, layered skeleton from the trace, no

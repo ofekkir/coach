@@ -1,5 +1,5 @@
 import type { CanonicalNode, NodeType } from '../../types.ts';
-import { nodeData, semanticsOf, type ExecutionGraph, type ExecutionNode } from '../types.ts';
+import { nodeData, semanticsOf, type ExecutionGraph } from '../types.ts';
 
 /** A reference back into `graph.nodes`. `what` is the stage-6 label when the node
  *  was enriched — the cheap human handle, and the concrete reason analysis runs
@@ -15,17 +15,10 @@ export function durationMs(node: CanonicalNode): number {
   return 'duration_ms' in node ? node.duration_ms : 0;
 }
 
-/** Every node id contained by a containment (sub)tree, parent before children. */
-export function collectTreeIds(root: ExecutionNode): string[] {
-  const ids: string[] = [];
-  const stack: ExecutionNode[] = [root];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (node == null) break;
-    ids.push(node.id);
-    for (const child of [...node.children].reverse()) stack.push(child);
-  }
-  return ids;
+/** Every node belonging to one interaction — a flat filter on the stage-4
+ *  `interactionId` FK, no tree walk (the interaction node carries its own id). */
+export function interactionNodes(graph: ExecutionGraph, interactionId: string): CanonicalNode[] {
+  return Object.values(graph.nodes).filter((n) => n.interactionId === interactionId);
 }
 
 /** Builds the curated, by-id reference for a node — type plus its stage-6 phrases. */

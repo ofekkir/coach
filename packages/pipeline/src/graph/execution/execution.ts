@@ -78,6 +78,7 @@ function buildUserPromptNode(interaction: InteractionNode): UserPromptNode | nul
     type: 'user_prompt',
     parent: interaction.id,
     sessionId: interaction.sessionId,
+    interactionId: interaction.id,
     prompt: interaction.prompt,
   };
 }
