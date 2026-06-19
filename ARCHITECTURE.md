@@ -10,7 +10,7 @@ Coach processes agent execution traces and renders them as an interactive causal
 The core thesis: harness-agnostic OTEL traces feed a pure data pipeline whose output can
 be reflected back to the agent (or its engineer) for improvement.
 
-The system is split into six packages plus a Node CLI layer:
+The system is split into seven packages plus a Node CLI layer:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -37,15 +37,16 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Package layout
 
-| Package / dir        | Purpose                                                                                                                                                                                                                                                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                                                                                                                    |
-| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → analysis, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                                                                                                                     |
-| `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                                                                                                                           |
-| `packages/store`     | Pure query core shared by the MCP (and a future browser/WASM backend): the relational schema specs, the graph→SQL `materializeSql`, and the backend-neutral `Store` (read-only UX guard, capped JSON-safe results, graph traversal) over a `Connection` port. Zero `node:*`/DB-driver imports — the engine lives in a backend.                   |
-| `packages/mcp`       | MCP server over the stage-6 graph: a node-api `Connection` (`duckdb.ts`) builds a temp file-backed DuckDB and serves it through a READ_ONLY handle, then hands it to `@coach/store`; exposes read-only SQL + graph-traversal tools so an analyst agent drives its own analyses. Node-only (filesystem + native DuckDB). See "MCP query surface". |
-| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README.                                                                                                           |
-| `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                                                                                                                                   |
+| Package / dir        | Purpose                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                                                                                                                                                      |
+| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → analysis, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                                                                                                                                                       |
+| `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                                                                                                                                                             |
+| `packages/store`     | Pure query core shared by the MCP (and a future browser/WASM backend): the relational schema specs, the graph→SQL `materializeSql`, and the backend-neutral `Store` (read-only UX guard, capped JSON-safe results, graph traversal) over a `Connection` port. Zero `node:*`/DB-driver imports — the engine lives in a backend.                                                     |
+| `packages/mcp`       | MCP server over the stage-6 graph: a node-api `Connection` (`duckdb.ts`) builds a temp file-backed DuckDB and serves it through a READ_ONLY handle, then hands it to `@coach/store`; exposes read-only SQL + graph-traversal tools so an analyst agent drives its own analyses. Node-only (filesystem + native DuckDB). See "MCP query surface".                                   |
+| `packages/server`    | The app's HTTP backend: a thin `node:http` adapter exposing `/api/{load,view,query,subtree,causal}` over an in-memory dataset session (runs the pipeline on uploaded file contents; reuses `@coach/mcp`'s read-only DuckDB store). The app's data-source seam talks to these routes; a Service Worker can later answer the same routes locally. Node-only. See "App HTTP backend". |
+| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README.                                                                                                                                             |
+| `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                                                                                                                                                                     |
 
 ## Data flow
 
@@ -292,6 +293,25 @@ not a reshape.
 
 This is why stage 7 is "a function of the `ExecutionGraph` alone": the same derivation feeds the live
 pipeline, the app, and now this MCP — and the MCP's flexible SQL surface sits beside it, not over it.
+
+## App HTTP backend
+
+`@coach/server` is the browser app's backend — the server-first move that lets the app stop running
+the pipeline itself and instead **query a server**. It is a thin `node:http` adapter (`server.ts`)
+over pure route handlers (`routes.ts`) and an in-memory dataset session (`session.ts`):
+
+- **Routes.** `POST /api/load` (uploaded `{ files }` → runs the pipeline, rebuilds the read-only
+  store, holds the views), `GET /api/view` (the `VizResult[]` the renderer consumes — mirrors
+  `buildVizResults`, asserted by test so it can't drift), `POST /api/query` (read-only SQL),
+  `GET /api/subtree?id=…`, `GET /api/causal?id=…&direction=…`. Permissive CORS for local dev.
+- **Reuse, not reimplementation.** The session runs `runPipeline` on the uploaded file _contents_
+  (no disk) and builds the DuckDB store via `@coach/mcp`'s `createStore` — so read-only enforcement
+  and result caps come straight from `@coach/store`. Errors map to clean statuses: bad SQL → `400`
+  (never a `500` stacktrace), no dataset loaded → `409`, unknown route → `404`.
+- **The seam stays put.** The app depends only on these `/api/*` JSON shapes (`VizData` /
+  `QueryResult`), so a later Service Worker that answers the same routes via a `duckdb-wasm`
+  `Connection` is a base-URL flip, not a rewrite — the reason the pipeline + `materializeSql` stay
+  `no node:*`.
 
 ## Upload flow and the data-source seam
 

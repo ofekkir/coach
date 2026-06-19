@@ -9,6 +9,7 @@
     "packages/semantics": {},
     "packages/store": {},
     "packages/mcp": {},
+    "packages/server": {},
     "packages/app": {}
   }
 }
