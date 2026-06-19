@@ -12,10 +12,9 @@
 import { z, type ZodRawShape } from 'zod';
 import { resolve as resolveNode, type GraphAnalysis } from '@coach/pipeline';
 import { defaultSemanticsConfig } from '@coach/semantics';
+import { TABLES, type CausalDirection } from '@coach/store';
 import type { Session } from './session.ts';
-import type { CausalDirection } from './store.ts';
 import { EXAMPLE_QUERIES } from './examples.ts';
-import { TABLES } from './schema.ts';
 
 export interface Tool {
   readonly name: string;
@@ -107,7 +106,7 @@ function queryTool(session: Session): Tool {
   return {
     name: 'query',
     description:
-      'Run a read-only SQL query (a single SELECT or WITH statement) over the loaded execution-graph tables. Results are capped at 1000 rows. See describe_schema for the table/column reference.',
+      'Run a read-only SQL query (a single SELECT or WITH statement) over the loaded execution-graph tables. Results are capped (≤1000 rows and a serialized-byte budget; `truncated` flags when rows were dropped or long cells clipped). See describe_schema for the table/column reference.',
     inputShape: { sql: z.string().describe('A single SELECT/WITH statement.') },
     handle: (args) => session.store().query(stringArg(args, 'sql')),
   };

@@ -4,8 +4,9 @@
 // throw a clear message until something is loaded. Load-once / serve-many — one
 // dataset at a time, replaced on each load.
 
+import type { Store } from '@coach/store';
 import { loadDataset, type Dataset } from './load.ts';
-import { createStore, type Store } from './store.ts';
+import { createStore } from './store.ts';
 
 /** What `load_dataset` reports back: where it loaded from and how much it found. */
 export interface DatasetSummary {
