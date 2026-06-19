@@ -17,6 +17,7 @@
     "test": "pnpm -r test",
     "test:watch": "pnpm --filter @coach/pipeline test:watch",
     "e2e": "node --experimental-strip-types scripts/e2e.ts",
+    "mcp": "node --experimental-strip-types packages/mcp/bin/mcp.ts",
     "knip": "knip",
     "check:structure": "node --experimental-strip-types scripts/check-structure.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm knip && pnpm check:structure",
