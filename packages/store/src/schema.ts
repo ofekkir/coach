@@ -1,7 +1,8 @@
-// The relational schema the MCP exposes to an analyst agent. This is the SINGLE
-// SOURCE OF TRUTH: `store.ts` builds the DuckDB tables from `TABLES`, and the
-// `describe_schema` tool renders the very same specs — so the DDL the data lives
-// in and the schema the agent reads can never drift.
+// The relational schema the store exposes to an analyst agent. This is the SINGLE
+// SOURCE OF TRUTH: a backend builds the DuckDB tables from `TABLES` (via
+// `materialize.ts`), and the MCP's `describe_schema` tool renders the very same
+// specs — so the DDL the data lives in and the schema the agent reads can never
+// drift.
 //
 // The execution graph (stage 6) is already a normalized, id-keyed relational
 // model (see ARCHITECTURE.md); these tables are that model made queryable:

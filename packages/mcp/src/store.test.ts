@@ -1,7 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Store } from '@coach/store';
 import { loadDataset } from './load.ts';
-import { createStore, type Store } from './store.ts';
+import { createStore } from './store.ts';
 
 const FIXTURE = fileURLToPath(
   new URL('../../pipeline/fixtures/otel/fetch-website', import.meta.url),
@@ -64,5 +65,14 @@ describe('createStore', () => {
     await expect(store.query('DROP TABLE nodes')).rejects.toThrow();
     await expect(store.query('DELETE FROM nodes')).rejects.toThrow();
     await expect(store.query('SELECT 1; SELECT 2')).rejects.toThrow();
+  });
+
+  it('allows keywords that appear inside string literals (the engine is the boundary)', async () => {
+    const result = await store.query("SELECT 'pnpm install' AS cmd, 'DROP me' AS note");
+    expect(result.rows[0]?.cmd).toBe('pnpm install');
+  });
+
+  it('blocks filesystem access from inside a SELECT (external access disabled)', async () => {
+    await expect(store.query("SELECT * FROM read_csv('/etc/hosts')")).rejects.toThrow();
   });
 });
