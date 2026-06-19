@@ -10,7 +10,7 @@ Coach processes agent execution traces and renders them as an interactive causal
 The core thesis: harness-agnostic OTEL traces feed a pure data pipeline whose output can
 be reflected back to the agent (or its engineer) for improvement.
 
-The system is split into four packages plus a Node CLI layer:
+The system is split into five packages plus a Node CLI layer:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -37,13 +37,14 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Package layout
 
-| Package / dir        | Purpose                                                                                                                                                                                                                                |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                          |
-| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → analysis, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.           |
-| `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                 |
-| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README. |
-| `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                         |
+| Package / dir        | Purpose                                                                                                                                                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                            |
+| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → analysis, plus orchestration. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.             |
+| `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                   |
+| `packages/mcp`       | MCP server over the stage-6 graph: materializes it into in-memory DuckDB and exposes read-only SQL + graph-traversal tools so an analyst agent drives its own analyses. Node-only (filesystem + native DuckDB). See "MCP query surface". |
+| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README.   |
+| `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                           |
 
 ## Data flow
 
@@ -243,6 +244,44 @@ from `causalEdges`, `layout/parallel-place.ts` lays each as a centered row insid
 `PARALLEL LEVEL · ×N` band, and the slowest branch — the critical path — is the only one in accent.
 Long values (a pasted prompt, a tool instruction) clamp on the card and open in full in the details
 panel; the raw `canonical` node stays one click away in the JSON viewer.
+
+## MCP query surface
+
+Stage 7 (`analyzeGraph`) is a **curated, hardcoded** read of the graph — a fixed set of findings.
+`@coach/mcp` is the **flexible** counterpart: it exposes the same stage-6 `ExecutionGraph` as a
+queryable relational surface so an analyst agent composes its own analyses instead of being limited to
+the canned ones. This is the deliberate payoff of the normalized, id-keyed model — the graph "maps 1:1
+to a relational DB" (see the node-data/edge tables above), so making it queryable is a faithful load,
+not a reshape.
+
+- **Engine — in-memory DuckDB.** `materialize.ts` turns the graph into ordered `CREATE`/`INSERT`
+  statements driven entirely by the table specs in `schema.ts` (the single source of truth for both
+  the DDL **and** the `describe_schema` tool, so they cannot drift). Tables mirror the model: the three
+  id-keyed node-data layers (`nodes` / `deltas` / `semantics`), the two edge relations
+  (`containment` / `causal_edges`), `threads` (layout lanes), and the `agents` / `sessions` dimension
+  entities. The `nodes` table promotes common + type-specific columns and keeps the full raw node in a
+  `data` JSON column (the escape hatch for un-promoted fields). DuckDB was chosen over the workload
+  scale (tiny) — for JSON columns, analytical SQL, and recursive CTEs for the tree/DAG.
+- **Tools (`tools.ts`).** Seven, bound to a session (its current dataset): `load_dataset` (point it at
+  a directory — runs the pipeline and makes the graph queryable, replacing any prior dataset),
+  `describe_schema` (tables + column docs + the semantic ontology vocabulary + example queries,
+  including the stage-7 detectors written as SQL — works with nothing loaded), `query` (read-only single
+  SELECT/WITH, guarded in `store.ts` and capped at 1000 rows), `resolve` (hydrate a node id across all
+  three layers, reusing the pipeline's `resolve`), `subtree` and `causal_path` (traversal primitives
+  over the containment tree / causal DAG, so the agent never hand-writes recursive CTEs), and
+  `get_analysis` (the stage-7 `GraphAnalysis` verbatim, as one option among many — not the only way in).
+  Tools carry a Zod input shape; the MCP layer validates args.
+- **Session + loading (`session.ts`, `load.ts`, `server.ts`, `bin/mcp.ts`).** The server holds one
+  mutable session: the dataset currently loaded. `load_dataset` reads a directory's trace/native files
+  into the same `UploadedFile[]` the browser produces, runs the pipeline, and rebuilds the DuckDB store
+  (closing the previous one); data-bound tools read through `session.store()` / `session.dataset()`,
+  which throw a clear "call load_dataset first" message until something is loaded. `coach-mcp [dir]`
+  (root `pnpm mcp`) serves over stdio (`McpServer`) with an **optional** preload directory — omit it and
+  the agent loads at runtime. Load-once / serve-many, one dataset at a time. Diagnostics go to **stderr
+  only** — stdout is the JSON-RPC channel.
+
+This is why stage 7 is "a function of the `ExecutionGraph` alone": the same derivation feeds the live
+pipeline, the app, and now this MCP — and the MCP's flexible SQL surface sits beside it, not over it.
 
 ## Upload flow and the data-source seam
 

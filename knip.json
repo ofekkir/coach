@@ -7,6 +7,7 @@
     "packages/logger": {},
     "packages/pipeline": {},
     "packages/semantics": {},
+    "packages/mcp": {},
     "packages/app": {}
   }
 }
