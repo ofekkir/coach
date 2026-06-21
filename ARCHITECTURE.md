@@ -270,7 +270,13 @@ not a reshape.
   mirror the model: the three id-keyed node-data layers (`nodes` / `deltas` / `semantics`), the two
   edge relations (`containment` / `causal_edges`), `threads` (layout lanes), and the `agents` /
   `sessions` dimension entities. The `nodes` table promotes common + type-specific columns and keeps
-  the full raw node in a `data` JSON column (the escape hatch for un-promoted fields). This lives in the
+  the full raw node in a `data` JSON column (the escape hatch for un-promoted fields). Span timing is
+  exposed twice: the VARCHAR `start_time_ns`/`end_time_ns` are retained as the full-precision int64
+  nanosecond values (they overflow DOUBLE/JS `number`), alongside numeric `start_time`/`end_time`
+  **BIGINT** columns (the same digits emitted as bare integer literals — never round-tripped through a
+  JS number) for arithmetic and ordering. A dense `seq` INTEGER ranks every node within its owning
+  interaction by `start_time_ns` ascending (`0..n-1`, no gaps): `ORDER BY seq` == `ORDER BY
+start_time_ns`, a stable per-interaction timeline index. This lives in the
   pipeline because the graph→DB mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it.
 - **Query core — `@coach/mcp` (pure, backend-neutral).** Beside the engine, the MCP holds the analyst
   `Store` (`query-core.ts`): a UX guard (`guard.ts`) + capped, JSON-safe result shaping (`result.ts`) +

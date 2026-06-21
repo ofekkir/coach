@@ -14,7 +14,7 @@
 export interface ColumnSpec {
   readonly name: string;
   /** DuckDB column type. `JSON` columns are populated from a JS value via CAST. */
-  readonly sqlType: 'VARCHAR' | 'DOUBLE' | 'INTEGER' | 'JSON';
+  readonly sqlType: 'VARCHAR' | 'DOUBLE' | 'INTEGER' | 'BIGINT' | 'JSON';
   readonly doc: string;
 }
 
@@ -59,6 +59,12 @@ const NODES: TableSpec = {
       doc: 'Span start, nanoseconds. VARCHAR because the value overflows DOUBLE precision.',
     },
     { name: 'end_time_ns', sqlType: 'VARCHAR', doc: 'Span end, nanoseconds (VARCHAR).' },
+    // prettier-ignore
+    { name: 'start_time', sqlType: 'BIGINT', doc: 'Span start, ns — numeric form of start_time_ns (BIGINT holds the full int64). ORDER BY start_time == ORDER BY seq within an interaction.' },
+    // prettier-ignore
+    { name: 'end_time', sqlType: 'BIGINT', doc: 'Span end, ns — numeric form of end_time_ns (BIGINT).' },
+    // prettier-ignore
+    { name: 'seq', sqlType: 'INTEGER', doc: 'Dense 0..n-1 rank of this node within its owning interaction (every node sharing interaction_id), by start_time_ns ascending. ORDER BY seq == ORDER BY start_time_ns — a stable per-interaction timeline index.' },
     { name: 'duration_ms', sqlType: 'DOUBLE', doc: 'Span wall-clock in ms.' },
     { name: 'model', sqlType: 'VARCHAR', doc: 'llm_request: model id.' },
     {
