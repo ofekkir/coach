@@ -11,6 +11,9 @@ importers:
       '@coach/logger':
         specifier: workspace:*
         version: link:packages/logger
+      '@coach/mcp':
+        specifier: workspace:*
+        version: link:packages/mcp
       '@coach/pipeline':
         specifier: workspace:*
         version: link:packages/pipeline

@@ -8,7 +8,8 @@
   },
   "bin": {
     "coach-mcp": "./bin/mcp.ts",
-    "coach-build-db": "./bin/build-db.ts"
+    "coach-build-db": "./bin/build-db.ts",
+    "coach-viz": "./bin/viz.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
