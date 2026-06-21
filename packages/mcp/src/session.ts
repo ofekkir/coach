@@ -1,12 +1,18 @@
 // The server's mutable state: the one dataset currently loaded. `load_dataset`
-// swaps it (running the pipeline over a directory and rebuilding the DuckDB
-// store); every data-bound tool reads through `dataset()` / `store()`, which
+// swaps it; every data-bound tool reads through `dataset()` / `store()`, which
 // throw a clear message until something is loaded. Load-once / serve-many — one
-// dataset at a time, replaced on each load.
+// dataset at a time, replaced on each load. A path is loaded one of two ways:
+//   *.db   — a pre-built coach DB, opened UNTOUCHED (no pipeline); graph recovered
+//            from `_coach_meta`, analysis recomputed (cheap) for the graph tools.
+//   a dir  — trace/native files run through the pipeline, then materialized.
 
+import { analyzeGraph } from '@coach/pipeline';
 import type { Store } from '@coach/store';
 import { loadDataset, type Dataset } from './load.ts';
+import { openPersistedStore } from './duckdb.ts';
 import { createStore } from './store.ts';
+
+const DB_SUFFIX = '.db';
 
 /** What `load_dataset` reports back: where it loaded from and how much it found. */
 export interface DatasetSummary {
@@ -18,8 +24,9 @@ export interface DatasetSummary {
 }
 
 export interface Session {
-  /** Run the pipeline over `dir` and make the resulting graph queryable. */
-  load(dir: string): Promise<DatasetSummary>;
+  /** Make a dataset queryable: a `.db` is opened untouched; a directory is run
+   *  through the pipeline first. */
+  load(path: string): Promise<DatasetSummary>;
   dataset(): Dataset;
   store(): Store;
   close(): void;
@@ -36,7 +43,22 @@ function summarize(dir: string, dataset: Dataset): DatasetSummary {
   };
 }
 
-const NOT_LOADED = 'no dataset loaded — call load_dataset with a directory path first';
+const NOT_LOADED = 'no dataset loaded — call load_dataset with a directory or a .db path first';
+
+interface Loaded {
+  readonly dataset: Dataset;
+  readonly store: Store;
+}
+
+async function loadFromDb(path: string): Promise<Loaded> {
+  const { store, graph } = await openPersistedStore(path);
+  return { dataset: { graph, analysis: analyzeGraph(graph) }, store };
+}
+
+async function loadFromDir(path: string): Promise<Loaded> {
+  const dataset = loadDataset(path);
+  return { dataset, store: await createStore(dataset.graph) };
+}
 
 /** Creates an empty session. Tools bind to this; `load` populates it. */
 export function createSession(): Session {
@@ -48,12 +70,13 @@ export function createSession(): Session {
   }
 
   return {
-    load: async (dir) => {
-      const dataset = loadDataset(dir);
-      const store = await createStore(dataset.graph);
+    load: async (path) => {
+      const { dataset, store } = path.endsWith(DB_SUFFIX)
+        ? await loadFromDb(path)
+        : await loadFromDir(path);
       current?.store.close();
-      current = { dir, dataset, store };
-      return summarize(dir, dataset);
+      current = { dir: path, dataset, store };
+      return summarize(path, dataset);
     },
     dataset: () => require().dataset,
     store: () => require().store,

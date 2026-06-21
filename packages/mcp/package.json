@@ -7,7 +7,8 @@
     ".": "./src/index.ts"
   },
   "bin": {
-    "coach-mcp": "./bin/mcp.ts"
+    "coach-mcp": "./bin/mcp.ts",
+    "coach-build-db": "./bin/build-db.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

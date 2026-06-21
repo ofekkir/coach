@@ -265,12 +265,20 @@ not a reshape.
   holds the analyst `Store` (a UX guard + capped, JSON-safe result shaping + traversal SQL) over a
   `Connection` port — no `node:*` or DB driver, so the same core will later serve a browser/WASM
   backend unchanged.
-- **Engine — DuckDB (read-only boundary).** `@coach/mcp`'s `duckdb.ts` is the node-api `Connection`:
-  it materializes the graph into a **temp file-backed** DuckDB (writable), then serves queries through
-  a `READ_ONLY` handle with `enable_external_access=false` + `lock_configuration=true` (the temp DB is
-  removed on `close()`). The **engine** is the read-only boundary — there is no keyword blocklist; the
-  `Store`'s guard only rejects non-`SELECT`/multi-statement input for a friendly error. DuckDB was
-  chosen over the workload scale (tiny) — for JSON columns, analytical SQL, and recursive CTEs.
+- **Engine — DuckDB (read-only boundary).** `@coach/mcp`'s `duckdb.ts` is the node-api layer, two ways
+  in: `createDuckDbConnection(graph)` materializes the graph into a **temp** DuckDB (removed on close),
+  and `openPersistedStore(dbPath)` opens a **pre-built coach DB file untouched** — no pipeline, no
+  materialize. Either way queries run through a `READ_ONLY` handle with `enable_external_access=false`
+  - `lock_configuration=true`. The **engine** is the read-only boundary — there is no keyword
+    blocklist; the `Store`'s guard only rejects non-`SELECT`/multi-statement input for a friendly error.
+    DuckDB was chosen over the workload scale (tiny) — for JSON columns, analytical SQL, and recursive
+    CTEs.
+- **Shippable DB artifact (`coach-build-db`).** `writePersistedDb(graph, dbPath)` materializes a stage-6
+  graph into a self-contained, queryable `.db` that **also carries the enriched graph** in a
+  `_coach_meta` table — so a loader recovers it for the graph-shaped tools (`resolve` / `get_analysis`)
+  and the visualization without re-running anything. `coach-build-db <traces-dir> [out.db]` (root
+  `pnpm build-db`) is the populate step: pipeline in, DB out. The browser can't read a `.db`, which is
+  why the graph rides inside it — one artifact feeds both the MCP's SQL and the viz.
 - **Tools (`tools.ts`).** Seven, bound to a session (its current dataset): `load_dataset` (point it at
   a directory — runs the pipeline and makes the graph queryable, replacing any prior dataset),
   `describe_schema` (tables + column docs + the semantic ontology vocabulary + example queries,
@@ -282,10 +290,12 @@ not a reshape.
   `get_analysis` (the stage-7 `GraphAnalysis` verbatim, as one option among many — not the only way in).
   Tools carry a Zod input shape; the MCP layer validates args.
 - **Session + loading (`session.ts`, `load.ts`, `server.ts`, `bin/mcp.ts`).** The server holds one
-  mutable session: the dataset currently loaded. `load_dataset` reads a directory's trace/native files
-  into the same `UploadedFile[]` the browser produces, runs the pipeline, and rebuilds the DuckDB store
-  (closing the previous one); data-bound tools read through `session.store()` / `session.dataset()`,
-  which throw a clear "call load_dataset first" message until something is loaded. `coach-mcp [dir]`
+  mutable session: the dataset currently loaded. `load_dataset` takes either a **`.db`** (opened
+  untouched via `openPersistedStore`, graph recovered from `_coach_meta`, analysis recomputed) or a
+  **directory** of trace/native files (read into the same `UploadedFile[]` the browser produces, run
+  through the pipeline, materialized). Either way it rebuilds the store (closing the previous one);
+  data-bound tools read through `session.store()` / `session.dataset()`, which throw a clear "call
+  load_dataset first" message until something is loaded. `coach-mcp [dir]`
   (root `pnpm mcp`) serves over stdio (`McpServer`) with an **optional** preload directory — omit it and
   the agent loads at runtime. Load-once / serve-many, one dataset at a time. Diagnostics go to **stderr
   only** — stdout is the JSON-RPC channel.

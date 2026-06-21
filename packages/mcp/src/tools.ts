@@ -84,9 +84,11 @@ function loadDatasetTool(session: Session): Tool {
   return {
     name: 'load_dataset',
     description:
-      'Load a dataset directory (OTEL Tempo traces and/or native session .jsonl logs). Runs the full pipeline over the files and makes the resulting execution graph queryable, replacing any previously loaded dataset. Returns a summary (counts). Call this before querying unless a dataset was preloaded at startup.',
+      'Load a dataset and make it queryable, replacing any previously loaded one. Pass either a pre-built coach DuckDB file (`*.db`, opened untouched — no pipeline run) or a directory of OTEL Tempo traces / native session .jsonl logs (run through the full pipeline). Returns a summary (counts). Call this before querying unless a dataset was preloaded at startup.',
     inputShape: {
-      path: z.string().describe('Absolute path to a directory of trace/native files.'),
+      path: z
+        .string()
+        .describe('Absolute path to a pre-built `.db` file or a directory of trace/native files.'),
     },
     handle: (args) => session.load(stringArg(args, 'path')),
   };
