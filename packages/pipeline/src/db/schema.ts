@@ -99,6 +99,20 @@ const THREADS: TableSpec = {
   ],
 };
 
+const TRANSITIONS: TableSpec = {
+  name: 'transitions',
+  doc: "Adjacent tool→tool action pairs within an interaction, ordered by `seq` (same ordering as nodes.seq). One row per adjacent tool pair → exactly tool_count−1 rows per interaction (0 when ≤1 tool). ADJACENCY, NOT causality: a row means 'this tool ran immediately after that one', NOT that it was triggered by it (causality lives in causal_edges). GROUP BY (from_action, to_action) for the action-flow histogram (e.g. explore→edit, edit→verify).",
+  columns: [
+    { name: 'interaction_id', sqlType: 'VARCHAR', doc: 'FK → owning interaction node id.' },
+    // prettier-ignore
+    { name: 'from_seq', sqlType: 'INTEGER', doc: 'nodes.seq of the source (earlier) tool node — join back to nodes on (interaction_id, seq).' },
+    // prettier-ignore
+    { name: 'from_action', sqlType: 'VARCHAR', doc: "Closed `action` bucket of the source tool ('explore'|'author'|'edit'|'run'|'test'|'verify'|'vcs'|'setup'|'mcp'|'research'|'delegate'|'plan'|'other')." },
+    // prettier-ignore
+    { name: 'to_action', sqlType: 'VARCHAR', doc: 'Closed `action` bucket of the next tool (same closed enum as from_action).' },
+  ],
+};
+
 const AGENTS: TableSpec = {
   name: 'agents',
   doc: 'The agent dimension entity — a FK target, never a node. Single-agent today.',
@@ -196,6 +210,7 @@ export const TABLES: readonly TableSpec[] = [
   CONTAINMENT,
   CAUSAL_EDGES,
   THREADS,
+  TRANSITIONS,
   AGENTS,
   SESSIONS,
   INTERACTION_METRICS,

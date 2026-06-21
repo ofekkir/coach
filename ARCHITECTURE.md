@@ -314,8 +314,8 @@ not a reshape.
   ordered `CREATE`/`INSERT` statements driven entirely by the table specs in `db/schema.ts` (the single
   source of truth for both the DDL **and** the `describe_schema` tool, so they cannot drift). Tables
   mirror the model: the three id-keyed node-data layers (`nodes` / `deltas` / `semantics`), the two
-  edge relations (`containment` / `causal_edges`), `threads` (layout lanes), and the `agents` /
-  `sessions` dimension entities. The `nodes` table promotes common + type-specific columns and keeps
+  edge relations (`containment` / `causal_edges`), `threads` (layout lanes), `transitions` (a derived
+  tool→tool adjacency rollup by `seq`, not causal), and the `agents` / `sessions` dimension entities. The `nodes` table promotes common + type-specific columns and keeps
   the full raw node in a `data` JSON column (the escape hatch for un-promoted fields). Span timing is
   exposed twice: the VARCHAR `start_time_ns`/`end_time_ns` are retained as the full-precision int64
   nanosecond values (they overflow DOUBLE/JS `number`), alongside numeric `start_time`/`end_time`
@@ -331,12 +331,19 @@ start_time_ns`, a stable per-interaction timeline index. The `sessions` dimensio
   to `<rest>`, else makes the path relative to the session's (worktree-normalized) `cwd`; the result
   never contains `/.claude/worktrees/` and never has a leading `/`. No hard-coded prefix. This lives in
   the pipeline because the graph→DB mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it.
-  Beside those base tables sits one **derived rollup**, `interaction_metrics` (`db/interaction-metrics.ts`):
-  one row per interaction where **every value is a pure aggregate over that interaction's `nodes` rows**
-  (`prompt_len`, `tool_count`/`llm_count`/`error_count`/`distinct_files`, summed `tokens_in`/`tokens_out`/`cost_usd`,
-  `duration_ms`, seq-ordered `first_action`/`last_action`, and `shape` = `'agentic'` iff `tool_count>0` else
-  `'direct'`). It is a flat lookup for the common per-turn aggregates, never a new source of truth — an
-  equality invariant (`db/interaction-metrics.test.ts`) recomputes each metric from `nodes` and asserts it matches.
+  Beside those base tables sit two **derived rollups** (pure aggregates, never new sources of truth).
+  `interaction_metrics` (`db/interaction-metrics.ts`): one row per interaction where **every value is a
+  pure aggregate over that interaction's `nodes` rows** (`prompt_len`, `tool_count`/`llm_count`/
+  `error_count`/`distinct_files`, summed `tokens_in`/`tokens_out`/`cost_usd`, `duration_ms`, seq-ordered
+  `first_action`/`last_action`, and `shape` = `'agentic'` iff `tool_count>0` else `'direct'`) — a flat
+  lookup for the common per-turn aggregates, with an equality invariant (`db/interaction-metrics.test.ts`)
+  that recomputes each metric from `nodes` and asserts it matches.
+  `transitions` (`db/transitions.ts`) rolls up tool→tool ADJACENCY by `seq`: for each interaction it
+  orders the TOOL nodes by the same `seq` the `nodes` table uses and emits one row per adjacent pair
+  (`interaction_id, from_seq, from_action, to_action`, actions from the closed `action` enum) — exactly
+  `tool_count − 1` rows per interaction (never negative). This is time-order adjacency, NOT causality
+  (causality lives in `causal_edges`); `GROUP BY (from_action, to_action)` gives the action-flow
+  histogram (e.g. `explore→edit`, `edit→verify`).
 - **Query core — `@coach/mcp` (pure, backend-neutral).** Beside the engine, the MCP holds the analyst
   `Store` (`query-core.ts`): a UX guard (`guard.ts`) + capped, JSON-safe result shaping (`result.ts`) +
   traversal SQL over a `Connection` port — no `node:*` or DB driver, so the same core could later serve

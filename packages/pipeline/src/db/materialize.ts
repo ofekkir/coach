@@ -11,6 +11,7 @@ import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
 import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
 import { seqByNodeId } from './seq.ts';
+import { buildTransitions } from './transitions.ts';
 import { filePathFromToolInput, normalizeRepoPath } from './repo-path.ts';
 import { buildInteractionMetrics } from './interaction-metrics.ts';
 
@@ -203,6 +204,7 @@ export function buildRecords(graph: ExecutionGraph): Record<string, Record<strin
       i.causalEdges.map((e) => ({ from_id: e.fromId, to_id: e.toId, gap_ms: e.gapMs })),
     ),
     threads: interactions.flatMap(threadRecords),
+    transitions: buildTransitions(graph),
     agents: agents.map((a) => ({ id: a.id, user_id: a.userId })),
     sessions: sessions.map((s) => ({
       id: s.id,
