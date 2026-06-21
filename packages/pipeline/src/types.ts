@@ -115,6 +115,8 @@ export interface Session {
   readonly userId: string;
   readonly sessionId: string; // the harness's own session id
   readonly title?: string;
+  readonly cwd?: string; // working directory the session ran in (native only)
+  readonly branch?: string; // git branch the session ran on (native only)
 }
 
 /** The `Agent` entity id for a user. The single id namespace shared everywhere. */
@@ -187,6 +189,8 @@ export interface InteractionNode extends SpannedNode {
   user_id: string;
   sequence: number;
   prompt: string;
+  cwd?: string; // working directory; native only (carried up to the Session entity)
+  branch?: string; // git branch; native only (carried up to the Session entity)
 }
 
 export interface LlmRequestNode extends SpannedNode {

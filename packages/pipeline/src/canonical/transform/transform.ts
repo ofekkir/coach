@@ -61,7 +61,7 @@ function buildInteractionNode(
   parent: string | null,
   sessionId: string,
 ): InteractionNode {
-  return {
+  const node: InteractionNode = {
     ...nodeBase(span, parent, sessionId),
     type: 'interaction',
     session_id: require(span.sessionId, span.id, 'session.id'),
@@ -69,6 +69,9 @@ function buildInteractionNode(
     prompt: require(span.userPrompt, span.id, 'user_prompt'),
     user_id: require(span.userId, span.id, 'user.id'),
   };
+  if (span.cwd != null) node.cwd = span.cwd;
+  if (span.branch != null) node.branch = span.branch;
+  return node;
 }
 
 function applyRequestBody(node: LlmRequestNode, rawRequestBody: string, repair: boolean): void {
