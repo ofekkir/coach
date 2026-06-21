@@ -4,6 +4,7 @@
 // Node CLI and the browser app.
 
 export { defaultSemanticsConfig } from './defaults.ts';
+export { ACTIONS, classifyAction, type Action } from './action.ts';
 export { assembleSemanticsConfig, actionLabel, objectLabel, strField, isRecord } from './config.ts';
 export type {
   AgentSemantics,

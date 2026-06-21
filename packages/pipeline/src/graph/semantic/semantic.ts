@@ -6,7 +6,13 @@ import type {
   ToolNode,
 } from '../../types.ts';
 import type { ExecutionGraph } from '../types.ts';
-import { actionLabel, type SemanticsConfig } from '@coach/semantics';
+import {
+  actionLabel,
+  classifyAction,
+  strField,
+  type Action,
+  type SemanticsConfig,
+} from '@coach/semantics';
 import {
   markerLabel,
   parseToolInput,
@@ -53,6 +59,14 @@ function inferenceFields(
   return { what: [node.model] };
 }
 
+/** The closed `action` bucket for a tool node. Reads the Bash command inline from
+ *  the tool input (the raw source item 4 will later promote to its own column);
+ *  every tool node yields a non-NULL action. Distinct from `semantics.what`. */
+function toolAction(node: ToolNode): Action {
+  const command = strField(parseToolInput(node.tool_input), 'command');
+  return classifyAction(node.name, command === '' ? undefined : command);
+}
+
 function toolFields(node: ToolNode, config: SemanticsConfig): SemanticFields {
   const input = parseToolInput(node.tool_input);
   const comment = toolComment(config, node.name, input);
@@ -75,20 +89,24 @@ function semanticFieldsOf(
 // ── Public entry point ────────────────────────────────────────────────────────
 
 /**
- * Enriches an ExecutionGraph by populating its `semantics` table: one row per
- * relabeled (`tool` / `llm_request`) node, keyed by node id. Pure and
- * deterministic — every label comes from the injected SemanticsConfig. The node
- * table, deltas, edges and entities are returned unchanged; only `semantics` is
- * (re)built.
+ * Enriches an ExecutionGraph by populating its `semantics` table (one sparse row
+ * per relabeled `tool` / `llm_request` node) and its `actions` table (one closed
+ * `action` bucket per `tool` node — dense over tool nodes, never NULL). Both are
+ * keyed by node id; `action` is the coarse closed dimension, distinct from the
+ * free-form `semantics.what`. Pure and deterministic — labels come from the
+ * injected SemanticsConfig, actions from `(name, bash command)` alone. The node
+ * table, deltas, edges and entities are returned unchanged.
  */
 export function enrichExecutionGraph(
   graph: ExecutionGraph,
   config: SemanticsConfig,
 ): ExecutionGraph {
   const semantics: Record<string, SemanticFields> = {};
+  const actions: Record<string, Action> = {};
   for (const [id, node] of Object.entries(graph.nodes)) {
+    if (node.type === 'tool') actions[id] = toolAction(node);
     const fields = semanticFieldsOf(node, graph.deltas[id], config);
     if (fields != null) semantics[id] = fields;
   }
-  return { ...graph, semantics };
+  return { ...graph, semantics, actions };
 }

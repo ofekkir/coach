@@ -149,5 +149,12 @@ export function buildExecutionGraph(agentGraph: AgentGraph): ExecutionGraph {
     ),
   };
 
-  return { kind: 'agent', data, nodes: state.nodes, deltas: state.deltas, semantics: {} };
+  return {
+    kind: 'agent',
+    data,
+    nodes: state.nodes,
+    deltas: state.deltas,
+    semantics: {},
+    actions: {},
+  };
 }

@@ -5,6 +5,7 @@
 // Records are sparse: a column absent from a record serializes to NULL, so each
 // builder only sets the columns its node/edge type actually has.
 
+import type { Action } from '@coach/semantics';
 import type { Agent, CanonicalNode, Session } from '../types.ts';
 import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
@@ -72,7 +73,7 @@ function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
   };
 }
 
-function typeNodeRecord(node: CanonicalNode): Record<string, unknown> {
+function typeNodeRecord(node: CanonicalNode, action: Action | undefined): Record<string, unknown> {
   if (node.type === 'llm_request')
     return {
       model: node.model,
@@ -83,14 +84,22 @@ function typeNodeRecord(node: CanonicalNode): Record<string, unknown> {
       cost_usd: node.cost_usd,
     };
   if (node.type === 'tool')
-    return { name: node.name, tool_use_id: node.tool_use_id, tool_input: node.tool_input };
+    return {
+      name: node.name,
+      tool_use_id: node.tool_use_id,
+      tool_input: node.tool_input,
+      action: action ?? 'other',
+    };
   if (node.type === 'hook') return { name: node.name };
   if (node.type === 'interaction') return { sequence: node.sequence, prompt: node.prompt };
   return {};
 }
 
-function nodeRecord(node: CanonicalNode): Record<string, unknown> {
-  return { ...baseNodeRecord(node), ...typeNodeRecord(node) };
+function nodeRecord(
+  node: CanonicalNode,
+  actions: Readonly<Record<string, Action>>,
+): Record<string, unknown> {
+  return { ...baseNodeRecord(node), ...typeNodeRecord(node, actions[node.id]) };
 }
 
 interface GraphStructure {
@@ -131,7 +140,7 @@ function buildRecords(graph: ExecutionGraph): Record<string, Record<string, unkn
   const nodes = Object.values(graph.nodes);
   const { agents, sessions, interactions } = collectStructure(graph);
   return {
-    nodes: nodes.map(nodeRecord),
+    nodes: nodes.map((node) => nodeRecord(node, graph.actions)),
     deltas: Object.entries(graph.deltas).map(([id, d]) => ({
       id,
       request_messages_delta: d.requestMessagesDelta,

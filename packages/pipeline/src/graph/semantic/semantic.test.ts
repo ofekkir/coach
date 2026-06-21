@@ -75,6 +75,14 @@ describe('enrichExecutionGraph', () => {
     });
   });
 
+  it('derives a closed action for every tool node (here: pnpm test → test)', () => {
+    const enriched = enrich([interaction, llm1, tool1]);
+    expect(enriched.actions.tool1).toBe('test');
+    // non-tool nodes get no action row
+    expect(enriched.actions.llm1).toBeUndefined();
+    expect(enriched.actions.inter).toBeUndefined();
+  });
+
   it('leaves the non-relabeled interaction node without a semantics row', () => {
     const enriched = enrich([interaction, llm1, tool1]);
     expect(semanticsOf(enriched, 'inter')).toBeUndefined();

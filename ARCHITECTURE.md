@@ -63,12 +63,20 @@ later drop-in with no reshaping. Three concerns are kept strictly separate:
 - **Node data is additive per stage, keyed by a shared node id.** Three id-keyed tables hang off the
   `ExecutionGraph`: `nodes` (stage 3 canonical data — the value type is `CanonicalNode`), `deltas`
   (stage 5 — per-`llm_request` `requestMessagesDelta` / `responseMessagesDelta`, the messages new to
-  that step vs. the previous request in the same thread), and `semantics` (stage 6 — per-node `what`
-  plus an optional `comment`). `node.id == data.id` across every layer (1:1 joins). A node "points
+  that step vs. the previous request in the same thread), `semantics` (stage 6 — per-node `what`
+  plus an optional `comment`), and `actions` (stage 6 — one **closed `action`** per tool node).
+  `node.id == data.id` across every layer (1:1 joins). A node "points
   to" its data **by id, resolved through a table** (`nodeData` / `deltasOf` / `semanticsOf` /
   `resolve`) — never an embedded object, so nothing re-duplicates on serialize/DB. There is **no
   `action`/`inference` node type**: "is this node enriched?" is answered by "does a `semantics[id]`
   row exist".
+- **`action` is a closed activity dimension, distinct from the free-form `semantics.what`.** `what`
+  is rich, ordered, open-ended human-readable phrasing; `action` is a single value from a small fixed
+  enum (`explore|author|edit|run|test|verify|vcs|setup|mcp|research|delegate|plan|other`, defined in
+  `@coach/semantics`) so the store can `GROUP BY action` for stable, comparable counts. It is derived
+  deterministically by `classifyAction(name, bashCommand?)` (no LLM, no config) in stage 6 for
+  **every** tool node — never NULL — and surfaces as the non-NULL `nodes.action` column. The Bash
+  command is read inline from the tool input today; item 4 will later promote it to its own column.
 - **Edges are two different relations over the same nodes.** _Containment_ ("child is contained in
   time by parent") is the `parent` self-FK, surfaced per interaction as `tree` (an id-only
   `ExecutionNode` = `{ id, children }`). _Causal_ ("effect triggered by cause") is its own DAG edge
@@ -204,7 +212,8 @@ generic `respond` act; a weak-model labeler that classified that act more finely
 reintroducing it. The interpreter (`graph/semantic`) is agent-agnostic, so a different domain/agent is
 a config swap, not a code change. See `packages/semantics/README.md` for the resolution order and
 what is deliberately out of scope (composition/inference roll-up). Enrichment writes into the
-`semantics` table (one row per relabeled node) and leaves the `nodes`/`deltas`/edges untouched — the
+`semantics` table (one row per relabeled node) and the `actions` table (one closed `action` per tool
+node, derived by `classifyAction`), and leaves the `nodes`/`deltas`/edges untouched — the
 old copied twin types (`ActionNode`/`InferenceNode`) are retired.
 
 All sessions roll up under one agent into a single execution graph, and sessions are navigated by
