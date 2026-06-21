@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runPipeline } from '../orchestrate.ts';
-import type { UploadedFile } from '../types.ts';
+import type { CanonicalNode, UploadedFile } from '../types.ts';
+import type { ExecutionGraph } from '../graph/types.ts';
 import { buildRecords, materializeSql } from './materialize.ts';
 import { normalizeRepoPath } from './repo-path.ts';
 
@@ -156,5 +157,85 @@ describe('sessions cwd/branch + nodes.repo_path columns', () => {
       expect(row.repo_path as string).not.toContain('/.claude/worktrees/');
       expect((row.repo_path as string).startsWith('/')).toBe(false);
     }
+  });
+});
+
+// ── cost_usd derivation (native logs carry no cost) ──────────────────────────────
+
+function llmRows(): Record<string, unknown>[] {
+  return nodeRows().filter((r) => r.type === 'llm_request');
+}
+
+describe('cost_usd derivation', () => {
+  it('derives a non-NULL cost_usd for native llm_requests (known model + tokens, no traced cost)', () => {
+    const rows = llmRows();
+    expect(rows.length).toBeGreaterThan(0);
+    // The native fixture uses claude-sonnet-4-6 (priced) and carries no cost_usd.
+    for (const row of rows) {
+      expect(row.model).toBe('claude-sonnet-4-6');
+      expect(typeof row.cost_usd).toBe('number');
+      expect(row.cost_usd).not.toBeNull();
+    }
+  });
+
+  it('INVARIANT: no known-model + tokens row has a NULL cost_usd', () => {
+    const KNOWN_MODELS = new Set(['claude-sonnet-4-6', 'claude-opus-4-8', 'claude-haiku-4-5']);
+    const offenders = llmRows().filter(
+      (r) =>
+        typeof r.model === 'string' &&
+        KNOWN_MODELS.has(r.model) &&
+        typeof r.tokens_in === 'number' &&
+        typeof r.tokens_out === 'number' &&
+        r.cost_usd == null,
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('leaves cost_usd NULL for an unknown model and does not throw', () => {
+    const node: CanonicalNode = {
+      id: 'llm-unknown',
+      type: 'llm_request',
+      sessionId: 'session-s',
+      interactionId: 'i',
+      model: 'some-unknown-model',
+      tokens_in: 1000,
+      tokens_out: 500,
+      start_time_ns: '0',
+      end_time_ns: '1',
+      duration_ms: 1,
+    };
+    const graph: ExecutionGraph = {
+      kind: 'interaction',
+      data: null,
+      nodes: { [node.id]: node },
+      deltas: {},
+      semantics: {},
+      actions: {},
+      intents: {},
+    };
+    // cost_usd is read straight off the node (no traced cost, unknown model → undefined → NULL).
+    const records = buildRecords(graph);
+    const row = (records.nodes ?? []).find((r) => r.id === 'llm-unknown');
+    expect(row?.cost_usd).toBeUndefined();
+  });
+});
+
+// ── intent_category (interaction-level) ──────────────────────────────────────────
+
+describe('intent_category', () => {
+  it('INVARIANT: 100% non-NULL on every interaction row', () => {
+    const interactions = nodeRows().filter((r) => r.type === 'interaction');
+    expect(interactions.length).toBeGreaterThan(0);
+    for (const row of interactions) {
+      expect(row.intent_category).not.toBeNull();
+      expect(typeof row.intent_category).toBe('string');
+    }
+  });
+
+  it('declares the intent_category column in the DDL', () => {
+    const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
+    const { enrichedGraph } = runPipeline(files);
+    const sql = materializeSql(enrichedGraph);
+    expect(sql.some((s) => s.includes('intent_category VARCHAR'))).toBe(true);
   });
 });

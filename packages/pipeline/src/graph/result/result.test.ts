@@ -96,6 +96,7 @@ function graphWith(nodes: readonly CanonicalNode[], inferenceId: string): Execut
     },
     semantics: {},
     actions: {},
+    intents: {},
   };
 }
 
@@ -147,6 +148,7 @@ describe('matchToolResults', () => {
       },
       semantics: {},
       actions: {},
+      intents: {},
     };
     const out = matchToolResults(graph).graph.nodes['n-1'] as ToolNode;
     expect(out.result_summary?.length).toBeLessThanOrEqual(500);

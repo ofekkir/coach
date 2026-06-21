@@ -103,6 +103,8 @@ const NODES: TableSpec = {
     },
     // prettier-ignore
     { name: 'repo_path', sqlType: 'VARCHAR', doc: "tool: repo-relative file path derived from tool_input (Read/Edit/Write/etc). Worktree-normalized — a path under …/.claude/worktrees/<id>/<rest> collapses to <rest>, so the same file under two worktrees yields ONE repo_path. Never contains '/.claude/worktrees/' and never has a leading '/'. NULL when the tool input carries no file path." },
+    // prettier-ignore
+    { name: 'intent_category', sqlType: 'VARCHAR', doc: "interaction: closed intent bucket, NON-NULL for every interaction node — 'debug'|'feature'|'refactor'|'explain'|'test'|'ops'|'research'|'other'. Deterministically derived from the prompt by the stage-6 labeler; GROUP BY it for stable per-intent counts. NULL for non-interaction nodes." },
     {
       name: 'data',
       sqlType: 'JSON',

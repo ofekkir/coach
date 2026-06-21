@@ -5,7 +5,7 @@
 // Records are sparse: a column absent from a record serializes to NULL, so each
 // builder only sets the columns its node/edge type actually has.
 
-import type { Action } from '@coach/semantics';
+import type { Action, IntentCategory } from '@coach/semantics';
 import type { Agent, CanonicalNode, Session } from '../types.ts';
 import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
@@ -98,6 +98,7 @@ function typeNodeRecord(
   node: CanonicalNode,
   action: Action | undefined,
   cwd: string | undefined,
+  intent: IntentCategory | undefined,
 ): Record<string, unknown> {
   if (node.type === 'llm_request')
     return {
@@ -124,19 +125,21 @@ function typeNodeRecord(
     };
   }
   if (node.type === 'hook') return { name: node.name };
-  if (node.type === 'interaction') return { sequence: node.sequence, prompt: node.prompt };
+  if (node.type === 'interaction')
+    return { sequence: node.sequence, prompt: node.prompt, intent_category: intent ?? 'other' };
   return {};
 }
 
 function nodeRecord(
   node: CanonicalNode,
   actions: Readonly<Record<string, Action>>,
+  intents: Readonly<Record<string, IntentCategory>>,
   seq: Map<string, number>,
   cwdBySession: ReadonlyMap<string, string | undefined>,
 ): Record<string, unknown> {
   return {
     ...baseNodeRecord(node),
-    ...typeNodeRecord(node, actions[node.id], cwdBySession.get(node.sessionId)),
+    ...typeNodeRecord(node, actions[node.id], cwdBySession.get(node.sessionId), intents[node.id]),
     seq: seq.get(node.id),
   };
 }
@@ -181,7 +184,7 @@ export function buildRecords(graph: ExecutionGraph): Record<string, Record<strin
   const seq = seqByNodeId(nodes);
   const cwdBySession = new Map(sessions.map((s) => [s.id, s.cwd]));
   return {
-    nodes: nodes.map((node) => nodeRecord(node, graph.actions, seq, cwdBySession)),
+    nodes: nodes.map((node) => nodeRecord(node, graph.actions, graph.intents, seq, cwdBySession)),
     deltas: Object.entries(graph.deltas).map(([id, d]) => ({
       id,
       request_messages_delta: d.requestMessagesDelta,
