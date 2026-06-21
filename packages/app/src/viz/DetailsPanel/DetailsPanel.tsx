@@ -1,10 +1,12 @@
-import { useState } from 'react';
 import type { ResolvedNode } from '@coach/pipeline';
-import { fonts, tokens } from '../theme.ts';
+import { useState } from 'react';
+
 import { formatMetrics, type NodeCard } from '../format/format.ts';
 import type { HiddenSubCall } from '../layout/types.ts';
-import { isActionType, panelBody } from './sections.tsx';
+import { fonts, tokens } from '../theme.ts';
+
 import { panelFooter, panelHeader } from './chrome.tsx';
+import { isActionType, panelBody } from './sections.tsx';
 
 // The flattened view fed to the raw JSON viewer: the node row with its semantic
 // overlay and message deltas merged in (the shape a single DB join would yield).

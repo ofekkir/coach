@@ -1,6 +1,8 @@
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import type { Store } from '@coach/store';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { loadDataset } from './load.ts';
 import { createStore } from './store.ts';
 

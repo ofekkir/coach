@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { aggregate } from './aggregate.ts';
+
 import type { CanonicalNode } from '../types.ts';
+
+import { aggregate } from './aggregate.ts';
 
 // A minimal interaction → tool → nested inference chain, so the parent closure has
 // to climb two levels to reach the interaction root.

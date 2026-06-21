@@ -1,4 +1,5 @@
 import type { UploadedFile } from '@coach/pipeline';
+
 import { slate } from '../palette.ts';
 
 const ghostButtonStyle: React.CSSProperties = {

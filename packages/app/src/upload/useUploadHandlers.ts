@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
-import { processUploads } from '../data-source.ts';
 import type { UploadedFile, VizResult } from '@coach/pipeline';
+import { useCallback, useState } from 'react';
+
+import { processUploads } from '../data-source.ts';
 
 function basenameOf(path: string): string {
   const idx = path.lastIndexOf('/');

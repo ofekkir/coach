@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+
+import { aggregate } from '../../aggregate/aggregate.ts';
 import type { CanonicalNode } from '../../types.ts';
 import { sessionEntityId } from '../../types.ts';
-import { aggregate } from '../../aggregate/aggregate.ts';
 import type { CausalEdge, InteractionExecution } from '../types.ts';
+
 import { buildExecutionGraph } from './execution.ts';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────

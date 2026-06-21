@@ -9,10 +9,11 @@ import type {
   SessionExecution,
 } from '@coach/pipeline';
 import { analyzeGraph } from '@coach/pipeline';
+import type { Edge } from '@xyflow/react';
+
 import { placeAgent, sessionWidth } from './place-graph.ts';
 import type { Ctx, RFNode } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, NW, HG } from './types.ts';
-import type { Edge } from '@xyflow/react';
 
 // Degraded-graph synthesizers — produce the missing upper ENTITIES (not nodes) so
 // layout always has an agent ▸ session to hang the interactions under.

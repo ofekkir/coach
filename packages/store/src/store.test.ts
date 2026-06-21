@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createStore, type Connection } from './store.ts';
+
 import type { RawResult } from './result.ts';
+import { createStore, type Connection } from './store.ts';
 
 const EMPTY: RawResult = { columns: [], rows: [] };
 

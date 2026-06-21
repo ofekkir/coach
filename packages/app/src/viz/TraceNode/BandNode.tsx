@@ -1,6 +1,7 @@
 import type { NodeProps } from '@xyflow/react';
-import { tokens } from '../theme.ts';
+
 import type { BandRFNode } from '../layout/types.ts';
+import { tokens } from '../theme.ts';
 
 // The faint band bracketing a parallel level — a backdrop behind the branch cards
 // (pointer-events off so clicks reach them). The grouping reads from the band

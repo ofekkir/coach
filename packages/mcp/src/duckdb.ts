@@ -7,9 +7,10 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
+
 import type { ExecutionGraph } from '@coach/pipeline';
 import { materializeSql, type Connection, type RawResult } from '@coach/store';
+import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
 
 // Engine-level read-only sandbox: read-only access, no filesystem/network (COPY,
 // read_csv, httpfs, ATTACH, INSTALL), and locked so a query can't re-enable them.

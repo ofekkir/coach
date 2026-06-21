@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { defaultSemanticsConfig } from '@coach/semantics';
+import { describe, expect, it } from 'vitest';
+
 import { markerLabel, responseText, structuralPrefix } from './derive.ts';
 import { toolPhrases } from './tool-intent.ts';
 

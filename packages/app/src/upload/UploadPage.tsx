@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
 import type { UploadedFile, VizResult } from '@coach/pipeline';
+import { useEffect, useRef, useState } from 'react';
+
 import { DropZone } from './DropZone/DropZone.tsx';
+import { danger, slate } from './palette.ts';
 import { PipelineOutputLoader } from './PipelineOutputLoader/PipelineOutputLoader.tsx';
 import { StagedFileList } from './StagedFileList/StagedFileList.tsx';
 import { useUploadHandlers } from './useUploadHandlers.ts';
-import { danger, slate } from './palette.ts';
 
 interface Props {
   onResults: (results: VizResult[]) => void;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { shapeResult, type RawResult } from './result.ts';
 
 function rawRows(n: number, cell: (i: number) => Record<string, unknown>): RawResult {

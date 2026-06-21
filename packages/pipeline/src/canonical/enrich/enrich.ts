@@ -7,12 +7,13 @@ import {
   LCG_MULTIPLIER,
   SPAN_ID_BYTES,
 } from '../../types.ts';
+
+import { extractHooks, resolveHookParentB64 } from './hooks.ts';
+import type { HookEntry } from './hooks.ts';
 import { allSpansFlat, collectSpanMeta, strAttr } from './id-utils.ts';
 import type { SpanMeta } from './id-utils.ts';
 import type { ToolEnrichment } from './logs.ts';
 import { attributeLogsToSpans, buildRequestBodyIndex, buildToolEnrichmentIndex } from './logs.ts';
-import { extractHooks, resolveHookParentB64 } from './hooks.ts';
-import type { HookEntry } from './hooks.ts';
 
 function hookSpanB64(index: number): string {
   function uint8ToBase64(bytes: Uint8Array): string {

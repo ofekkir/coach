@@ -1,5 +1,6 @@
 import type { ToolNode } from '../../types.ts';
 import { type ExecutionGraph, type InteractionExecution } from '../types.ts';
+
 import { interactionNodes } from './access.ts';
 
 // A repetition needs the original call plus at least one repeat.
