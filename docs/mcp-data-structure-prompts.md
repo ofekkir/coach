@@ -235,47 +235,53 @@ surfaces.
 **Success.** [ ] failing/success fixture test green; [ ] errors query non-empty; [ ] misleading-file
 query now uses ground truth.
 
-## 9. `cost_usd` for native logs + interaction `intent_category` _(old #10)_
+## 9. `cost_usd` is traced-only + interaction `intent_category` _(old #10)_
 
 **Parallel with:** 4,5,6,7,8.
-**Goal.** Non-empty cost rollups for native sessions; intent as a column.
-**Guidelines.** Model→price table in `@coach/semantics`; derive `cost_usd` from `model + tokens` when the
-harness gave none (unknown model → NULL+log, not 0). Add `interaction.intent_category` from a fixed
-closed enum via the existing semantic labeler.
-**Correctness verification.** Cost arithmetic exact on a known `(model, tokens)` → USD; invariant: no
-`llm_request` with known model + non-null tokens has NULL `cost_usd`. Intent: 100% non-NULL coverage +
-a human-picked ~15-prompt gold set the labeler must match ≥80%, documented in the PR.
-**You verify.** `SELECT session_id, round(sum(cost_usd),4) … WHERE type='llm_request' GROUP BY 1`
-**non-empty for native sessions**; `SELECT intent_category, count(*) … GROUP BY 1` matches your gold set.
-**Success.** [ ] exact cost + coverage tests green; [ ] native cost rollup non-empty; [ ] gold-set met.
+**Goal.** Honest cost (known-or-NULL, never estimated); intent as a column.
+**Guidelines.** `cost_usd` is populated **iff the trace carries a cost**; otherwise it stays **NULL
+("unknown"), never 0**. We deliberately do **not** back-compute it from a model price table — a
+price-table figure is a guess (prices drift, ≠ what was charged) and would be indistinguishable from a
+real cost once written. (Superseded the earlier "derive from `model + tokens`" plan — see the cost
+note in ARCHITECTURE.md.) Add `interaction.intent_category` from a fixed closed enum via the existing
+semantic labeler.
+**Correctness verification.** Invariant: every native (untraced) `llm_request` row has NULL `cost_usd`;
+a traced cost flows through verbatim. Intent: 100% non-NULL coverage + a human-picked ~15-prompt gold
+set the labeler must match ≥80%, documented in the PR.
+**You verify.** `SELECT count(*) … WHERE type='llm_request' AND cost_usd IS NOT NULL` is **0 for native
+sessions** (NULL, not 0); `SELECT intent_category, count(*) … GROUP BY 1` matches your gold set.
+**Success.** [ ] traced-only invariant green; [ ] intent coverage; [ ] gold-set met.
 
 ---
 
 # WAVE 2 — Rollups (parallel: 10 ∥ 11; depends on 7 + 5)
 
-## 10. `interaction_metrics` rollup table _(old #6)_
+## 10. `interaction_metrics` rollup VIEW _(old #6)_
 
 **Goal.** Flatten repeated per-interaction aggregations.
-**Guidelines.** New table/view: `interaction_id, session_id, sequence, prompt_len, tool_count,
-llm_count, tokens_in, tokens_out, cost_usd, duration_ms, shape, first_action, last_action,
-distinct_files, error_count`.
-**Correctness verification.** Cross-check: every value **equals** the direct aggregate over `nodes`
-(`tool_count` = `COUNT(*) FILTER (WHERE type='tool')` …); `shape='agentic'` iff `tool_count>0`. Ship the
-equality check passing.
+**Guidelines.** A DuckDB **VIEW** (not a materialized table — in a columnar engine a stored copy of an
+aggregate only risks drift): `interaction_id, session_id, sequence, prompt_len, tool_count, llm_count,
+tokens_in, tokens_out, cost_usd, duration_ms, shape, first_action, last_action, distinct_files,
+error_count`, all GROUP BY over `nodes`. Lives in `db/views.ts`; `materializeSql` emits `CREATE VIEW`.
+**Correctness verification.** Because it is a view, equality with `nodes` holds **by construction**; the
+SQL is proven valid + agreeing with a direct node aggregate against real DuckDB in `mcp/duckdb.test.ts`.
+`shape='agentic'` iff `tool_count>0`.
 **You verify.** `SELECT shape, count(*), round(avg(tool_count),1) FROM interaction_metrics GROUP BY 1`;
-row count == number of interaction nodes; cost rollup is now one line off this table.
-**Success.** [ ] rollup-vs-raw equality green; [ ] row-count + shape checks.
+row count == number of interaction nodes; cost rollup is one line off this view.
+**Success.** [ ] view valid + agrees with raw aggregate (DuckDB); [ ] row-count + shape checks.
 
-## 11. `transitions` table (action → next action) _(old #7)_
+## 11. `transitions` VIEW (action → next action) _(old #7)_
 
-**Goal.** Make "common workflow" a sort, not a `LEAD` self-join.
-**Guidelines.** One row per adjacent tool pair within an interaction (`interaction_id, from_seq,
-from_action, to_action`), built from nodes ordered by `seq`.
-**Correctness verification.** Counts **equal** a reference `LEAD()` query on a fixture; rows per
-interaction = `tool_count − 1`, never negative.
+**Goal.** Make "common workflow" a sort, not a hand-written `LEAD` self-join each time.
+**Guidelines.** A DuckDB **VIEW** (`db/views.ts`): a `ROW_NUMBER() OVER (PARTITION BY interaction_id
+ORDER BY seq)` window over TOOL nodes, self-joined rank *n*→*n+1*, one row per adjacent pair
+(`interaction_id, from_seq, from_action, to_action`).
+**Correctness verification.** Rows per interaction = `tool_count − 1`, never negative — asserted against
+real DuckDB in `mcp/duckdb.test.ts` (total `transitions` rows == Σ `tool_count − 1` from
+`interaction_metrics`).
 **You verify.** `SELECT from_action, to_action, count(*) n FROM transitions WHERE from_action<>to_action
 GROUP BY 1,2 ORDER BY n DESC LIMIT 5` reproduces `explore→edit`, `edit→explore`, `edit→verify`.
-**Success.** [ ] table-vs-`LEAD` equality green; [ ] dominant edges reproduced.
+**Success.** [ ] view valid + `tool_count − 1` invariant green (DuckDB); [ ] dominant edges reproduced.
 
 ---
 

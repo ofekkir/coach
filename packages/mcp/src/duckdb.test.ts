@@ -48,4 +48,35 @@ describe('persisted DB (pipeline ships it, MCP loads it untouched)', () => {
   it('keeps the loaded DB read-only', async () => {
     await expect(store.query('DROP TABLE nodes')).rejects.toThrow();
   });
+
+  // interaction_metrics + transitions are VIEWs over `nodes` (computed on read).
+  // These prove the view SQL is valid AND that it agrees with a direct aggregate —
+  // the equality is by construction, but only if the SELECT bodies are correct.
+  it('exposes interaction_metrics + transitions as queryable views', async () => {
+    const views = await store.query(
+      "SELECT table_name FROM information_schema.tables WHERE table_type = 'VIEW' ORDER BY table_name",
+    );
+    const names = views.rows.map((r) => r.table_name);
+    expect(names).toContain('interaction_metrics');
+    expect(names).toContain('transitions');
+  });
+
+  it('interaction_metrics.tool_count sums to the total tool-node count (no drift)', async () => {
+    const res = await store.query(
+      "SELECT (SELECT SUM(tool_count) FROM interaction_metrics) AS m, (SELECT COUNT(*) FROM nodes WHERE type = 'tool') AS n",
+    );
+    expect(Number(res.rows[0]?.m)).toBe(Number(res.rows[0]?.n));
+  });
+
+  it('transitions has exactly tool_count−1 rows per interaction', async () => {
+    const res = await store.query(
+      'SELECT (SELECT COUNT(*) FROM transitions) AS t, ' +
+        '(SELECT SUM(CASE WHEN tool_count > 0 THEN tool_count - 1 ELSE 0 END) FROM interaction_metrics) AS expected',
+    );
+    expect(Number(res.rows[0]?.t)).toBe(Number(res.rows[0]?.expected));
+  });
+
+  it('keeps the views read-only too', async () => {
+    await expect(store.query('DROP VIEW interaction_metrics')).rejects.toThrow();
+  });
 });

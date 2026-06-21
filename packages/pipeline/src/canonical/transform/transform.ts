@@ -9,7 +9,6 @@ import type {
   HookNode,
 } from '../../types.ts';
 import { sessionEntityId } from '../../types.ts';
-import { costUsd } from '@coach/semantics';
 import {
   extractRequestMessages,
   extractResponseMessages,
@@ -17,12 +16,6 @@ import {
 } from './request-body.ts';
 import { parseSpans } from './parse.ts';
 import type { ParsedSpan } from './parse.ts';
-
-/** Called with the model id when a present model + tokens cannot be priced (model
- *  absent from the @coach/semantics price table). The pure pipeline never logs
- *  directly (it must run in the browser too); the Node CLI injects a logger-backed
- *  callback. Optional everywhere else. */
-export type OnUnknownCostModel = (model: string) => void;
 
 // The id/timing/parent/sessionId fields every span-derived node shares. `sessionId`
 // is the FK → Session entity, denormalized onto every node (resolved once per
@@ -94,29 +87,15 @@ function applyResponseBody(node: LlmRequestNode, rawResponseBody: string): void 
   if (stopReason != null) node.stop_reason = stopReason;
 }
 
-// The trace's own cost, when it carries one (the OTEL/harness path). Native logs
-// usually don't — `null` means "derive it from model + tokens instead".
-function tracedCost(span: ParsedSpan): number | null {
-  if (span.costUsd == null) return null;
-  const n = parseFloat(span.costUsd);
-  return isNaN(n) ? null : n;
-}
-
-// Cost for an llm_request: prefer the cost the trace already carries; otherwise
-// derive it from model + tokens via the @coach/semantics price table. An unknown
-// model derives to NULL (never 0) and reports the model so the caller can log it.
-function resolveCost(node: LlmRequestNode, span: ParsedSpan, onUnknown?: OnUnknownCostModel): void {
-  const traced = tracedCost(span);
-  if (traced != null) {
-    node.cost_usd = traced;
-    return;
-  }
-  const derived = costUsd(node.model, node.tokens_in, node.tokens_out);
-  if (derived != null) {
-    node.cost_usd = derived;
-    return;
-  }
-  onUnknown?.(node.model);
+// Cost for an llm_request is ONLY ever the cost the trace itself carries (the
+// OTEL/harness path). Native logs usually don't carry one — and we deliberately do
+// NOT back-compute an estimate from a model price table: a price-table figure is a
+// guess, not what was charged, and once written here it's indistinguishable from a
+// real cost. Absent a traced cost, `cost_usd` stays NULL ("unknown"), never 0.
+function resolveCost(node: LlmRequestNode, span: ParsedSpan): void {
+  if (span.costUsd == null) return;
+  const traced = parseFloat(span.costUsd);
+  if (!isNaN(traced)) node.cost_usd = traced;
 }
 
 function buildLlmRequestNode(
@@ -124,7 +103,6 @@ function buildLlmRequestNode(
   parent: string | null,
   sessionId: string,
   repair: boolean,
-  onUnknownCostModel?: OnUnknownCostModel,
 ): LlmRequestNode {
   const node: LlmRequestNode = {
     ...nodeBase(span, parent, sessionId),
@@ -136,7 +114,7 @@ function buildLlmRequestNode(
   if (span.querySource != null) node.source = span.querySource;
   if (span.rawRequestBody != null) applyRequestBody(node, span.rawRequestBody, repair);
   if (span.rawResponseBody != null) applyResponseBody(node, span.rawResponseBody);
-  resolveCost(node, span, onUnknownCostModel);
+  resolveCost(node, span);
   return node;
 }
 
@@ -177,12 +155,11 @@ function spanToNode(
   rootId: string | null,
   sessionId: string,
   repair: boolean,
-  onUnknownCostModel?: OnUnknownCostModel,
 ): CanonicalNode {
   const parent = effectiveParent(span, rootId);
   switch (span.spanType) {
     case 'llm_request':
-      return buildLlmRequestNode(span, parent, sessionId, repair, onUnknownCostModel);
+      return buildLlmRequestNode(span, parent, sessionId, repair);
     case 'tool':
       return buildToolNode(span, parent, sessionId);
     case 'tool.execution':
@@ -204,13 +181,9 @@ function resolveSessionId(spans: readonly ParsedSpan[]): string {
   return harnessSessionId != null ? sessionEntityId(harnessSessionId) : '';
 }
 
-export function transformTrace(
-  trace: TempoTrace,
-  repair = false,
-  onUnknownCostModel?: OnUnknownCostModel,
-): CanonicalNode[] {
+export function transformTrace(trace: TempoTrace, repair = false): CanonicalNode[] {
   const spans = parseSpans(trace);
   const rootId = spans.find((s) => s.parentId === null)?.id ?? null;
   const sessionId = resolveSessionId(spans);
-  return spans.map((s) => spanToNode(s, rootId, sessionId, repair, onUnknownCostModel));
+  return spans.map((s) => spanToNode(s, rootId, sessionId, repair));
 }
