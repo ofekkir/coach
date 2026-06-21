@@ -281,7 +281,7 @@ not a reshape.
   and the visualization without re-running anything. `coach-build-db <traces-dir> [out.db]` (root
   `pnpm build-db`) is the populate step: pipeline in, DB out. The browser can't read a `.db`, which is
   why the graph rides inside it — one artifact feeds both the MCP's SQL and the viz.
-- **Tools (`tools.ts`).** Seven, bound to a session (its current dataset): `load_dataset` (point it at
+- **Tools (`tools.ts`).** Eight, bound to a session (its current dataset): `load_dataset` (point it at
   a directory — runs the pipeline and makes the graph queryable, replacing any prior dataset),
   `describe_schema` (tables + column docs + the semantic ontology vocabulary + example queries,
   including the stage-7 detectors written as SQL — works with nothing loaded), `query` (read-only single
@@ -289,8 +289,18 @@ not a reshape.
   with `truncated` flagging any cut), `resolve` (hydrate a node id across all
   three layers, reusing the pipeline's `resolve`), `subtree` and `causal_path` (traversal primitives
   over the containment tree / causal DAG, so the agent never hand-writes recursive CTEs), and
-  `get_analysis` (the stage-7 `GraphAnalysis` verbatim, as one option among many — not the only way in).
+  `get_analysis` (the stage-7 `GraphAnalysis` verbatim, as one option among many — not the only way in),
+  and `open_viz` (start a local static server over the built app + the stage JSON dumped into the cwd by
+  the last directory load, and hand back a boot URL — `?data=<file>&focus=<nodeId>`).
   Tools carry a Zod input shape; the MCP layer validates args.
+- **Stage dump + viz server (`dump.ts`, `viz-server.ts`, `bin/viz.ts`).** `dumpPipelineOutputs(result,
+outDir)` writes the seven `01..07` stage JSON files + a self-contained `graph.db` for one pipeline run
+  and returns the written paths; the `pnpm e2e` CLI and a **directory** `load_dataset` both call it (a
+  directory load dumps into the cwd and reports the paths in its summary; a `.db` load does not — it's
+  already a built artifact). `startVizServer` is a dependency-free `node:http` server that serves the
+  built `@coach/app` (`packages/app/dist`, resolved relative to the package) plus those dumped JSON
+  files, erroring with a build hint if `dist` is missing. `coach-viz [data-file] [focus]` (its bin) boots
+  the server and opens the browser.
 - **Session + loading (`session.ts`, `load.ts`, `server.ts`, `bin/mcp.ts`).** The server holds one
   mutable session: the dataset currently loaded. `load_dataset` takes either a **`.db`** (opened
   untouched via `openPersistedStore`, graph recovered from `_coach_meta`, analysis recomputed) or a

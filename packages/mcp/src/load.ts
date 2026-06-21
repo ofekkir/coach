@@ -9,6 +9,7 @@ import {
   runPipeline,
   type ExecutionGraph,
   type GraphAnalysis,
+  type PipelineResult,
   type UploadedFile,
 } from '@coach/pipeline';
 
@@ -35,8 +36,14 @@ function gatherFiles(dir: string, rootDir: string): UploadedFile[] {
   });
 }
 
+/** Loads every file under `dir` and runs the full pipeline, returning every
+ *  stage's output — the directory load uses this to also dump the stage files. */
+export function loadPipelineResult(dir: string): PipelineResult {
+  return runPipeline(gatherFiles(dir, dir));
+}
+
 /** Loads every file under `dir` and runs the full pipeline over them. */
 export function loadDataset(dir: string): Dataset {
-  const { enrichedGraph, analysis } = runPipeline(gatherFiles(dir, dir));
+  const { enrichedGraph, analysis } = loadPipelineResult(dir);
   return { graph: enrichedGraph, analysis };
 }

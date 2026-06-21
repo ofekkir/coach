@@ -1,9 +1,9 @@
-// The analyst-facing tool surface. Seven tools over the session's current
-// dataset: load it, describe the schema, run read-only SQL, and four graph
-// primitives. The point is flexibility — the agent loads data and composes its
-// own queries instead of consuming a fixed set of hardcoded findings. The stage-7
-// analysis is still available verbatim through `get_analysis`, but as one option
-// among many, not the only way in.
+// The analyst-facing tool surface. Eight tools over the session's current
+// dataset: load it, describe the schema, run read-only SQL, four graph
+// primitives, and open the visualization. The point is flexibility — the agent
+// loads data and composes its own queries instead of consuming a fixed set of
+// hardcoded findings. The stage-7 analysis is still available verbatim through
+// `get_analysis`, but as one option among many, not the only way in.
 //
 // Tools carry a Zod input shape; the MCP layer (server.ts) validates args against
 // it before dispatch. Data-bound tools read through the session, which throws a
@@ -15,6 +15,7 @@ import { defaultSemanticsConfig } from '@coach/semantics';
 import type { CausalDirection } from './query-core.ts';
 import type { Session } from './session.ts';
 import { EXAMPLE_QUERIES } from './examples.ts';
+import { startVizServer } from './viz-server.ts';
 
 export interface Tool {
   readonly name: string;
@@ -163,6 +164,29 @@ function getAnalysisTool(session: Session): Tool {
   };
 }
 
+const DEFAULT_VIZ_FILE = '06-enriched-graph.json';
+
+function openVizTool(): Tool {
+  return {
+    name: 'open_viz',
+    description:
+      'Open the interactive graph visualization. Starts a local web server over the built app and the stage JSON dumped into the cwd by the last directory `load_dataset`, and returns a URL. Pass a dumped JSON file name (default `06-enriched-graph.json`) and an optional `focus` node id to center on. Requires the app to be built (`pnpm --filter @coach/app build`).',
+    inputShape: {
+      file: z
+        .string()
+        .optional()
+        .describe('Dumped JSON file name to visualize. Default 06-enriched-graph.json.'),
+      focus: z.string().optional().describe('Node id to center the graph on.'),
+    },
+    handle: async (args) => {
+      const file = optionalString(args, 'file') ?? DEFAULT_VIZ_FILE;
+      const focus = optionalString(args, 'focus');
+      const { url } = await startVizServer(file, focus);
+      return { url };
+    },
+  };
+}
+
 /** Builds the analyst tools bound to one session (its current dataset + store). */
 export function createTools(session: Session): Tool[] {
   return [
@@ -173,5 +197,6 @@ export function createTools(session: Session): Tool[] {
     subtreeTool(session),
     causalPathTool(session),
     getAnalysisTool(session),
+    openVizTool(),
   ];
 }
