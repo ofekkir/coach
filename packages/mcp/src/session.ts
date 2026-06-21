@@ -7,7 +7,7 @@
 //   a dir  — trace/native files run through the pipeline, then materialized.
 
 import { analyzeGraph } from '@coach/pipeline';
-import type { Store } from '@coach/store';
+import type { Store } from './query-core.ts';
 import { loadDataset, type Dataset } from './load.ts';
 import { openPersistedStore } from './duckdb.ts';
 import { createStore } from './store.ts';

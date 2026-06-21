@@ -1,10 +1,10 @@
 // Backend-neutral query core. Given a `Connection` — a thin port over a SQL engine
-// that already enforces read-only at the engine level (see @coach/mcp's DuckDB
-// backend) — this builds the analyst-facing `Store`: read-only SQL behind a UX
+// that already enforces read-only at the engine level (see the DuckDB backend in
+// `duckdb.ts`) — this builds the analyst-facing `Store`: read-only SQL behind a UX
 // guard, graph-traversal primitives, and capped/JSON-safe results.
 //
 // Pure: no node:* and no database driver import, so the same core serves the Node
-// MCP today and a browser/WASM backend later.
+// DuckDB backend today and a browser/WASM backend later.
 
 import { assertReadOnly } from './guard.ts';
 import { DEFAULT_LIMITS, shapeResult } from './result.ts';

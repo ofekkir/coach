@@ -10,9 +10,9 @@
 // clear message until a dataset is loaded.
 
 import { z, type ZodRawShape } from 'zod';
-import { resolve as resolveNode, type GraphAnalysis } from '@coach/pipeline';
+import { resolve as resolveNode, TABLES, type GraphAnalysis } from '@coach/pipeline';
 import { defaultSemanticsConfig } from '@coach/semantics';
-import { TABLES, type CausalDirection } from '@coach/store';
+import type { CausalDirection } from './query-core.ts';
 import type { Session } from './session.ts';
 import { EXAMPLE_QUERIES } from './examples.ts';
 

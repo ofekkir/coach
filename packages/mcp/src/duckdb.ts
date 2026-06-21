@@ -1,4 +1,4 @@
-// The node-api DuckDB layer. Two ways to get a read-only Connection for @coach/store:
+// The node-api DuckDB layer. Two ways to get a read-only Connection for the query core:
 //
 //   createDuckDbConnection(graph)  — materialize a graph into a TEMP DB, query, then
 //                                    delete it on close (the in-memory load path).
@@ -9,19 +9,15 @@
 // DuckDB that ALSO carries the enriched graph (in `_coach_meta`) so a loader can
 // recover it for the graph-shaped tools and the visualization. Either way the query
 // handle is READ_ONLY with external access disabled — the engine is the boundary.
+// This is the one node:*-bound piece; the query surface lives in ./query-core.ts.
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
-import type { ExecutionGraph } from '@coach/pipeline';
-import {
-  createStore as createCoreStore,
-  materializeSql,
-  type Connection,
-  type RawResult,
-  type Store,
-} from '@coach/store';
+import { materializeSql, type ExecutionGraph } from '@coach/pipeline';
+import { createStore as createCoreStore, type Connection, type Store } from './query-core.ts';
+import type { RawResult } from './result.ts';
 
 // Engine-level read-only sandbox: read-only access, no filesystem/network (COPY,
 // read_csv, httpfs, ATTACH, INSTALL), and locked so a query can't re-enable them.

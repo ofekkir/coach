@@ -19,7 +19,6 @@
   "dependencies": {
     "@coach/pipeline": "workspace:*",
     "@coach/semantics": "workspace:*",
-    "@coach/store": "workspace:*",
     "@duckdb/node-api": "1.5.4-r.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.4.3"

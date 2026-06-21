@@ -62,3 +62,9 @@ export type { Repetition } from './graph/analysis/repetition.ts';
 // Orchestration
 export { buildVizResultFromExecutionGraph, buildVizResults, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';
+
+// Graph → DB SQL (the relational schema specs + the graph→SQL materializer). Pure
+// string generation; the DuckDB engine that runs it lives in @coach/mcp.
+export { materializeSql } from './db/materialize.ts';
+export { TABLES } from './db/schema.ts';
+export type { ColumnSpec, TableSpec } from './db/schema.ts';

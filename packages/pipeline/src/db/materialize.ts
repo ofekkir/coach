@@ -5,13 +5,8 @@
 // Records are sparse: a column absent from a record serializes to NULL, so each
 // builder only sets the columns its node/edge type actually has.
 
-import type {
-  Agent,
-  CanonicalNode,
-  ExecutionGraph,
-  InteractionExecution,
-  Session,
-} from '@coach/pipeline';
+import type { Agent, CanonicalNode, Session } from '../types.ts';
+import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
 
 const INSERT_CHUNK = 200;
