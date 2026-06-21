@@ -1,7 +1,7 @@
 // The upload / landing surface keeps the cool slate palette (Tailwind slate +
-// indigo + red) it shipped with — it has NOT been migrated to the warm graph
-// system in `viz/theme.ts`. Centralized here so the raw hex lives in one place
-// rather than scattered across the four upload components.
+// red) it shipped with — it has NOT been migrated to the warm graph system in
+// `viz/theme.ts`. Centralized here so the raw hex lives in one place rather than
+// scattered across the upload components.
 
 export const slate = {
   page: '#f8fafc', // page background, secondary button fill, dir-group fill
@@ -14,11 +14,6 @@ export const slate = {
   label: '#475569', // form labels
   body: '#334155', // body text, button labels
   heading: '#1e293b', // headings + primary button fill
-} as const;
-
-export const accent = {
-  drag: '#6366f1', // active drag-over border
-  dragBg: '#eef2ff', // active drag-over fill
 } as const;
 
 export const danger = {

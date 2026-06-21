@@ -15,17 +15,17 @@ The system is split into five packages plus a Node CLI layer:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  @coach/app  (packages/app)                             │
-│  React SPA · Upload UI · Graph renderer                 │
+│  React SPA · Graph renderer                             │
 │                                                         │
-│  upload/UploadPage.tsx ──► data-source.ts ──► viz/App   │
-│  (raw logs or pre-computed JSON)                        │
+│  ?data=<url> / file → data-source.ts → viz/App          │
+│  (renders a pre-computed ExecutionGraph)                │
 │                               │                         │
 │           ┌───────────────────┘                         │
 │           ▼                                             │
 │  @coach/pipeline (packages/pipeline)                    │
 │  Pure data processing · No node:* imports               │
 │  classify → route → canonical → aggregate →             │
-│            execution graph                              │
+│            execution graph  (run offline by the CLI/MCP)│
 └─────────────────────────────────────────────────────────┘
 
 scripts/          Node CLI — reads from disk, writes JSON artifacts
@@ -41,7 +41,7 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → analysis, plus orchestration, plus the graph→DB SQL (`db/`: the relational schema specs + `materializeSql`). Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                                                                                                                                                                                                                                 |
-| `packages/app`       | React SPA: upload landing page, graph visualization, data-source seam.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `packages/app`       | React SPA: renders a pre-computed `ExecutionGraph` (loaded from a file or fetched via `?data=<url>`); graph visualization + data-source seam. Does not run the pipeline in the browser.                                                                                                                                                                                                                                                                                                                                                     |
 | `packages/mcp`       | MCP server over the stage-6 graph. Owns the backend-neutral query core (`query-core.ts` + `guard.ts`/`result.ts`: read-only UX guard, capped JSON-safe results, graph traversal) over a `Connection` port, plus the node-api `Connection` (`duckdb.ts`) that runs `@coach/pipeline`'s `materializeSql` into a temp file-backed DuckDB and serves it through a READ_ONLY handle. Exposes read-only SQL + graph-traversal tools so an analyst agent drives its own analyses. Node-only (filesystem + native DuckDB). See "MCP query surface". |
 | `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README.                                                                                                                                                                                                                                                                                                      |
 | `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -53,7 +53,8 @@ named stages, each surfaced as a member: `classified`, `sessions`, `canonicalByS
 `agentGraph`, `executionGraph`, `enrichedGraph`, `analysis`. It is pure and file-system-free; the CLI
 and the app both call it. Stage 6 enrichment is deterministic and always runs (using `config`,
 defaulting to the bundled `defaultSemanticsConfig`). Stage 7 analyzes the enriched graph alone.
-`buildVizResults` is a thin adapter that wraps the execution graph for the renderer.
+`buildVizResultFromExecutionGraph` is a thin adapter that wraps a pre-computed execution graph in the
+`VizResult` shape the renderer consumes (used by the app's pipeline-output loader).
 
 The pipeline **organizes** data; it does not decide how to render it. The execution graph is a
 **normalized, stage-layered, id-keyed model** that maps 1:1 to a relational DB, so persistence is a
@@ -177,7 +178,7 @@ Input files (accumulating — user stages N files/folders before submitting)
                             benign re-read) are surfaced in `gaps`, never dropped.
                             Always runs as the final stage of runPipeline.
         │
-        ▼  buildVizResults() adapter → VizResult[]  (one result, execution graph)
+        ▼  buildVizResultFromExecutionGraph() adapter → VizResult  (execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)
 ```
 
@@ -206,10 +207,10 @@ what is deliberately out of scope (composition/inference roll-up). Enrichment wr
 `semantics` table (one row per relabeled node) and leaves the `nodes`/`deltas`/edges untouched — the
 old copied twin types (`ActionNode`/`InferenceNode`) are retired.
 
-All sessions roll up under one agent; `buildVizResults` emits exactly one `VizResult` carrying the
-execution graph, and sessions are navigated by expand/collapse inside the graph. Unsupported files
-are carried through `classified` (never silently dropped) and surfaced as a count. The graph is
-consumed only by the renderer — no raw `CanonicalNode[]` reaches the visualization layer.
+All sessions roll up under one agent into a single execution graph, and sessions are navigated by
+expand/collapse inside the graph. Unsupported files are carried through `classified` (never silently
+dropped) and surfaced as a count. The graph is consumed only by the renderer — no raw
+`CanonicalNode[]` reaches the visualization layer.
 
 **Display derives from structure, never content.** Tree/thread nodes the layout walks are **id-only**
 (`{ id, children }`); the layout resolves each id against the graph tables through one seam
@@ -304,27 +305,22 @@ not a reshape.
 This is why stage 7 is "a function of the `ExecutionGraph` alone": the same derivation feeds the live
 pipeline, the app, and now this MCP — and the MCP's flexible SQL surface sits beside it, not over it.
 
-## Upload flow and the data-source seam
+## Intake flow and the data-source seam
 
-The app has two intake paths, both converging on `VizResult[]` before the renderer:
+The app renders a **pre-computed** execution graph — it no longer runs the pipeline in the browser.
+The graph is produced offline (the `pnpm e2e` CLI, or the MCP server) and reaches the renderer one
+of two ways, both converging on a `VizResult` (`{ title, data: ExecutionGraph }`):
 
 ```
-Browser — path 1: raw log files (full pipeline)
-  UploadPage.tsx  (accumulating staging UI)
-    ├── "Add files" button   → <input multiple>
-    ├── "Add folder" button  → <input multiple webkitdirectory>
-    └── Drag-and-drop        → DataTransferItem.webkitGetAsEntry() recursive walk
-          │  staged Map<path, UploadedFile> — deduped by relative path
-          ▼  "Visualize N files" button
-    File.text() × N → UploadedFile[] (name=basename, path=relative)
-          └── data-source.ts :: processUploads(files)
-                └── @coach/pipeline :: buildVizResults(files)
-                        └── runPipeline: classify → route → canonical → aggregate
-                              → execution graph
-                              └── VizResult[]  (one result, execution graph)
-                                    └── App.tsx renders the graph (derives all display text)
+Boot params (src/main.tsx parses window.location.search)
+  ?data=<url>  → fetch(url) → text → loadPipelineOutput(text, titleFromUrl(url))
+                   └── <App data title> rendered directly (no upload page)
+  ?focus=<id>  → passed to <App initialFocusId>; after first render a one-shot
+                   effect calls App's onFocusId(id) — the same reveal/select/center
+                   path the FocusInput search box uses (revealPath in layout/queries)
+  (neither)    → <ManualRoot>: the upload page below
 
-Browser — path 2: pre-computed pipeline output (bypasses the pipeline)
+Manual intake: pre-computed pipeline output
   UploadPage.tsx  (PipelineOutputLoader)
     └── "Load pipeline output" → <input accept=".json"> single file
           └── data-source.ts :: loadPipelineOutput(jsonText, fileName)
@@ -335,15 +331,14 @@ Browser — path 2: pre-computed pipeline output (bypasses the pipeline)
                             └── App.tsx renders the graph unchanged
 ```
 
-**`packages/app/src/data-source.ts` is the single swap point** for moving raw-log
-processing to a backend. Replace `processUploads`'s body with a `fetch('/api/process', ...)`
-call and nothing else in the app changes — the visualization layer depends only on
-`VizResult` / `ExecutionGraph`.
+**`packages/app/src/data-source.ts` is the single swap point** for changing where the
+pre-computed graph comes from — it exposes `loadPipelineOutput` (parse + shape-detect + wrap).
+The visualization layer depends only on `VizResult` / `ExecutionGraph`.
 
-`loadPipelineOutput` and `extractExecutionGraph` live alongside it. The shape-detection
-logic is centralized in `extractExecutionGraph`: it accepts a bare `ExecutionGraph` (the
-e2e script's direct output) or any object with an `executionGraph` member, tolerating the
-pipeline output format being reworked.
+The shape-detection logic is centralized in `extractExecutionGraph`: it accepts a bare
+`ExecutionGraph` (the e2e script's direct output) or any object with an `executionGraph` member,
+tolerating the pipeline output format being reworked. `?data` fetch/parse failures render a readable
+error screen rather than a blank page.
 
 ## Fixture modes
 
@@ -363,9 +358,9 @@ pipeline.)
 | `06-enriched-graph.json`       | 6     | `ExecutionGraph` with the `semantics` table populated                 |
 | `07-analysis.json`             | 7     | `GraphAnalysis` — mechanical analysis derived from the enriched graph |
 
-Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one upload all flow through
+Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one gather all flow through
 the same pipeline. The CLI populates `UploadedFile.path` relative to the gather root so the
-same session-id routing (with directory fallback for logs) that powers the browser upload applies.
+session-id routing (with directory fallback for logs) groups them correctly.
 
 ## Deploying to Vercel (static SPA)
 

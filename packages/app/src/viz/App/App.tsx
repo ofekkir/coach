@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExecutionGraph, ResolvedNode } from '@coach/pipeline';
 import { resolve } from '@coach/pipeline';
 import {
@@ -39,7 +39,42 @@ export interface FocusRequest {
   nonce: number;
 }
 
-export function App({ data, title }: { data: ExecutionGraph; title: string }) {
+// A `?focus=<nodeId>` boot param fires the same reveal/select/center path as the
+// FocusInput search box, once, after the first render. The ref guards against
+// StrictMode's double-invoke and prop identity changes re-triggering it.
+function useInitialFocus(initialFocusId: string | undefined, onFocusId: (id: string) => boolean) {
+  const focusedOnBoot = useRef(false);
+  useEffect(() => {
+    if (initialFocusId == null || initialFocusId === '' || focusedOnBoot.current) return;
+    focusedOnBoot.current = true;
+    onFocusId(initialFocusId);
+  }, [initialFocusId, onFocusId]);
+}
+
+// The TopBar's expand-all / collapse-all controls over the shared `expanded` set:
+// expand-all opens every expandable id; collapse-all leaves only the agent root.
+function useExpandControls(
+  data: ExecutionGraph,
+  setExpanded: React.Dispatch<React.SetStateAction<Set<string>>>,
+) {
+  const allExpandable = useMemo(() => allExpandableIds(data), [data]);
+  const rootId = useMemo(() => agentRoot(data), [data]);
+  const onExpandAll = useCallback(() => {
+    setExpanded(new Set(allExpandable));
+  }, [allExpandable, setExpanded]);
+  const onCollapseAll = useCallback(() => {
+    setExpanded(new Set([rootId]));
+  }, [rootId, setExpanded]);
+  return { onExpandAll, onCollapseAll };
+}
+
+interface AppProps {
+  data: ExecutionGraph;
+  title: string;
+  initialFocusId?: string | undefined;
+}
+
+export function App({ data, title, initialFocusId }: AppProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => initialExpanded());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focus, setFocus] = useState<FocusRequest | null>(null);
@@ -60,6 +95,7 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
     },
     [data],
   );
+  useInitialFocus(initialFocusId, onFocusId);
 
   const build = useCallback(
     (exp: Set<string>, sel: string | null): Elements => buildElements(data, exp, sel),
@@ -68,20 +104,12 @@ export function App({ data, title }: { data: ExecutionGraph; title: string }) {
 
   const elements = useMemo(() => build(expanded, selectedId), [build, expanded, selectedId]);
 
-  const allExpandable = useMemo(() => allExpandableIds(data), [data]);
-  const rootId = useMemo(() => agentRoot(data), [data]);
   const stats = useMemo(() => summarizeRun(data), [data]);
 
   const selected = selectedData(elements, selectedId);
   const selectedNode = useMemo(() => selectedResolved(data, selectedId), [data, selectedId]);
 
-  const onExpandAll = useCallback(() => {
-    setExpanded(new Set(allExpandable));
-  }, [allExpandable]);
-
-  const onCollapseAll = useCallback(() => {
-    setExpanded(new Set([rootId]));
-  }, [rootId]);
+  const { onExpandAll, onCollapseAll } = useExpandControls(data, setExpanded);
 
   return (
     <div

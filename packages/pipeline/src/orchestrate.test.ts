@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildVizResults, runPipeline } from './orchestrate.ts';
+import { runPipeline } from './orchestrate.ts';
 import { PSEUDO_USER_ID } from './types.ts';
 import type { UploadedFile } from './types.ts';
 
@@ -17,7 +17,7 @@ const OTEL_B_LOGS = readFixture('otel/update-claude-config/logs.json');
 const OTEL_B_TRACE = readFixture('otel/update-claude-config/trace.json');
 const NATIVE_JSONL = readFixture('native-claude/fetch-website/session.jsonl');
 
-describe('buildVizResults', () => {
+describe('runPipeline', () => {
   it('two distinct OTEL sessions roll up under one agent', () => {
     const files: UploadedFile[] = [
       { name: 'logs.json', content: OTEL_A_LOGS, path: 'projA/logs.json' },
@@ -26,13 +26,10 @@ describe('buildVizResults', () => {
       { name: 'trace.json', content: OTEL_B_TRACE, path: 'projB/trace.json' },
     ];
 
-    const results = buildVizResults(files);
+    const { enrichedGraph } = runPipeline(files);
 
-    expect(results).toHaveLength(1);
-    const result = results[0];
-    expect(result?.data.kind).toBe('agent');
-
-    const agentView = result?.data.kind === 'agent' ? result.data.data : null;
+    expect(enrichedGraph.kind).toBe('agent');
+    const agentView = enrichedGraph.kind === 'agent' ? enrichedGraph.data : null;
     expect(agentView?.sessions).toHaveLength(2);
   });
 
@@ -52,13 +49,11 @@ describe('buildVizResults', () => {
   it('native .jsonl session uses pseudo_user_id when no real user identity exists', () => {
     const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
 
-    const results = buildVizResults(files);
+    const { enrichedGraph } = runPipeline(files);
 
-    expect(results).toHaveLength(1);
-    expect(results[0]?.title).toBe(PSEUDO_USER_ID);
-    expect(results[0]?.data.kind).toBe('agent');
-
-    const agentView = results[0]?.data.kind === 'agent' ? results[0].data.data : null;
+    expect(enrichedGraph.kind).toBe('agent');
+    const agentView = enrichedGraph.kind === 'agent' ? enrichedGraph.data : null;
+    expect(agentView?.agent.userId).toBe(PSEUDO_USER_ID);
     expect(agentView?.agent.id).toBe(`agent-${PSEUDO_USER_ID}`);
   });
 
@@ -72,9 +67,11 @@ describe('buildVizResults', () => {
     expect(sessions).toHaveLength(1);
   });
 
-  it('returns empty array when nothing renderable is produced', () => {
-    expect(buildVizResults([])).toEqual([]);
+  it('produces no sessions when nothing renderable is present', () => {
+    expect(runPipeline([]).agentGraph.sessions).toHaveLength(0);
     // logs.json resolves a session id but has no trace, so it yields no nodes.
-    expect(buildVizResults([{ name: 'logs.json', content: OTEL_A_LOGS }])).toEqual([]);
+    expect(
+      runPipeline([{ name: 'logs.json', content: OTEL_A_LOGS }]).agentGraph.sessions,
+    ).toHaveLength(0);
   });
 });
