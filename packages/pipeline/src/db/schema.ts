@@ -76,6 +76,10 @@ const NODES: TableSpec = {
       sqlType: 'VARCHAR',
       doc: 'tool: serialized tool input. Identical (name, tool_input) ≥2× in one interaction is the redundant-tool signal.',
     },
+    // prettier-ignore
+    { name: 'file_path', sqlType: 'VARCHAR', doc: 'tool: the file path a path-bearing file tool targets (Read/Edit/Write → file_path, NotebookEdit → notebook_path), promoted from tool_input. NULL for non-file tools and on malformed input.' },
+    // prettier-ignore
+    { name: 'bash_command', sqlType: 'VARCHAR', doc: 'tool: the shell command a Bash tool runs, promoted from tool_input.command. NULL for non-Bash tools and on malformed input. Invariant: every name=\'Bash\' node carries a non-NULL command.' },
     {
       name: 'action',
       sqlType: 'VARCHAR',

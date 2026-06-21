@@ -76,7 +76,12 @@ later drop-in with no reshaping. Three concerns are kept strictly separate:
   `@coach/semantics`) so the store can `GROUP BY action` for stable, comparable counts. It is derived
   deterministically by `classifyAction(name, bashCommand?)` (no LLM, no config) in stage 6 for
   **every** tool node — never NULL — and surfaces as the non-NULL `nodes.action` column. The Bash
-  command is read inline from the tool input today; item 4 will later promote it to its own column.
+  command and file path are promoted to their own `nodes` columns — `bash_command` (from
+  `tool_input.command`) and `file_path` (from `tool_input.file_path`/`notebook_path`) — by a single
+  total extractor (`extractBashCommand` / `extractFilePath` in `graph/semantic/derive.ts`) reused by
+  both the materializer and `classifyAction`, so there is one source of truth for the command. Both
+  are NULL for tools that don't carry them and on malformed input (the extractor never throws);
+  invariant: every `name='Bash'` node has a non-NULL `bash_command`, and every Read node a `file_path`.
 - **Edges are two different relations over the same nodes.** _Containment_ ("child is contained in
   time by parent") is the `parent` self-FK, surfaced per interaction as `tree` (an id-only
   `ExecutionNode` = `{ id, children }`). _Causal_ ("effect triggered by cause") is its own DAG edge
