@@ -7,6 +7,7 @@ import { analyzeGraph, type GraphAnalysis } from './graph/analysis/analysis.ts';
 import type { ExecutionGraph, VizResult } from './graph/types.ts';
 import { defaultSemanticsConfig, type SemanticsConfig } from '@coach/semantics';
 import { enrichExecutionGraph } from './graph/semantic/semantic.ts';
+import { matchToolResults } from './graph/result/result.ts';
 import { routeToSessions } from './route/route.ts';
 import type { CanonicalNode, ClassifiedInput, SessionInputs, UploadedFile } from './types.ts';
 
@@ -49,7 +50,7 @@ function sortByTime(nodes: readonly CanonicalNode[]): CanonicalNode[] {
  * stage's output. Pure and file-system-free — the CLI and the app both call it.
  *
  *   classify → route to sessions → to canonical (per session) → aggregate →
- *   execution graph → semantic enrichment → analysis
+ *   execution graph → tool-result matching → semantic enrichment → analysis
  *
  * Stage 6 enrichment is deterministic and always runs, using `config` (the
  * bundled `defaultSemanticsConfig` unless overridden). Stage 7 analyzes the
@@ -69,9 +70,10 @@ export function runPipeline(
   }));
 
   const agentGraph = aggregate(canonicalBySession.map((c) => c.nodes));
-  const executionGraph = buildExecutionGraph(agentGraph);
+  const mechanicalGraph = buildExecutionGraph(agentGraph);
+  const { graph: executionGraph, unmatchedToolIds } = matchToolResults(mechanicalGraph);
   const enrichedGraph = enrichExecutionGraph(executionGraph, config);
-  const analysis = analyzeGraph(enrichedGraph);
+  const analysis = analyzeGraph(enrichedGraph, unmatchedToolIds);
 
   return {
     classified,

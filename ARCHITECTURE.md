@@ -155,6 +155,29 @@ Input files (accumulating — user stages N files/folders before submitting)
                             agnostic: native stamps tool_use_id on its tool spans,
                             OTEL gets it via enrich (from the tool decision log).
         │
+        ▼  Stage 5.5 — graph/result/result.ts  → ExecutionGraph (+ unmatchedToolIds)
+   matchToolResults(graph)  a PURE TABLE PASS that matches every `tool` node to its
+                            result. A tool call's result is NOT on the tool node — it
+                            arrives as a `tool_result` block, keyed by `tool_use_id`, in
+                            the request messages (stage-5 `requestMessagesDelta`) of the
+                            inference that consumed it. This indexes those blocks by
+                            tool_use_id and annotates each matched tool node with three
+                            promoted columns: `is_error` (the harness failure flag),
+                            `error_kind` (a deterministic class, NO LLM — see below), and
+                            `result_summary` (≤500-char cleanly-truncated result/error
+                            text). Tool calls with NO matching result are REPORTED (their
+                            ids returned in `unmatchedToolIds` → surfaced in analysis
+                            `gaps`), never silently dropped; their `is_error` stays NULL.
+                            error_kind rules, matched in priority order against the lower-
+                            cased text: a failed-match edit (`no match` / `string to
+                            replace` / `not unique`) → invalid_args (it is a bad
+                            old_string, not a missing file); file/command not found
+                            (`no such file` / `enoent` / `command not found` / `does not
+                            exist`) → not_found; `permission denied` / `eacces` →
+                            permission; `timed out` / `etimedout` → timeout; other
+                            invalid-argument/parse text → invalid_args; a Bash `exit code
+                            N>0` / `killed` → nonzero_exit; anything else → other.
+        │
         ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
    enrichExecutionGraph(graph, config)  a PURE TABLE PASS: iterates the `nodes`
                             table and, for each `tool` / `llm_request`, writes a
@@ -173,17 +196,23 @@ Input files (accumulating — user stages N files/folders before submitting)
                             NOTHING ELSE — per interaction: shape (query/agentic),
                             cost/token/latency rollup, longest step, critical path
                             (slowest route through causalEdges), redundant tool
-                            calls, and a (currently empty) failures list; rolled up
-                            per session and agent. A function of the
+                            calls, and `failureIds` (tool nodes whose matched
+                            result carried is_error=true, from stage 5.5); rolled up
+                            per session and agent. Per session it also emits
+                            `misleadingFiles` — the "misleading file" signal, rebased
+                            on failed edits: Edit/Write tool nodes with is_error=true
+                            grouped by file_path, descending (a file that keeps
+                            rejecting edits is one the agent's mental model of is
+                            wrong). A function of the
                             `ExecutionGraph` alone, so the live pipeline, the MCP
                             reading a persisted graph, and the app's pre-computed-
                             load path share one derivation. `longestStep` and the
                             critical path moved here OUT of the app's
                             `viz/layout` pass — the moment a second, non-rendering
                             consumer exists, this derivation can't live in the
-                            renderer. Observations that aren't yet mechanical (failed
-                            tool calls — no status field on ToolNode; retry vs.
-                            benign re-read) are surfaced in `gaps`, never dropped.
+                            renderer. Observations that aren't yet mechanical (retry
+                            vs. benign re-read) plus any unmatched tool calls (from
+                            stage 5.5) are surfaced in `gaps`, never dropped.
                             Always runs as the final stage of runPipeline.
         │
         ▼  buildVizResultFromExecutionGraph() adapter → VizResult  (execution graph)

@@ -33,6 +33,8 @@ UploadedFile[]   (*.jsonl · logs.json + trace*.json)
         ▼ 5. execution graph buildExecutionGraph → executionGraph (ExecutionGraph)
                                id-keyed, stage-layered: nodes/deltas/semantics tables + entities;
                                edges are containment (tree) and causal (causalEdges)
+        ▼ 5.5 tool results   matchToolResults → tool nodes get is_error/error_kind/result_summary
+                               (matched by tool_use_id; unmatched calls reported, not dropped)
         ▼ 6. semantic graph  enrichExecutionGraph → ExecutionGraph
                                pure table pass: writes a semantics[id] row per tool / llm_request
                                deterministic; labels come from @coach/semantics (no model)

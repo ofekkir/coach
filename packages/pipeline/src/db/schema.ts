@@ -2,19 +2,16 @@
 // SOURCE OF TRUTH: a backend builds the DuckDB tables from `TABLES` (via
 // `materialize.ts`), and the MCP's `describe_schema` tool renders the very same
 // specs — so the DDL the data lives in and the schema the agent reads can never
-// drift.
-//
-// The execution graph (stage 6) is already a normalized, id-keyed relational
-// model (see ARCHITECTURE.md); these tables are that model made queryable:
+// drift. The execution graph (stage 6) is already a normalized, id-keyed
+// relational model (see ARCHITECTURE.md); these tables are that model queryable:
 //   nodes / deltas / semantics  — the three id-keyed node-data layers
 //   containment / causal_edges  — the two edge relations over those nodes
 //   threads                     — layout lanes (grouping, not causality)
 //   agents / sessions           — the dimension entities (FK targets, not nodes)
-
 export interface ColumnSpec {
   readonly name: string;
   /** DuckDB column type. `JSON` columns are populated from a JS value via CAST. */
-  readonly sqlType: 'VARCHAR' | 'DOUBLE' | 'INTEGER' | 'BIGINT' | 'JSON';
+  readonly sqlType: 'VARCHAR' | 'DOUBLE' | 'INTEGER' | 'BIGINT' | 'BOOLEAN' | 'JSON';
   readonly doc: string;
 }
 
@@ -48,15 +45,11 @@ const NODES: TableSpec = {
       sqlType: 'VARCHAR',
       doc: 'FK → sessions.id. Denormalized onto every node so per-session aggregation is a flat filter.',
     },
-    {
-      name: 'interaction_id',
-      sqlType: 'VARCHAR',
-      doc: 'FK → the owning interaction node id (its own id for an interaction row).',
-    },
+    { name: 'interaction_id', sqlType: 'VARCHAR', doc: 'FK → owning interaction node id.' },
     {
       name: 'start_time_ns',
       sqlType: 'VARCHAR',
-      doc: 'Span start, nanoseconds. VARCHAR because the value overflows DOUBLE precision.',
+      doc: 'Span start, ns. VARCHAR because the value overflows DOUBLE precision.',
     },
     { name: 'end_time_ns', sqlType: 'VARCHAR', doc: 'Span end, nanoseconds (VARCHAR).' },
     // prettier-ignore
@@ -67,11 +60,7 @@ const NODES: TableSpec = {
     { name: 'seq', sqlType: 'INTEGER', doc: 'Dense 0..n-1 rank of this node within its owning interaction (every node sharing interaction_id), by start_time_ns ascending. ORDER BY seq == ORDER BY start_time_ns — a stable per-interaction timeline index.' },
     { name: 'duration_ms', sqlType: 'DOUBLE', doc: 'Span wall-clock in ms.' },
     { name: 'model', sqlType: 'VARCHAR', doc: 'llm_request: model id.' },
-    {
-      name: 'source',
-      sqlType: 'VARCHAR',
-      doc: 'llm_request: the emitting loop/source, when present.',
-    },
+    { name: 'source', sqlType: 'VARCHAR', doc: 'llm_request: emitting loop/source.' },
     { name: 'stop_reason', sqlType: 'VARCHAR', doc: 'llm_request: stop reason, when present.' },
     { name: 'tokens_in', sqlType: 'DOUBLE', doc: 'llm_request: input tokens.' },
     { name: 'tokens_out', sqlType: 'DOUBLE', doc: 'llm_request: output tokens.' },
@@ -92,6 +81,12 @@ const NODES: TableSpec = {
       sqlType: 'VARCHAR',
       doc: "tool: closed activity bucket, NON-NULL for every tool node — 'explore'|'author'|'edit'|'run'|'test'|'verify'|'vcs'|'setup'|'mcp'|'research'|'delegate'|'plan'|'other'. Deterministically derived from (name, bash command); GROUP BY it for stable counts. Coarse dimension, distinct from the free-form semantics.what.",
     },
+    // prettier-ignore
+    { name: 'is_error', sqlType: 'BOOLEAN', doc: "tool: did the matched tool_result carry is_error=true? Matched by tool_use_id from the consuming inference's request messages. NULL when no result was matched (the call is reported, never dropped)." },
+    // prettier-ignore
+    { name: 'error_kind', sqlType: 'VARCHAR', doc: "tool: deterministic error class (no LLM) — 'not_found' | 'invalid_args' | 'permission' | 'timeout' | 'nonzero_exit' | 'other'. NULL when the call succeeded or had no matched result. Count Edit/Write rows WHERE is_error for the misleading-file (failed-edits-per-file) signal." },
+    // prettier-ignore
+    { name: 'result_summary', sqlType: 'VARCHAR', doc: 'tool: ≤500-char summary of the tool_result/error text (cleanly truncated). NULL when the result had no text.' },
     {
       name: 'sequence',
       sqlType: 'INTEGER',

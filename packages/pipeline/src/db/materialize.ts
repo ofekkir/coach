@@ -37,10 +37,16 @@ function bigintLiteral(value: unknown): string {
   return /^-?\d+$/.test(digits) ? digits : 'NULL';
 }
 
+function booleanLiteral(value: unknown): string {
+  if (typeof value !== 'boolean') return 'NULL';
+  return value ? 'TRUE' : 'FALSE';
+}
+
 function columnLiteral(column: ColumnSpec, value: unknown): string {
   if (column.sqlType === 'JSON')
     return value == null ? 'NULL' : `CAST(${sqlString(JSON.stringify(value))} AS JSON)`;
   if (column.sqlType === 'BIGINT') return bigintLiteral(value);
+  if (column.sqlType === 'BOOLEAN') return booleanLiteral(value);
   return sqlScalar(value);
 }
 
@@ -102,6 +108,9 @@ function typeNodeRecord(node: CanonicalNode, action: Action | undefined): Record
       tool_use_id: node.tool_use_id,
       tool_input: node.tool_input,
       action: action ?? 'other',
+      is_error: node.is_error,
+      error_kind: node.error_kind,
+      result_summary: node.result_summary,
     };
   if (node.type === 'hook') return { name: node.name };
   if (node.type === 'interaction') return { sequence: node.sequence, prompt: node.prompt };

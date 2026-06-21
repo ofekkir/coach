@@ -40,9 +40,13 @@ describe('analyzeGraph', () => {
     expect(agentCost).toBeCloseTo(summed);
   });
 
-  it('reports the failed-tool-call coverage gap honestly', () => {
+  it('surfaces the remaining coverage gaps honestly', () => {
     expect(analysis.gaps.length).toBeGreaterThan(0);
+  });
+
+  it('derives failed-tool-call ids from matched tool results (none in this fixture)', () => {
     const interactions = analysis.sessions.flatMap((s) => s.interactions);
     expect(interactions.every((i) => i.failureIds.length === 0)).toBe(true);
+    expect(analysis.sessions.every((s) => s.misleadingFiles.length === 0)).toBe(true);
   });
 });

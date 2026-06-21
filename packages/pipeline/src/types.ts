@@ -201,6 +201,17 @@ export interface LlmRequestNode extends SpannedNode {
   cost_usd?: number;
 }
 
+/** The closed, deterministic taxonomy for a failed tool call, classified from the
+ *  tool_result text/exit info by rule (no LLM). NULL/absent when the call succeeded
+ *  or has no matched result. See `graph/result/result.ts` for the classifier rules. */
+export type ErrorKind =
+  | 'not_found' // file/path/command not found
+  | 'invalid_args' // bad arguments / parse failure / a "no match" edit
+  | 'permission' // permission denied
+  | 'timeout' // timed out
+  | 'nonzero_exit' // a Bash non-zero exit not otherwise classified
+  | 'other'; // an error that matched none of the above
+
 export interface ToolNode extends SpannedNode {
   type: 'tool';
   name?: string;
@@ -210,6 +221,15 @@ export interface ToolNode extends SpannedNode {
    *  block referencing this id). Absent when the trace doesn't carry one. */
   tool_use_id?: string;
   tool_input?: string;
+  /** Stage-5.5 result matching (`graph/result/result.ts`): the tool_result block,
+   *  matched by `tool_use_id` from the consuming inference's request messages.
+   *  `is_error` is the harness's failure flag (absent when no result was matched —
+   *  unmatched calls are reported, never silently dropped). `error_kind` is the
+   *  deterministic classification of an error (NULL when ok). `result_summary` is a
+   *  ≤500-char summary of the result/error text. */
+  is_error?: boolean;
+  error_kind?: ErrorKind;
+  result_summary?: string;
 }
 
 export interface ToolExecutionNode extends SpannedNode {
