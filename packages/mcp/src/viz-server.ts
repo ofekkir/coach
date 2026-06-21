@@ -30,11 +30,6 @@ const HTTP_NOT_FOUND = 404;
 
 const MISSING_DIST_HINT = `viz: built app not found at ${APP_DIST} — run \`pnpm --filter @coach/app build\` first.`;
 
-function assertDistBuilt(): void {
-  if (existsSync(join(APP_DIST, INDEX_HTML))) return;
-  throw new Error(MISSING_DIST_HINT);
-}
-
 /** Builds the boot URL for a running server: the app reads `data`/`focus` from the
  *  query string (see app `main.tsx`). Pure — tested without a live server. */
 export function buildVizUrl(port: number, dataFile: string, focus?: string): string {
@@ -86,11 +81,14 @@ export function startVizServer(
   focus?: string,
   dataDir: string = process.cwd(),
 ): Promise<VizServer> {
-  assertDistBuilt();
-  const server = createServer((req, res) => {
-    handleRequest(req, res, dataDir);
-  });
-  return new Promise((resolvePromise) => {
+  return new Promise((resolvePromise, rejectPromise) => {
+    if (!existsSync(join(APP_DIST, INDEX_HTML))) {
+      rejectPromise(new Error(MISSING_DIST_HINT));
+      return;
+    }
+    const server = createServer((req, res) => {
+      handleRequest(req, res, dataDir);
+    });
     server.listen(0, () => {
       const { port } = server.address() as AddressInfo;
       resolvePromise({ url: buildVizUrl(port, dataFile, focus), close: () => server.close() });
