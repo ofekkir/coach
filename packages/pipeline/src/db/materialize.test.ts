@@ -12,9 +12,10 @@ function readFixture(relPath: string): string {
 }
 
 const NATIVE_JSONL = readFixture('native-claude/fetch-website/session.jsonl');
+const REFACTOR_JSONL = readFixture('native-claude/refactor-code/session.jsonl');
 
-function nodeRows(): Record<string, unknown>[] {
-  const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
+function nodeRows(content: string = NATIVE_JSONL): Record<string, unknown>[] {
+  const files: UploadedFile[] = [{ name: 'session.jsonl', content }];
   const { enrichedGraph } = runPipeline(files);
   return buildRecords(enrichedGraph).nodes ?? [];
 }
@@ -55,6 +56,22 @@ describe('seq invariant', () => {
       const seqs = rows.map((r) => r.seq as number).sort((a, b) => a - b);
       expect(seqs).toEqual([...Array(rows.length).keys()]);
     }
+  });
+});
+
+describe('promoted file_path / bash_command columns', () => {
+  it("every name='Bash' node carries a non-NULL bash_command", () => {
+    const bashRows = nodeRows(REFACTOR_JSONL).filter((r) => r.name === 'Bash');
+    expect(bashRows.length).toBeGreaterThan(0);
+    const missing = bashRows.filter((r) => r.bash_command == null);
+    expect(missing.length).toBe(0);
+  });
+
+  it("every name='Read' node carries a non-NULL file_path", () => {
+    const readRows = nodeRows(REFACTOR_JSONL).filter((r) => r.name === 'Read');
+    expect(readRows.length).toBeGreaterThan(0);
+    const missing = readRows.filter((r) => r.file_path == null);
+    expect(missing.length).toBe(0);
   });
 });
 

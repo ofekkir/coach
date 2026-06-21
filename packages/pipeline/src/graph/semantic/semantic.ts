@@ -6,14 +6,9 @@ import type {
   ToolNode,
 } from '../../types.ts';
 import type { ExecutionGraph } from '../types.ts';
+import { actionLabel, classifyAction, type Action, type SemanticsConfig } from '@coach/semantics';
 import {
-  actionLabel,
-  classifyAction,
-  strField,
-  type Action,
-  type SemanticsConfig,
-} from '@coach/semantics';
-import {
+  extractBashCommand,
   markerLabel,
   parseToolInput,
   responseText,
@@ -59,12 +54,13 @@ function inferenceFields(
   return { what: [node.model] };
 }
 
-/** The closed `action` bucket for a tool node. Reads the Bash command inline from
- *  the tool input (the raw source item 4 will later promote to its own column);
- *  every tool node yields a non-NULL action. Distinct from `semantics.what`. */
+/** The closed `action` bucket for a tool node. Reads the Bash command via the
+ *  shared `extractBashCommand` (same source of truth as the promoted
+ *  nodes.bash_command column); every tool node yields a non-NULL action. Distinct
+ *  from `semantics.what`. */
 function toolAction(node: ToolNode): Action {
-  const command = strField(parseToolInput(node.tool_input), 'command');
-  return classifyAction(node.name, command === '' ? undefined : command);
+  const command = extractBashCommand(parseToolInput(node.tool_input));
+  return classifyAction(node.name, command ?? undefined);
 }
 
 function toolFields(node: ToolNode, config: SemanticsConfig): SemanticFields {

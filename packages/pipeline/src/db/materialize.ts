@@ -8,6 +8,7 @@
 import type { Action } from '@coach/semantics';
 import type { Agent, CanonicalNode, Session } from '../types.ts';
 import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
+import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
 import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
 
 const INSERT_CHUNK = 200;
@@ -102,16 +103,20 @@ function typeNodeRecord(node: CanonicalNode, action: Action | undefined): Record
       tokens_out: node.tokens_out,
       cost_usd: node.cost_usd,
     };
-  if (node.type === 'tool')
+  if (node.type === 'tool') {
+    const input = parseToolInput(node.tool_input);
     return {
       name: node.name,
       tool_use_id: node.tool_use_id,
       tool_input: node.tool_input,
+      file_path: extractFilePath(input),
+      bash_command: extractBashCommand(input),
       action: action ?? 'other',
       is_error: node.is_error,
       error_kind: node.error_kind,
       result_summary: node.result_summary,
     };
+  }
   if (node.type === 'hook') return { name: node.name };
   if (node.type === 'interaction') return { sequence: node.sequence, prompt: node.prompt };
   return {};
