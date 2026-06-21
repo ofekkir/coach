@@ -12,6 +12,7 @@ import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/se
 import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
 import { seqByNodeId } from './seq.ts';
 import { filePathFromToolInput, normalizeRepoPath } from './repo-path.ts';
+import { buildInteractionMetrics } from './interaction-metrics.ts';
 
 const INSERT_CHUNK = 200;
 
@@ -212,6 +213,7 @@ export function buildRecords(graph: ExecutionGraph): Record<string, Record<strin
       cwd: s.cwd,
       branch: s.branch,
     })),
+    interaction_metrics: buildInteractionMetrics(graph),
   };
 }
 

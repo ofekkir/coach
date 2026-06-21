@@ -331,6 +331,12 @@ start_time_ns`, a stable per-interaction timeline index. The `sessions` dimensio
   to `<rest>`, else makes the path relative to the session's (worktree-normalized) `cwd`; the result
   never contains `/.claude/worktrees/` and never has a leading `/`. No hard-coded prefix. This lives in
   the pipeline because the graph→DB mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it.
+  Beside those base tables sits one **derived rollup**, `interaction_metrics` (`db/interaction-metrics.ts`):
+  one row per interaction where **every value is a pure aggregate over that interaction's `nodes` rows**
+  (`prompt_len`, `tool_count`/`llm_count`/`error_count`/`distinct_files`, summed `tokens_in`/`tokens_out`/`cost_usd`,
+  `duration_ms`, seq-ordered `first_action`/`last_action`, and `shape` = `'agentic'` iff `tool_count>0` else
+  `'direct'`). It is a flat lookup for the common per-turn aggregates, never a new source of truth — an
+  equality invariant (`db/interaction-metrics.test.ts`) recomputes each metric from `nodes` and asserts it matches.
 - **Query core — `@coach/mcp` (pure, backend-neutral).** Beside the engine, the MCP holds the analyst
   `Store` (`query-core.ts`): a UX guard (`guard.ts`) + capped, JSON-safe result shaping (`result.ts`) +
   traversal SQL over a `Connection` port — no `node:*` or DB driver, so the same core could later serve
