@@ -6,6 +6,7 @@ export { agentEntityId, PSEUDO_USER_ID, sessionEntityId } from './types.ts';
 export type {
   Agent,
   CanonicalNode,
+  ErrorKind,
   HookNode,
   InputType,
   InteractionNode,
@@ -45,6 +46,11 @@ export { deltasOf, nodeData, resolve, semanticsOf } from './graph/types.ts';
 // @coach/semantics — import config types from there).
 export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 
+// Tool result/error matching (stage 5.5; deterministic, no LLM) — matches each
+// tool node to its tool_result by tool_use_id and annotates is_error/error_kind/
+// result_summary. Unmatched calls are reported, never dropped.
+export { matchToolResults, type ToolResultMatch } from './graph/result/result.ts';
+
 // Analysis stage — mechanical derivations over the enriched graph (stage 7).
 // Types live in the module that derives them.
 export {
@@ -55,7 +61,7 @@ export {
   type SessionAnalysis,
   type Shape,
 } from './graph/analysis/analysis.ts';
-export type { Hotspot } from './graph/analysis/hotspots.ts';
+export type { FailedFile, Hotspot } from './graph/analysis/hotspots.ts';
 export type { CriticalPath } from './graph/analysis/critical-path.ts';
 export type { Repetition } from './graph/analysis/repetition.ts';
 

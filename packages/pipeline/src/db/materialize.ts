@@ -26,9 +26,15 @@ function sqlScalar(value: unknown): string {
   return sqlString(JSON.stringify(value));
 }
 
+function booleanLiteral(value: unknown): string {
+  if (typeof value !== 'boolean') return 'NULL';
+  return value ? 'TRUE' : 'FALSE';
+}
+
 function columnLiteral(column: ColumnSpec, value: unknown): string {
   if (column.sqlType === 'JSON')
     return value == null ? 'NULL' : `CAST(${sqlString(JSON.stringify(value))} AS JSON)`;
+  if (column.sqlType === 'BOOLEAN') return booleanLiteral(value);
   return sqlScalar(value);
 }
 
@@ -83,7 +89,14 @@ function typeNodeRecord(node: CanonicalNode): Record<string, unknown> {
       cost_usd: node.cost_usd,
     };
   if (node.type === 'tool')
-    return { name: node.name, tool_use_id: node.tool_use_id, tool_input: node.tool_input };
+    return {
+      name: node.name,
+      tool_use_id: node.tool_use_id,
+      tool_input: node.tool_input,
+      is_error: node.is_error,
+      error_kind: node.error_kind,
+      result_summary: node.result_summary,
+    };
   if (node.type === 'hook') return { name: node.name };
   if (node.type === 'interaction') return { sequence: node.sequence, prompt: node.prompt };
   return {};

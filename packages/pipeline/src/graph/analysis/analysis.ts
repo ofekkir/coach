@@ -1,7 +1,8 @@
 import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
-import type { CanonicalNode } from '../../types.ts';
+import type { CanonicalNode, ToolNode } from '../../types.ts';
 import { interactionNodes } from './access.ts';
 import { criticalPath, type CriticalPath } from './critical-path.ts';
+import { failedEditsByFile, type FailedFile } from './hotspots.ts';
 import { longestStep, type Hotspot } from './hotspots.ts';
 import { repetitions, type Repetition } from './repetition.ts';
 
@@ -36,9 +37,9 @@ export interface InteractionAnalysis {
   readonly longestStep: Hotspot | null;
   readonly criticalPath: CriticalPath | null;
   readonly repetitions: readonly Repetition[];
-  /** Failed tool-call node ids. Empty until `ToolNode` gains an error/status field
-   *  — until then failures live only in the consuming inference's `tool_result`
-   *  content, which the curated layer does not parse. See `GraphAnalysis.gaps`. */
+  /** Failed tool-call node ids — `tool` nodes whose matched `tool_result` carried
+   *  `is_error=true` (stage-5.5 `matchToolResults`). Resolve through `graph.nodes`
+   *  for `error_kind` / `result_summary`. */
   readonly failureIds: readonly string[];
 }
 
@@ -47,6 +48,11 @@ export interface SessionAnalysis {
   readonly rollup: Rollup;
   readonly shapeMix: Readonly<Record<Shape, number>>; // interaction counts per shape
   readonly interactions: readonly InteractionAnalysis[];
+  /** The "misleading file" signal, rebased on failed edits: files (by path) with
+   *  the most failed Edit/Write calls (`is_error=true`) in the session, descending.
+   *  A file that repeatedly rejects edits is one the agent is reasoning about with a
+   *  stale or wrong mental model. Empty when no edit failed. */
+  readonly misleadingFiles: readonly FailedFile[];
 }
 
 /** The full analysis for one execution graph. `kind` mirrors the graph's
@@ -69,17 +75,28 @@ const EMPTY_ROLLUP: Rollup = {
   toolCallCount: 0,
 };
 
-const GAPS = [
-  'failed tool calls — no error/status field on ToolNode; failures live only in the consuming inference tool_result content. Needs a schema addition.',
+const BASE_GAPS = [
   'retry vs. benign re-read — separating them needs a tool-mutation taxonomy (semantic, not mechanical). Only redundant_tool is emitted today.',
 ];
+
+function gapsWithUnmatched(unmatchedToolIds: readonly string[]): string[] {
+  if (unmatchedToolIds.length === 0) return BASE_GAPS;
+  const ids = unmatchedToolIds.join(', ');
+  return [
+    ...BASE_GAPS,
+    `unmatched tool calls — ${String(unmatchedToolIds.length)} tool node(s) had no tool_result to match by tool_use_id, so is_error is NULL for them: ${ids}.`,
+  ];
+}
 
 /** Mechanical analysis of the ENRICHED execution graph (stage 6 output). Pure and
  *  graph-only: the live pipeline (stage 7), the MCP reading a persisted
  *  `06-enriched-graph.json`, and the app's pre-computed-load path all call this and
  *  get byte-identical results. Every metric comes from the node table; findings
  *  reference nodes by id. */
-export function analyzeGraph(graph: ExecutionGraph): GraphAnalysis {
+export function analyzeGraph(
+  graph: ExecutionGraph,
+  unmatchedToolIds: readonly string[] = [],
+): GraphAnalysis {
   const sessions = sessionsOf(graph).map((s) =>
     sessionAnalysis(graph, s.sessionId, s.interactions),
   );
@@ -87,7 +104,7 @@ export function analyzeGraph(graph: ExecutionGraph): GraphAnalysis {
     kind: graph.kind,
     rollup: mergeRollups(sessions.map((s) => s.rollup)),
     sessions,
-    gaps: GAPS,
+    gaps: gapsWithUnmatched(unmatchedToolIds),
   };
 }
 
@@ -119,11 +136,15 @@ function sessionAnalysis(
   interactions: readonly InteractionExecution[],
 ): SessionAnalysis {
   const analyses = interactions.map((i) => interactionAnalysis(graph, i));
+  const tools = interactions.flatMap((i) =>
+    interactionNodes(graph, i.interactionId).filter((n): n is ToolNode => n.type === 'tool'),
+  );
   return {
     sessionId,
     rollup: mergeRollups(analyses.map((a) => a.rollup)),
     shapeMix: tallyShapes(analyses),
     interactions: analyses,
+    misleadingFiles: failedEditsByFile(tools),
   };
 }
 
@@ -141,7 +162,7 @@ function interactionAnalysis(
     longestStep: longestStep(graph, interaction),
     criticalPath: criticalPath(graph, interaction),
     repetitions: repetitions(graph, interaction),
-    failureIds: [],
+    failureIds: nodes.filter((n) => n.type === 'tool' && n.is_error === true).map((n) => n.id),
   };
 }
 
