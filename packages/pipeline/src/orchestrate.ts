@@ -57,16 +57,25 @@ function sortByTime(nodes: readonly CanonicalNode[]): CanonicalNode[] {
  * enriched graph alone. Multi-agent is out of scope: all sessions roll up under
  * a single agent.
  */
+/** Optional pipeline hooks. `onUnknownCostModel` fires when an llm_request carries
+ *  no cost and its model is absent from the price table — the cost is left NULL.
+ *  The pure pipeline can't import a logger (it runs in the browser); the Node CLI
+ *  passes a logger-backed callback so unpriced models are surfaced. */
+export interface PipelineOptions {
+  readonly onUnknownCostModel?: (model: string) => void;
+}
+
 export function runPipeline(
   files: readonly UploadedFile[],
   config: SemanticsConfig = defaultSemanticsConfig,
+  options: PipelineOptions = {},
 ): PipelineResult {
   const classified = classifyInputs(files);
   const sessions = routeToSessions(classified);
 
   const canonicalBySession = sessions.map((session) => ({
     sessionId: session.sessionId,
-    nodes: sortByTime(toCanonical(session)),
+    nodes: sortByTime(toCanonical(session, options.onUnknownCostModel)),
   }));
 
   const agentGraph = aggregate(canonicalBySession.map((c) => c.nodes));

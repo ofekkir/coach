@@ -5,7 +5,7 @@
 // Records are sparse: a column absent from a record serializes to NULL, so each
 // builder only sets the columns its node/edge type actually has.
 
-import type { Action } from '@coach/semantics';
+import type { Action, IntentCategory } from '@coach/semantics';
 import type { Agent, CanonicalNode, Session } from '../types.ts';
 import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
@@ -92,7 +92,11 @@ function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
   };
 }
 
-function typeNodeRecord(node: CanonicalNode, action: Action | undefined): Record<string, unknown> {
+function typeNodeRecord(
+  node: CanonicalNode,
+  action: Action | undefined,
+  intent: IntentCategory | undefined,
+): Record<string, unknown> {
   if (node.type === 'llm_request')
     return {
       model: node.model,
@@ -113,7 +117,8 @@ function typeNodeRecord(node: CanonicalNode, action: Action | undefined): Record
       result_summary: node.result_summary,
     };
   if (node.type === 'hook') return { name: node.name };
-  if (node.type === 'interaction') return { sequence: node.sequence, prompt: node.prompt };
+  if (node.type === 'interaction')
+    return { sequence: node.sequence, prompt: node.prompt, intent_category: intent ?? 'other' };
   return {};
 }
 
@@ -146,11 +151,12 @@ function seqByNodeId(nodes: readonly CanonicalNode[]): Map<string, number> {
 function nodeRecord(
   node: CanonicalNode,
   actions: Readonly<Record<string, Action>>,
+  intents: Readonly<Record<string, IntentCategory>>,
   seq: Map<string, number>,
 ): Record<string, unknown> {
   return {
     ...baseNodeRecord(node),
-    ...typeNodeRecord(node, actions[node.id]),
+    ...typeNodeRecord(node, actions[node.id], intents[node.id]),
     seq: seq.get(node.id),
   };
 }
@@ -194,7 +200,7 @@ export function buildRecords(graph: ExecutionGraph): Record<string, Record<strin
   const { agents, sessions, interactions } = collectStructure(graph);
   const seq = seqByNodeId(nodes);
   return {
-    nodes: nodes.map((node) => nodeRecord(node, graph.actions, seq)),
+    nodes: nodes.map((node) => nodeRecord(node, graph.actions, graph.intents, seq)),
     deltas: Object.entries(graph.deltas).map(([id, d]) => ({
       id,
       request_messages_delta: d.requestMessagesDelta,

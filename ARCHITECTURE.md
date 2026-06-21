@@ -64,7 +64,9 @@ later drop-in with no reshaping. Three concerns are kept strictly separate:
   `ExecutionGraph`: `nodes` (stage 3 canonical data — the value type is `CanonicalNode`), `deltas`
   (stage 5 — per-`llm_request` `requestMessagesDelta` / `responseMessagesDelta`, the messages new to
   that step vs. the previous request in the same thread), `semantics` (stage 6 — per-node `what`
-  plus an optional `comment`), and `actions` (stage 6 — one **closed `action`** per tool node).
+  plus an optional `comment`), `actions` (stage 6 — one **closed `action`** per tool node), and
+  `intents` (stage 6 — one **closed `intent_category`** per interaction node, derived from the
+  prompt; the interaction-level analogue of `action`).
   `node.id == data.id` across every layer (1:1 joins). A node "points
   to" its data **by id, resolved through a table** (`nodeData` / `deltasOf` / `semanticsOf` /
   `resolve`) — never an embedded object, so nothing re-duplicates on serialize/DB. There is **no
@@ -241,9 +243,19 @@ generic `respond` act; a weak-model labeler that classified that act more finely
 reintroducing it. The interpreter (`graph/semantic`) is agent-agnostic, so a different domain/agent is
 a config swap, not a code change. See `packages/semantics/README.md` for the resolution order and
 what is deliberately out of scope (composition/inference roll-up). Enrichment writes into the
-`semantics` table (one row per relabeled node) and the `actions` table (one closed `action` per tool
-node, derived by `classifyAction`), and leaves the `nodes`/`deltas`/edges untouched — the
-old copied twin types (`ActionNode`/`InferenceNode`) are retired.
+`semantics` table (one row per relabeled node), the `actions` table (one closed `action` per tool
+node, derived by `classifyAction`), and the `intents` table (one closed `intent_category` per
+interaction node, derived from the prompt by `classifyIntent`), and leaves the `nodes`/`deltas`/edges
+untouched — the old copied twin types (`ActionNode`/`InferenceNode`) are retired.
+
+**Cost derivation lives beside the vocabulary in `@coach/semantics`.** A bundled
+`data/pricing/model-prices.json` (per-MTok USD, input/output, with a dated source comment) plus a
+pure `costUsd(model, tokensIn, tokensOut)` deriver let the canonical builder fill `nodes.cost_usd`
+when a trace carries no cost (the common native-log case): the OTEL/harness cost wins when present,
+otherwise cost is derived from `model + tokens`. An **unknown model → NULL** (never 0) and is
+surfaced through an optional `onUnknownCostModel` callback threaded from `runPipeline` — the pure
+pipeline cannot import `@coach/logger` (it runs in the browser too), so the Node CLI (`scripts/e2e.ts`)
+injects a logger-backed sink. `intent_category` is 100% non-NULL on interactions (fallback `other`).
 
 All sessions roll up under one agent into a single execution graph, and sessions are navigated by
 expand/collapse inside the graph. Unsupported files are carried through `classified` (never silently

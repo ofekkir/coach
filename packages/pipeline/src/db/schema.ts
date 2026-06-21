@@ -97,6 +97,8 @@ const NODES: TableSpec = {
       sqlType: 'VARCHAR',
       doc: 'interaction: the user prompt text (the spine head; not a separate node).',
     },
+    // prettier-ignore
+    { name: 'intent_category', sqlType: 'VARCHAR', doc: "interaction: closed intent bucket, NON-NULL for every interaction node — 'debug'|'feature'|'refactor'|'explain'|'test'|'ops'|'research'|'other'. Deterministically derived from the prompt by the stage-6 labeler; GROUP BY it for stable per-intent counts. NULL for non-interaction nodes." },
     {
       name: 'data',
       sqlType: 'JSON',

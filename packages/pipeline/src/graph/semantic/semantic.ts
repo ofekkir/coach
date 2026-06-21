@@ -1,5 +1,6 @@
 import type {
   CanonicalNode,
+  InteractionNode,
   LlmRequestNode,
   MessageDeltas,
   SemanticFields,
@@ -9,8 +10,10 @@ import type { ExecutionGraph } from '../types.ts';
 import {
   actionLabel,
   classifyAction,
+  classifyIntent,
   strField,
   type Action,
+  type IntentCategory,
   type SemanticsConfig,
 } from '@coach/semantics';
 import {
@@ -76,6 +79,14 @@ function toolFields(node: ToolNode, config: SemanticsConfig): SemanticFields {
   };
 }
 
+/** The closed `intent_category` for an interaction, derived from its prompt by the
+ *  same deterministic labeler mechanism as `action`. Every interaction yields a
+ *  non-NULL category (`other` is the fallback). The interaction-level analogue of
+ *  `toolAction`. */
+function interactionIntent(node: InteractionNode): IntentCategory {
+  return classifyIntent(node.prompt);
+}
+
 function semanticFieldsOf(
   node: CanonicalNode,
   deltas: MessageDeltas | undefined,
@@ -90,12 +101,14 @@ function semanticFieldsOf(
 
 /**
  * Enriches an ExecutionGraph by populating its `semantics` table (one sparse row
- * per relabeled `tool` / `llm_request` node) and its `actions` table (one closed
- * `action` bucket per `tool` node — dense over tool nodes, never NULL). Both are
- * keyed by node id; `action` is the coarse closed dimension, distinct from the
- * free-form `semantics.what`. Pure and deterministic — labels come from the
- * injected SemanticsConfig, actions from `(name, bash command)` alone. The node
- * table, deltas, edges and entities are returned unchanged.
+ * per relabeled `tool` / `llm_request` node), its `actions` table (one closed
+ * `action` bucket per `tool` node — dense over tool nodes, never NULL), and its
+ * `intents` table (one closed `intent_category` per `interaction` node — dense
+ * over interactions, never NULL). All keyed by node id; `action`/`intent_category`
+ * are the coarse closed dimensions, distinct from the free-form `semantics.what`.
+ * Pure and deterministic — labels come from the injected SemanticsConfig, actions
+ * from `(name, bash command)` and intents from the prompt alone. The node table,
+ * deltas, edges and entities are returned unchanged.
  */
 export function enrichExecutionGraph(
   graph: ExecutionGraph,
@@ -103,10 +116,12 @@ export function enrichExecutionGraph(
 ): ExecutionGraph {
   const semantics: Record<string, SemanticFields> = {};
   const actions: Record<string, Action> = {};
+  const intents: Record<string, IntentCategory> = {};
   for (const [id, node] of Object.entries(graph.nodes)) {
     if (node.type === 'tool') actions[id] = toolAction(node);
+    if (node.type === 'interaction') intents[id] = interactionIntent(node);
     const fields = semanticFieldsOf(node, graph.deltas[id], config);
     if (fields != null) semantics[id] = fields;
   }
-  return { ...graph, semantics, actions };
+  return { ...graph, semantics, actions, intents };
 }
