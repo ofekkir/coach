@@ -27,9 +27,20 @@ function sqlScalar(value: unknown): string {
   return sqlString(JSON.stringify(value));
 }
 
+// BIGINT columns hold nanosecond timestamps that overflow JS `number` and DuckDB
+// DOUBLE, so the value arrives as a digit string (the ns VARCHAR) and is emitted as
+// a bare integer literal — never round-tripped through a JS number.
+function bigintLiteral(value: unknown): string {
+  if (value == null) return 'NULL';
+  if (typeof value !== 'string' && typeof value !== 'number') return 'NULL';
+  const digits = String(value);
+  return /^-?\d+$/.test(digits) ? digits : 'NULL';
+}
+
 function columnLiteral(column: ColumnSpec, value: unknown): string {
   if (column.sqlType === 'JSON')
     return value == null ? 'NULL' : `CAST(${sqlString(JSON.stringify(value))} AS JSON)`;
+  if (column.sqlType === 'BIGINT') return bigintLiteral(value);
   return sqlScalar(value);
 }
 
@@ -68,6 +79,8 @@ function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
     interaction_id: node.interactionId,
     start_time_ns: node.start_time_ns,
     end_time_ns: node.end_time_ns,
+    start_time: node.start_time_ns,
+    end_time: node.end_time_ns,
     duration_ms: node.duration_ms,
     data: node,
   };
@@ -95,11 +108,42 @@ function typeNodeRecord(node: CanonicalNode, action: Action | undefined): Record
   return {};
 }
 
+// Dense per-interaction sequence. Scope: every node that shares an interaction_id
+// (the whole interaction), ranked by start_time_ns ascending and compared as int64
+// (BigInt) so values of differing digit-length sort numerically, not lexically.
+// Ties break on id for determinism. Yields a dense 0..n-1 with no gaps/dupes; nodes
+// without an interactionId get no seq (NULL).
+function compareByStartTime(a: CanonicalNode, b: CanonicalNode): number {
+  const at = BigInt(a.start_time_ns);
+  const bt = BigInt(b.start_time_ns);
+  if (at !== bt) return at < bt ? -1 : 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+function seqByNodeId(nodes: readonly CanonicalNode[]): Map<string, number> {
+  const byInteraction = new Map<string, CanonicalNode[]>();
+  for (const node of nodes) {
+    if (node.interactionId == null) continue;
+    const group = byInteraction.get(node.interactionId) ?? [];
+    group.push(node);
+    byInteraction.set(node.interactionId, group);
+  }
+  const seq = new Map<string, number>();
+  for (const group of byInteraction.values())
+    group.sort(compareByStartTime).forEach((node, index) => seq.set(node.id, index));
+  return seq;
+}
+
 function nodeRecord(
   node: CanonicalNode,
   actions: Readonly<Record<string, Action>>,
+  seq: Map<string, number>,
 ): Record<string, unknown> {
-  return { ...baseNodeRecord(node), ...typeNodeRecord(node, actions[node.id]) };
+  return {
+    ...baseNodeRecord(node),
+    ...typeNodeRecord(node, actions[node.id]),
+    seq: seq.get(node.id),
+  };
 }
 
 interface GraphStructure {
@@ -136,11 +180,12 @@ function threadRecords(interaction: InteractionExecution): Record<string, unknow
   );
 }
 
-function buildRecords(graph: ExecutionGraph): Record<string, Record<string, unknown>[]> {
+export function buildRecords(graph: ExecutionGraph): Record<string, Record<string, unknown>[]> {
   const nodes = Object.values(graph.nodes);
   const { agents, sessions, interactions } = collectStructure(graph);
+  const seq = seqByNodeId(nodes);
   return {
-    nodes: nodes.map((node) => nodeRecord(node, graph.actions)),
+    nodes: nodes.map((node) => nodeRecord(node, graph.actions, seq)),
     deltas: Object.entries(graph.deltas).map(([id, d]) => ({
       id,
       request_messages_delta: d.requestMessagesDelta,
