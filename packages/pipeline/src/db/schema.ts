@@ -101,6 +101,8 @@ const NODES: TableSpec = {
       sqlType: 'VARCHAR',
       doc: 'interaction: the user prompt text (the spine head; not a separate node).',
     },
+    // prettier-ignore
+    { name: 'repo_path', sqlType: 'VARCHAR', doc: "tool: repo-relative file path derived from tool_input (Read/Edit/Write/etc). Worktree-normalized — a path under …/.claude/worktrees/<id>/<rest> collapses to <rest>, so the same file under two worktrees yields ONE repo_path. Never contains '/.claude/worktrees/' and never has a leading '/'. NULL when the tool input carries no file path." },
     {
       name: 'data',
       sqlType: 'JSON',
@@ -206,6 +208,10 @@ const SESSIONS: TableSpec = {
     { name: 'user_id', sqlType: 'VARCHAR', doc: 'The user behind the session.' },
     { name: 'session_id', sqlType: 'VARCHAR', doc: "The harness's own session id." },
     { name: 'title', sqlType: 'VARCHAR', doc: 'Optional session title.' },
+    // prettier-ignore
+    { name: 'cwd', sqlType: 'VARCHAR', doc: 'Absolute working directory the session ran in. Populated for native Claude sessions; NULL for OTEL traces (no cwd attribute).' },
+    // prettier-ignore
+    { name: 'branch', sqlType: 'VARCHAR', doc: 'Git branch the session ran on. Populated for native Claude sessions; NULL for OTEL traces (no branch attribute).' },
   ],
 };
 

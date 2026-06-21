@@ -24,6 +24,8 @@ export interface ParsedSpan {
   readonly toolInputSummary: string | null;
   readonly hookName: string | null;
   readonly sequenceIndex: number | null;
+  readonly cwd: string | null;
+  readonly branch: string | null;
 }
 
 function getStringAttr(attrs: readonly OtlpAttribute[], key: string): string | null {
@@ -73,6 +75,8 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
         toolInputSummary: getStringAttr(span.attributes, 'tool_input'),
         hookName: getStringAttr(span.attributes, 'hook.name'),
         sequenceIndex: getIntAttr(span.attributes, 'interaction.sequence'),
+        cwd: getStringAttr(span.attributes, 'cwd'),
+        branch: getStringAttr(span.attributes, 'git.branch'),
       };
     });
   spans.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));

@@ -310,8 +310,15 @@ not a reshape.
   **BIGINT** columns (the same digits emitted as bare integer literals — never round-tripped through a
   JS number) for arithmetic and ordering. A dense `seq` INTEGER ranks every node within its owning
   interaction by `start_time_ns` ascending (`0..n-1`, no gaps): `ORDER BY seq` == `ORDER BY
-start_time_ns`, a stable per-interaction timeline index. This lives in the
-  pipeline because the graph→DB mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it.
+start_time_ns`, a stable per-interaction timeline index. The `sessions` dimension carries `cwd` and
+  `branch` (the working directory + git branch a session ran in; populated for native Claude
+  sessions, NULL for OTEL traces, which expose neither). The `nodes` table adds a worktree-normalized
+  `repo_path` (`db/repo-path.ts`): the file path a tool touched, derived from `tool_input`, collapsed
+  to a single repo-relative form so the SAME file accessed under two different git worktrees yields ONE
+  `repo_path`. The rule strips any `…/.claude/worktrees/<id>/<rest>` (or bare `worktrees/<id>/`) segment
+  to `<rest>`, else makes the path relative to the session's (worktree-normalized) `cwd`; the result
+  never contains `/.claude/worktrees/` and never has a leading `/`. No hard-coded prefix. This lives in
+  the pipeline because the graph→DB mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it.
 - **Query core — `@coach/mcp` (pure, backend-neutral).** Beside the engine, the MCP holds the analyst
   `Store` (`query-core.ts`): a UX guard (`guard.ts`) + capped, JSON-safe result shaping (`result.ts`) +
   traversal SQL over a `Connection` port — no `node:*` or DB driver, so the same core could later serve

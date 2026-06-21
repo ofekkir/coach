@@ -10,6 +10,7 @@ import type { Agent, CanonicalNode, Session } from '../types.ts';
 import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
 import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
+import { filePathFromToolInput, normalizeRepoPath } from './repo-path.ts';
 
 const INSERT_CHUNK = 200;
 
@@ -39,8 +40,7 @@ function bigintLiteral(value: unknown): string {
 }
 
 function booleanLiteral(value: unknown): string {
-  if (typeof value !== 'boolean') return 'NULL';
-  return value ? 'TRUE' : 'FALSE';
+  return typeof value !== 'boolean' ? 'NULL' : value ? 'TRUE' : 'FALSE';
 }
 
 function columnLiteral(column: ColumnSpec, value: unknown): string {
@@ -93,7 +93,11 @@ function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
   };
 }
 
-function typeNodeRecord(node: CanonicalNode, action: Action | undefined): Record<string, unknown> {
+function typeNodeRecord(
+  node: CanonicalNode,
+  action: Action | undefined,
+  cwd: string | undefined,
+): Record<string, unknown> {
   if (node.type === 'llm_request')
     return {
       model: node.model,
@@ -115,6 +119,7 @@ function typeNodeRecord(node: CanonicalNode, action: Action | undefined): Record
       is_error: node.is_error,
       error_kind: node.error_kind,
       result_summary: node.result_summary,
+      repo_path: normalizeRepoPath(filePathFromToolInput(node.tool_input), cwd),
     };
   }
   if (node.type === 'hook') return { name: node.name };
@@ -128,8 +133,7 @@ function typeNodeRecord(node: CanonicalNode, action: Action | undefined): Record
 // Ties break on id for determinism. Yields a dense 0..n-1 with no gaps/dupes; nodes
 // without an interactionId get no seq (NULL).
 function compareByStartTime(a: CanonicalNode, b: CanonicalNode): number {
-  const at = BigInt(a.start_time_ns);
-  const bt = BigInt(b.start_time_ns);
+  const [at, bt] = [BigInt(a.start_time_ns), BigInt(b.start_time_ns)];
   if (at !== bt) return at < bt ? -1 : 1;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
@@ -152,10 +156,11 @@ function nodeRecord(
   node: CanonicalNode,
   actions: Readonly<Record<string, Action>>,
   seq: Map<string, number>,
+  cwdBySession: ReadonlyMap<string, string | undefined>,
 ): Record<string, unknown> {
   return {
     ...baseNodeRecord(node),
-    ...typeNodeRecord(node, actions[node.id]),
+    ...typeNodeRecord(node, actions[node.id], cwdBySession.get(node.sessionId)),
     seq: seq.get(node.id),
   };
 }
@@ -198,8 +203,9 @@ export function buildRecords(graph: ExecutionGraph): Record<string, Record<strin
   const nodes = Object.values(graph.nodes);
   const { agents, sessions, interactions } = collectStructure(graph);
   const seq = seqByNodeId(nodes);
+  const cwdBySession = new Map(sessions.map((s) => [s.id, s.cwd]));
   return {
-    nodes: nodes.map((node) => nodeRecord(node, graph.actions, seq)),
+    nodes: nodes.map((node) => nodeRecord(node, graph.actions, seq, cwdBySession)),
     deltas: Object.entries(graph.deltas).map(([id, d]) => ({
       id,
       request_messages_delta: d.requestMessagesDelta,
@@ -224,6 +230,8 @@ export function buildRecords(graph: ExecutionGraph): Record<string, Record<strin
       user_id: s.userId,
       session_id: s.sessionId,
       title: s.title,
+      cwd: s.cwd,
+      branch: s.branch,
     })),
   };
 }
