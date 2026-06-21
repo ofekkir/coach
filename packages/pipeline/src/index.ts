@@ -60,5 +60,5 @@ export type { CriticalPath } from './graph/analysis/critical-path.ts';
 export type { Repetition } from './graph/analysis/repetition.ts';
 
 // Orchestration
-export { buildVizResultFromExecutionGraph, buildVizResults, runPipeline } from './orchestrate.ts';
+export { buildVizResultFromExecutionGraph, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';

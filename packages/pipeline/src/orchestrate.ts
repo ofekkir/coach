@@ -85,26 +85,6 @@ export function runPipeline(
 }
 
 /**
- * Thin adapter for the app's data-source seam: runs the pipeline and wraps the
- * stage-6 enriched graph in the `VizResult` shape the renderer consumes. Always
- * emits one result (single agent), or none when no session was produced.
- */
-export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
-  const result = runPipeline(files);
-
-  const unsupported = result.classified.filter((c) => c.type === 'unsupported').length;
-  // eslint-disable-next-line no-console
-  if (unsupported > 0) console.warn(`coach: ignored ${String(unsupported)} unsupported file(s)`);
-
-  // No session entity means nothing renderable (empty upload, or inputs that
-  // resolved a session id but produced no canonical nodes — e.g. logs with no trace).
-  if (result.agentGraph.sessions.length === 0) return [];
-
-  const title = result.agentGraph.agent.userId || 'agent';
-  return [{ title, data: result.enrichedGraph }];
-}
-
-/**
  * Builds a VizResult directly from a pre-computed ExecutionGraph (e.g. loaded
  * from the e2e script's `05-execution-graph.json`), bypassing the full pipeline.
  */
