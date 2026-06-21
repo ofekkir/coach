@@ -2,14 +2,15 @@
 // graph into a temp file-backed DuckDB (writable), then serves queries through a
 // READ_ONLY handle with external access disabled and configuration locked, so the
 // ENGINE enforces read-only (not a keyword blocklist). The temp DB is removed on
-// close. This is the one node:*-bound piece; the query surface lives in @coach/store.
+// close. This is the one node:*-bound piece; the query surface lives in ./query-core.ts.
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
-import type { ExecutionGraph } from '@coach/pipeline';
-import { materializeSql, type Connection, type RawResult } from '@coach/store';
+import { materializeSql, type ExecutionGraph } from '@coach/pipeline';
+import type { Connection } from './query-core.ts';
+import type { RawResult } from './result.ts';
 
 // Engine-level read-only sandbox: read-only access, no filesystem/network (COPY,
 // read_csv, httpfs, ATTACH, INSTALL), and locked so a query can't re-enable them.

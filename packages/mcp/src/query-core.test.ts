@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createStore, type Connection } from './store.ts';
+import { createStore, type Connection } from './query-core.ts';
 import type { RawResult } from './result.ts';
 
 const EMPTY: RawResult = { columns: [], rows: [] };
@@ -11,7 +11,7 @@ function fakeConnection(onSql: (sql: string) => RawResult = () => EMPTY): Connec
   };
 }
 
-describe('createStore', () => {
+describe('createStore (query core)', () => {
   it('runs a read-only query through the guard and shapes the result', async () => {
     const store = createStore(fakeConnection(() => ({ columns: ['n'], rows: [{ n: 1 }] })));
     const out = await store.query('SELECT 1 AS n');

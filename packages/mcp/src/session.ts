@@ -4,7 +4,7 @@
 // throw a clear message until something is loaded. Load-once / serve-many — one
 // dataset at a time, replaced on each load.
 
-import type { Store } from '@coach/store';
+import type { Store } from './query-core.ts';
 import { loadDataset, type Dataset } from './load.ts';
 import { createStore } from './store.ts';
 
