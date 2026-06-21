@@ -82,6 +82,11 @@ const NODES: TableSpec = {
       doc: 'tool: serialized tool input. Identical (name, tool_input) ≥2× in one interaction is the redundant-tool signal.',
     },
     {
+      name: 'action',
+      sqlType: 'VARCHAR',
+      doc: "tool: closed activity bucket, NON-NULL for every tool node — 'explore'|'author'|'edit'|'run'|'test'|'verify'|'vcs'|'setup'|'mcp'|'research'|'delegate'|'plan'|'other'. Deterministically derived from (name, bash command); GROUP BY it for stable counts. Coarse dimension, distinct from the free-form semantics.what.",
+    },
+    {
       name: 'sequence',
       sqlType: 'INTEGER',
       doc: 'interaction: 0-based turn index within the session.',

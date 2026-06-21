@@ -1,3 +1,4 @@
+import type { Action } from '@coach/semantics';
 import type { Agent, CanonicalNode, MessageDeltas, SemanticFields, Session } from '../types.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -100,6 +101,9 @@ export type ExecutionGraph = {
   readonly nodes: Readonly<Record<string, CanonicalNode>>;
   readonly deltas: Readonly<Record<string, MessageDeltas>>;
   readonly semantics: Readonly<Record<string, SemanticFields>>;
+  /** Stage-6 closed `action` per tool node, keyed by node id. A non-NULL bucket
+   *  for EVERY tool node — distinct from the free-form `semantics.what`. */
+  readonly actions: Readonly<Record<string, Action>>;
 } & (
   | { readonly kind: 'agent'; readonly data: AgentExecution }
   | { readonly kind: 'session'; readonly data: SessionExecution }
