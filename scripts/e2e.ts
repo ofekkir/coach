@@ -55,15 +55,7 @@ const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
 // runPipeline runs all seven stages, including deterministic enrichment + analysis.
-// An llm_request with no traced cost and a model absent from the price table leaves
-// cost_usd NULL (never 0); surface those unpriced models so the table can be updated.
-const unpricedModels = new Set<string>();
-const result = runPipeline(files, undefined, {
-  onUnknownCostModel: (model) => unpricedModels.add(model),
-});
-if (unpricedModels.size > 0) {
-  log.warn({ models: [...unpricedModels] }, 'cost_usd left NULL for unpriced model(s)');
-}
+const result = runPipeline(files);
 
 // Shared with the MCP's directory load: writes 01..07 JSON + the self-contained .db.
 const written = await dumpPipelineOutputs(result, outDir);

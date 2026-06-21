@@ -253,14 +253,13 @@ node, derived by `classifyAction`), and the `intents` table (one closed `intent_
 interaction node, derived from the prompt by `classifyIntent`), and leaves the `nodes`/`deltas`/edges
 untouched — the old copied twin types (`ActionNode`/`InferenceNode`) are retired.
 
-**Cost derivation lives beside the vocabulary in `@coach/semantics`.** A bundled
-`data/pricing/model-prices.json` (per-MTok USD, input/output, with a dated source comment) plus a
-pure `costUsd(model, tokensIn, tokensOut)` deriver let the canonical builder fill `nodes.cost_usd`
-when a trace carries no cost (the common native-log case): the OTEL/harness cost wins when present,
-otherwise cost is derived from `model + tokens`. An **unknown model → NULL** (never 0) and is
-surfaced through an optional `onUnknownCostModel` callback threaded from `runPipeline` — the pure
-pipeline cannot import `@coach/logger` (it runs in the browser too), so the Node CLI (`scripts/e2e.ts`)
-injects a logger-backed sink. `intent_category` is 100% non-NULL on interactions (fallback `other`).
+**`nodes.cost_usd` is the traced cost only — never an estimate.** The canonical builder fills it
+**iff** the trace itself carries a cost (`resolveCost` in `canonical/transform/transform.ts`); absent
+that (the common native-log case) it stays **NULL ("unknown"), never 0**. We deliberately do **not**
+back-compute a figure from a model price table: a price-table number is a guess (prices drift, and it
+is not what was actually charged), and once written into `cost_usd` it is indistinguishable from a real
+cost — so "don't know" is recorded as NULL, not approximated. `intent_category` is 100% non-NULL on
+interactions (fallback `other`).
 
 All sessions roll up under one agent into a single execution graph, and sessions are navigated by
 expand/collapse inside the graph. Unsupported files are carried through `classified` (never silently
@@ -331,19 +330,25 @@ start_time_ns`, a stable per-interaction timeline index. The `sessions` dimensio
   to `<rest>`, else makes the path relative to the session's (worktree-normalized) `cwd`; the result
   never contains `/.claude/worktrees/` and never has a leading `/`. No hard-coded prefix. This lives in
   the pipeline because the graph→DB mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it.
-  Beside those base tables sit two **derived rollups** (pure aggregates, never new sources of truth).
-  `interaction_metrics` (`db/interaction-metrics.ts`): one row per interaction where **every value is a
-  pure aggregate over that interaction's `nodes` rows** (`prompt_len`, `tool_count`/`llm_count`/
-  `error_count`/`distinct_files`, summed `tokens_in`/`tokens_out`/`cost_usd`, `duration_ms`, seq-ordered
-  `first_action`/`last_action`, and `shape` = `'agentic'` iff `tool_count>0` else `'direct'`) — a flat
-  lookup for the common per-turn aggregates, with an equality invariant (`db/interaction-metrics.test.ts`)
-  that recomputes each metric from `nodes` and asserts it matches.
-  `transitions` (`db/transitions.ts`) rolls up tool→tool ADJACENCY by `seq`: for each interaction it
-  orders the TOOL nodes by the same `seq` the `nodes` table uses and emits one row per adjacent pair
-  (`interaction_id, from_seq, from_action, to_action`, actions from the closed `action` enum) — exactly
-  `tool_count − 1` rows per interaction (never negative). This is time-order adjacency, NOT causality
-  (causality lives in `causal_edges`); `GROUP BY (from_action, to_action)` gives the action-flow
-  histogram (e.g. `explore→edit`, `edit→verify`).
+  Beside those base tables sit two **derived relations**, defined as DuckDB **VIEWs** (`db/views.ts`),
+  not materialized tables. Both are pure aggregates over `nodes`, and in a columnar engine a stored copy
+  of an aggregate buys no query power — it only adds a second thing that can drift. As views they are
+  **computed on read against `nodes`, so they can never disagree with it**, yet still expose a flat,
+  documented surface (`describe_schema` renders a view spec exactly like a table; only the `view` SELECT
+  body differs, and `materializeSql` emits `CREATE VIEW` instead of `CREATE TABLE` + `INSERT`s). Views
+  appear after `nodes` in `TABLES`, so the relation they select from already exists when they are created.
+  `interaction_metrics`: one row per interaction, every column a GROUP BY over that interaction's nodes
+  (`prompt_len`, `tool_count`/`llm_count`/`error_count`/`distinct_files`, summed `tokens_in`/`tokens_out`/
+  `cost_usd`, `duration_ms`, `arg_min`/`arg_max`-over-`seq` `first_action`/`last_action`, and `shape` =
+  `'agentic'` iff `tool_count>0` else `'direct'`). `transitions` rolls up tool→tool ADJACENCY: a window
+  (`ROW_NUMBER() OVER (PARTITION BY interaction_id ORDER BY seq)`) ranks the TOOL nodes and self-joins
+  rank _n_ to _n+1_, emitting one row per adjacent pair (`interaction_id, from_seq, from_action,
+  to_action`, actions from the closed `action` enum) — exactly `tool_count − 1` rows per interaction
+  (never negative). This is time-order adjacency, NOT causality (causality lives in `causal_edges`);
+  `GROUP BY (from_action, to_action)` gives the action-flow histogram (e.g. `explore→edit`,
+  `edit→verify`). The view SQL is proven valid + drift-free against a real DuckDB in
+  `mcp/src/duckdb.test.ts` (the views exist, `interaction_metrics` agrees with a direct node aggregate,
+  and `transitions` has `tool_count − 1` rows per interaction).
 - **Query core — `@coach/mcp` (pure, backend-neutral).** Beside the engine, the MCP holds the analyst
   `Store` (`query-core.ts`): a UX guard (`guard.ts`) + capped, JSON-safe result shaping (`result.ts`) +
   traversal SQL over a `Connection` port — no `node:*` or DB driver, so the same core could later serve

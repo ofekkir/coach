@@ -11,9 +11,7 @@ import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
 import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
 import { seqByNodeId } from './seq.ts';
-import { buildTransitions } from './transitions.ts';
 import { filePathFromToolInput, normalizeRepoPath } from './repo-path.ts';
-import { buildInteractionMetrics } from './interaction-metrics.ts';
 
 const INSERT_CHUNK = 200;
 
@@ -59,6 +57,10 @@ function columnLiteral(column: ColumnSpec, value: unknown): string {
 function createTableSql(table: TableSpec): string {
   const columns = table.columns.map((c) => `${c.name} ${c.sqlType}`).join(', ');
   return `CREATE TABLE ${table.name} (${columns})`;
+}
+
+function createViewSql(table: TableSpec): string {
+  return `CREATE VIEW ${table.name} AS ${table.view ?? ''}`;
 }
 
 function rowLiteral(columns: readonly ColumnSpec[], row: Record<string, unknown>): string {
@@ -204,7 +206,6 @@ export function buildRecords(graph: ExecutionGraph): Record<string, Record<strin
       i.causalEdges.map((e) => ({ from_id: e.fromId, to_id: e.toId, gap_ms: e.gapMs })),
     ),
     threads: interactions.flatMap(threadRecords),
-    transitions: buildTransitions(graph),
     agents: agents.map((a) => ({ id: a.id, user_id: a.userId })),
     sessions: sessions.map((s) => ({
       id: s.id,
@@ -215,15 +216,20 @@ export function buildRecords(graph: ExecutionGraph): Record<string, Record<strin
       cwd: s.cwd,
       branch: s.branch,
     })),
-    interaction_metrics: buildInteractionMetrics(graph),
   };
 }
 
-/** The ordered CREATE + INSERT statements that load `graph` into a fresh DuckDB. */
+/**
+ * The ordered DDL + DML that load `graph` into a fresh DuckDB. Materialized tables
+ * emit CREATE TABLE + INSERTs; `view` specs emit a single CREATE VIEW (computed on
+ * read against `nodes`, no rows). Views appear after `nodes` in `TABLES`, so the
+ * relation they select from already exists when the view is created.
+ */
 export function materializeSql(graph: ExecutionGraph): string[] {
   const records = buildRecords(graph);
-  return TABLES.flatMap((table) => [
-    createTableSql(table),
-    ...insertStatements(table, records[table.name] ?? []),
-  ]);
+  return TABLES.flatMap((table) =>
+    table.view != null
+      ? [createViewSql(table)]
+      : [createTableSql(table), ...insertStatements(table, records[table.name] ?? [])],
+  );
 }

@@ -10,6 +10,7 @@
 //   agents / sessions           — the dimension entities (FK targets, not nodes)
 
 import { NODES } from './nodes-table.ts';
+import { INTERACTION_METRICS, TRANSITIONS } from './views.ts';
 
 export interface ColumnSpec {
   readonly name: string;
@@ -22,6 +23,9 @@ export interface TableSpec {
   readonly name: string;
   readonly doc: string;
   readonly columns: readonly ColumnSpec[];
+  /** When set, this relation is a DuckDB VIEW with this SELECT body (computed on
+   *  read against `nodes`), not a materialized table — no rows are ever inserted. */
+  readonly view?: string;
 }
 
 const DELTAS: TableSpec = {
@@ -99,20 +103,6 @@ const THREADS: TableSpec = {
   ],
 };
 
-const TRANSITIONS: TableSpec = {
-  name: 'transitions',
-  doc: "Adjacent tool→tool action pairs within an interaction, ordered by `seq` (same ordering as nodes.seq). One row per adjacent tool pair → exactly tool_count−1 rows per interaction (0 when ≤1 tool). ADJACENCY, NOT causality: a row means 'this tool ran immediately after that one', NOT that it was triggered by it (causality lives in causal_edges). GROUP BY (from_action, to_action) for the action-flow histogram (e.g. explore→edit, edit→verify).",
-  columns: [
-    { name: 'interaction_id', sqlType: 'VARCHAR', doc: 'FK → owning interaction node id.' },
-    // prettier-ignore
-    { name: 'from_seq', sqlType: 'INTEGER', doc: 'nodes.seq of the source (earlier) tool node — join back to nodes on (interaction_id, seq).' },
-    // prettier-ignore
-    { name: 'from_action', sqlType: 'VARCHAR', doc: "Closed `action` bucket of the source tool ('explore'|'author'|'edit'|'run'|'test'|'verify'|'vcs'|'setup'|'mcp'|'research'|'delegate'|'plan'|'other')." },
-    // prettier-ignore
-    { name: 'to_action', sqlType: 'VARCHAR', doc: 'Closed `action` bucket of the next tool (same closed enum as from_action).' },
-  ],
-};
-
 const AGENTS: TableSpec = {
   name: 'agents',
   doc: 'The agent dimension entity — a FK target, never a node. Single-agent today.',
@@ -139,67 +129,6 @@ const SESSIONS: TableSpec = {
     { name: 'cwd', sqlType: 'VARCHAR', doc: 'Absolute working directory the session ran in. Populated for native Claude sessions; NULL for OTEL traces (no cwd attribute).' },
     // prettier-ignore
     { name: 'branch', sqlType: 'VARCHAR', doc: 'Git branch the session ran on. Populated for native Claude sessions; NULL for OTEL traces (no branch attribute).' },
-  ],
-};
-
-const INTERACTION_METRICS: TableSpec = {
-  name: 'interaction_metrics',
-  doc: "Derived per-interaction rollup — one row per interaction node. Every column equals the direct aggregate over that interaction's `nodes` rows (COUNT / SUM / seq-ordered first-last), so it never drifts from `nodes`; it exists to make the common per-turn aggregates a flat lookup. `shape='agentic'` iff tool_count>0.",
-  columns: [
-    // prettier-ignore
-    { name: 'interaction_id', sqlType: 'VARCHAR', doc: 'PK; FK → the interaction node id (nodes.id where type=\'interaction\'). One row per interaction.' },
-    {
-      name: 'session_id',
-      sqlType: 'VARCHAR',
-      doc: "FK → sessions.id (the interaction node's session).",
-    },
-    {
-      name: 'sequence',
-      sqlType: 'INTEGER',
-      doc: "The interaction's 0-based turn index within the session (nodes.sequence).",
-    },
-    // prettier-ignore
-    { name: 'prompt_len', sqlType: 'INTEGER', doc: 'Character length of the interaction prompt (nodes.prompt).' },
-    {
-      name: 'tool_count',
-      sqlType: 'INTEGER',
-      doc: "Count of tool nodes (type='tool') in the interaction.",
-    },
-    {
-      name: 'llm_count',
-      sqlType: 'INTEGER',
-      doc: 'Count of llm_request nodes in the interaction.',
-    },
-    {
-      name: 'tokens_in',
-      sqlType: 'DOUBLE',
-      doc: "SUM of tokens_in over the interaction's llm_request nodes.",
-    },
-    {
-      name: 'tokens_out',
-      sqlType: 'DOUBLE',
-      doc: "SUM of tokens_out over the interaction's llm_request nodes.",
-    },
-    // prettier-ignore
-    { name: 'cost_usd', sqlType: 'DOUBLE', doc: "SUM of cost_usd over the interaction's llm_request nodes (NULL costs counted as 0)." },
-    {
-      name: 'duration_ms',
-      sqlType: 'DOUBLE',
-      doc: "The interaction node's own wall-clock duration in ms.",
-    },
-    // prettier-ignore
-    { name: 'shape', sqlType: 'VARCHAR', doc: "'agentic' iff tool_count>0 (the interaction called at least one tool), else 'direct'." },
-    // prettier-ignore
-    { name: 'first_action', sqlType: 'VARCHAR', doc: "The `action` of the first tool node by seq. NULL when the interaction has no tool nodes." },
-    // prettier-ignore
-    { name: 'last_action', sqlType: 'VARCHAR', doc: "The `action` of the last tool node by seq. NULL when the interaction has no tool nodes." },
-    // prettier-ignore
-    { name: 'distinct_files', sqlType: 'INTEGER', doc: "Count of distinct non-NULL file_path among the interaction's tool nodes (the same file_path nodes promotes)." },
-    {
-      name: 'error_count',
-      sqlType: 'INTEGER',
-      doc: 'Count of tool nodes with is_error=true in the interaction.',
-    },
   ],
 };
 

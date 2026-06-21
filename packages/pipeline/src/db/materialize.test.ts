@@ -160,63 +160,62 @@ describe('sessions cwd/branch + nodes.repo_path columns', () => {
   });
 });
 
-// ── cost_usd derivation (native logs carry no cost) ──────────────────────────────
+// ── cost_usd: traced-only, never estimated ───────────────────────────────────────
 
 function llmRows(): Record<string, unknown>[] {
   return nodeRows().filter((r) => r.type === 'llm_request');
 }
 
-describe('cost_usd derivation', () => {
-  it('derives a non-NULL cost_usd for native llm_requests (known model + tokens, no traced cost)', () => {
+describe('cost_usd (traced only, never estimated)', () => {
+  it('INVARIANT: native (untraced) llm_request rows all carry NULL cost_usd', () => {
     const rows = llmRows();
     expect(rows.length).toBeGreaterThan(0);
-    // The native fixture uses claude-sonnet-4-6 (priced) and carries no cost_usd.
+    // The native fixture carries no traced cost; we deliberately do NOT back-compute
+    // an estimate from a price table, so cost_usd stays absent → NULL ("unknown"),
+    // never 0 (an omitted record key serializes to SQL NULL via columnLiteral).
     for (const row of rows) {
-      expect(row.model).toBe('claude-sonnet-4-6');
-      expect(typeof row.cost_usd).toBe('number');
-      expect(row.cost_usd).not.toBeNull();
+      expect(row.cost_usd == null).toBe(true);
     }
   });
 
-  it('INVARIANT: no known-model + tokens row has a NULL cost_usd', () => {
-    const KNOWN_MODELS = new Set(['claude-sonnet-4-6', 'claude-opus-4-8', 'claude-haiku-4-5']);
-    const offenders = llmRows().filter(
-      (r) =>
-        typeof r.model === 'string' &&
-        KNOWN_MODELS.has(r.model) &&
-        typeof r.tokens_in === 'number' &&
-        typeof r.tokens_out === 'number' &&
-        r.cost_usd == null,
-    );
-    expect(offenders).toEqual([]);
-  });
-
-  it('leaves cost_usd NULL for an unknown model and does not throw', () => {
-    const node: CanonicalNode = {
-      id: 'llm-unknown',
+  it('emits a traced cost_usd verbatim and leaves an untraced one NULL', () => {
+    const traced: CanonicalNode = {
+      id: 'llm-traced',
       type: 'llm_request',
       sessionId: 'session-s',
       interactionId: 'i',
-      model: 'some-unknown-model',
+      model: 'claude-sonnet-4-6',
       tokens_in: 1000,
       tokens_out: 500,
+      cost_usd: 0.0042,
       start_time_ns: '0',
       end_time_ns: '1',
+      duration_ms: 1,
+    };
+    const untraced: CanonicalNode = {
+      id: 'llm-untraced',
+      type: 'llm_request',
+      sessionId: 'session-s',
+      interactionId: 'i',
+      model: 'claude-sonnet-4-6',
+      tokens_in: 1000,
+      tokens_out: 500,
+      start_time_ns: '2',
+      end_time_ns: '3',
       duration_ms: 1,
     };
     const graph: ExecutionGraph = {
       kind: 'interaction',
       data: null,
-      nodes: { [node.id]: node },
+      nodes: { [traced.id]: traced, [untraced.id]: untraced },
       deltas: {},
       semantics: {},
       actions: {},
       intents: {},
     };
-    // cost_usd is read straight off the node (no traced cost, unknown model → undefined → NULL).
-    const records = buildRecords(graph);
-    const row = (records.nodes ?? []).find((r) => r.id === 'llm-unknown');
-    expect(row?.cost_usd).toBeUndefined();
+    const rows = buildRecords(graph).nodes ?? [];
+    expect(rows.find((r) => r.id === 'llm-traced')?.cost_usd).toBe(0.0042);
+    expect(rows.find((r) => r.id === 'llm-untraced')?.cost_usd).toBeUndefined();
   });
 });
 
@@ -237,5 +236,31 @@ describe('intent_category', () => {
     const { enrichedGraph } = runPipeline(files);
     const sql = materializeSql(enrichedGraph);
     expect(sql.some((s) => s.includes('intent_category VARCHAR'))).toBe(true);
+  });
+});
+
+// ── derived relations are VIEWs, not materialized tables ─────────────────────────
+
+describe('interaction_metrics / transitions are views', () => {
+  it('emits CREATE VIEW (not CREATE TABLE) for both, and inserts no rows for them', () => {
+    const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
+    const { enrichedGraph } = runPipeline(files);
+    const sql = materializeSql(enrichedGraph);
+
+    for (const name of ['interaction_metrics', 'transitions']) {
+      expect(sql.some((s) => s.startsWith(`CREATE VIEW ${name} AS`))).toBe(true);
+      expect(sql.some((s) => s.startsWith(`CREATE TABLE ${name} `))).toBe(false);
+      expect(sql.some((s) => s.startsWith(`INSERT INTO ${name} `))).toBe(false);
+    }
+  });
+
+  it('the view reads from nodes only after the nodes table is created', () => {
+    const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
+    const { enrichedGraph } = runPipeline(files);
+    const sql = materializeSql(enrichedGraph);
+    const nodesTableAt = sql.findIndex((s) => s.startsWith('CREATE TABLE nodes '));
+    const metricsViewAt = sql.findIndex((s) => s.startsWith('CREATE VIEW interaction_metrics AS'));
+    expect(nodesTableAt).toBeGreaterThanOrEqual(0);
+    expect(metricsViewAt).toBeGreaterThan(nodesTableAt);
   });
 });
