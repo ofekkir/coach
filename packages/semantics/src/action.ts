@@ -4,64 +4,99 @@
 //
 // `what` is a rich, ordered, human-readable description ("fetch ynet.co.il",
 // "summarize headlines"); it is open-ended and tuned per agent. `action` is the
-// opposite: one value, drawn from a small fixed set, that buckets EVERY tool node
+// opposite: ONE value, drawn from a small fixed set, that buckets EVERY tool node
 // into a coarse activity class so the store can `GROUP BY action` and get stable,
-// comparable counts. It is a pure function of `(toolName, bashCommand?)` — no LLM,
-// no config, no message context — so it is trivially reproducible: the same node
-// always yields the same action, and reloading a fixture yields identical counts.
+// comparable counts.
 //
-// Every tool node MUST resolve to a non-NULL action; `other` is the explicit
-// catch-all, never NULL.
+// `action` is NOT a second taxonomy of tool calls — it is a fixed COARSENING of
+// the ontology's own (finer) action vocabulary. The config layer already resolves
+// every tool call to one ontology action id (Read→`read`, Write→`write`, …); this
+// module's `ACTION_GROUP` rolls those ~30 fine ids up into ~13 coarse buckets, so
+// there is one classification source of truth (the ontology mapping), not two.
+// `coarseAction` is the rollup; `bashAction` is the one piece with NO ontology
+// twin — shell escape-hatch tools (Bash) carry an arbitrary command the config
+// deliberately does not classify, so the command-grammar rules live here.
+//
+// The coarse vocabulary is GLOBAL and agent-invariant on purpose: an agent may
+// remap a tool to a different ontology action, but the coarse bucket map does not
+// move, so counts stay comparable across agents. Every tool node MUST resolve to a
+// non-NULL action; `other` is the explicit catch-all, never NULL.
 // ════════════════════════════════════════════════════════════════════════════
 
 /** The closed action vocabulary. Order is documentation only. */
 export const ACTIONS = [
-  'explore', // read/search the workspace (Read, Grep, Glob, LS, NotebookRead)
-  'author', // create new content (Write)
-  'edit', // modify existing content (Edit, MultiEdit, NotebookEdit)
-  'run', // execute a shell command with no more specific class
-  'test', // run a test suite / test runner
-  'verify', // typecheck / lint / format-check — non-test correctness gates
-  'vcs', // version control (git, gh, jj, hg, svn)
-  'setup', // install / build / scaffold the environment
-  'mcp', // an MCP tool call (mcp__*)
-  'research', // fetch/search the web (WebFetch, WebSearch)
-  'delegate', // hand work to a sub-agent (Task)
-  'plan', // planning tools (ExitPlanMode, TodoWrite)
+  'explore', // read/search the workspace (ontology: read, search, review)
+  'author', // create new content (ontology: write)
+  'edit', // modify existing content (ontology: edit, delete, refactor)
+  'run', // execute a command with no more specific class (ontology: run, debug)
+  'test', // run a test suite / test runner (ontology: test)
+  'verify', // typecheck / lint / format-check (ontology: lint, format, typecheck, verify)
+  'vcs', // version control (ontology: vcs)
+  'setup', // install / build / scaffold the environment (ontology: build, configure)
+  'mcp', // an MCP tool call (ontology: invoke)
+  'research', // fetch/search the web (ontology: fetch, search-web)
+  'delegate', // hand work to a sub-agent / skill (ontology: delegate, use-skill)
+  'plan', // planning tools (ontology: plan)
   'other', // explicit catch-all — never NULL
 ] as const;
 
 /** A canonical node action — one of the closed {@link ACTIONS} values. */
 export type Action = (typeof ACTIONS)[number];
 
-// ── Tool-name rule map (exact tool names) ───────────────────────────────────--
-// A flat lookup, not nested ifs. A tool absent here falls through to the prefix
-// rules and finally the `other` catch-all.
-const TOOL_ACTIONS: Readonly<Record<string, Action>> = {
-  Read: 'explore',
-  Grep: 'explore',
-  Glob: 'explore',
-  LS: 'explore',
-  NotebookRead: 'explore',
-  Write: 'author',
-  Edit: 'edit',
-  MultiEdit: 'edit',
-  NotebookEdit: 'edit',
-  WebFetch: 'research',
-  WebSearch: 'research',
-  Task: 'delegate',
-  ExitPlanMode: 'plan',
-  TodoWrite: 'plan',
+// ── Ontology-action → coarse-action rollup ──────────────────────────────────--
+// A TOTAL map over the coding ontology's action ids. Kept here (not in the per-
+// agent config) so the coarse buckets stay global and comparable; a test asserts
+// it covers every ontology action id, so adding an ontology action without a
+// bucket fails CI rather than silently falling through to `other`.
+export const ACTION_GROUP: Readonly<Record<string, Action>> = {
+  read: 'explore',
+  search: 'explore',
+  review: 'explore',
+  write: 'author',
+  edit: 'edit',
+  delete: 'edit',
+  refactor: 'edit',
+  run: 'run',
+  debug: 'run',
+  build: 'setup',
+  configure: 'setup',
+  test: 'test',
+  lint: 'verify',
+  format: 'verify',
+  typecheck: 'verify',
+  verify: 'verify',
+  vcs: 'vcs',
+  fetch: 'research',
+  'search-web': 'research',
+  plan: 'plan',
+  invoke: 'mcp',
+  delegate: 'delegate',
+  'use-skill': 'delegate',
+  respond: 'other',
+  clarify: 'other',
+  'generate-title': 'other',
+  predict: 'other',
+  'load-schema': 'other',
+  act: 'other',
 };
 
-// Tools whose body is an arbitrary shell command — classified by the command.
-const SHELL_TOOLS: ReadonlySet<string> = new Set(['Bash', 'run_command', 'shell']);
+/**
+ * Rolls an ontology action id up to its coarse {@link Action} bucket. An id absent
+ * from {@link ACTION_GROUP} (or `undefined`) yields `other` — never NULL. This is
+ * the primary path: the config layer resolves a tool call to its ontology action,
+ * and this collapses that to the comparable coarse dimension.
+ */
+export function coarseAction(ontologyActionId: string | undefined): Action {
+  if (ontologyActionId == null) return 'other';
+  return ACTION_GROUP[ontologyActionId] ?? 'other';
+}
 
-const MCP_TOOL_PREFIX = 'mcp__';
-
-// ── Bash-command rule map (first matching rule wins, evaluated in order) ─────--
-// Each rule tests the first significant token(s) of the command. Deterministic
-// and documented; no command parsing beyond a normalized leading-token scan.
+// ── Bash-command classifier — the one rule set with NO ontology twin ─────────--
+// Shell escape-hatch tools (Bash, run_command, shell) wrap an arbitrary command
+// the config layer labels by tool name only (escapeHatch). The command-grammar
+// below is therefore the SOLE place git→vcs / pytest→test / build→setup live; it
+// is not duplicated anywhere in config. First matching rule wins, evaluated in
+// order, on a normalized leading-token scan (no full command parsing).
 interface CommandRule {
   readonly action: Action;
   readonly test: (firstToken: string) => boolean;
@@ -134,25 +169,16 @@ function firstToken(command: string): string {
   return command.trim().split(/\s+/)[0] ?? '';
 }
 
-function bashAction(command: string | undefined): Action {
+/**
+ * Classifies a shell command into its coarse {@link Action} (git→vcs, test
+ * runners→test, build/install→setup, package-runner scripts by their task,
+ * else→run). Pure and deterministic. An empty command is `run`.
+ */
+export function bashAction(command: string | undefined): Action {
   const cmd = (command ?? '').trim();
   if (cmd === '') return 'run';
   const first = firstToken(cmd);
   if (PACKAGE_RUNNERS.has(first)) return packageRunnerAction(cmd);
   const rule = COMMAND_RULES.find((r) => r.test(first));
   return rule?.action ?? 'run';
-}
-
-/**
- * Maps a tool call to its closed {@link Action}. Pure and deterministic: depends
- * only on the tool name and — for shell tools — the bash command. MCP tools
- * (`mcp__*`) are `mcp`; known tools use the name lookup; shell tools are
- * classified by their command (git→vcs, test runners→test, build/install→setup,
- * lint/typecheck→verify, else→run); everything else falls through to `other`.
- */
-export function classifyAction(toolName: string | undefined, bashCommand?: string): Action {
-  const name = toolName ?? '';
-  if (name.startsWith(MCP_TOOL_PREFIX)) return 'mcp';
-  if (SHELL_TOOLS.has(name)) return bashAction(bashCommand);
-  return TOOL_ACTIONS[name] ?? 'other';
 }

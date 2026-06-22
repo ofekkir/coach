@@ -9,8 +9,9 @@ import type {
 import type { ExecutionGraph } from '../types.ts';
 import {
   actionLabel,
-  classifyAction,
+  bashAction,
   classifyIntent,
+  coarseAction,
   type Action,
   type IntentCategory,
   type SemanticsConfig,
@@ -23,7 +24,7 @@ import {
   responseToolCall,
   structuralPrefix,
 } from './derive.ts';
-import { toolComment, toolPhrases } from './tool-intent.ts';
+import { toolComment, toolOntologyAction, toolPhrases } from './tool-intent.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Semantic enrichment stage — a PURE TABLE PASS. It iterates the node table and,
@@ -62,13 +63,17 @@ function inferenceFields(
   return { what: [node.model] };
 }
 
-/** The closed `action` bucket for a tool node. Reads the Bash command via the
- *  shared `extractBashCommand` (same source of truth as the promoted
- *  nodes.bash_command column); every tool node yields a non-NULL action. Distinct
- *  from `semantics.what`. */
-function toolAction(node: ToolNode): Action {
-  const command = extractBashCommand(parseToolInput(node.tool_input));
-  return classifyAction(node.name, command ?? undefined);
+/** The closed `action` bucket for a tool node — a coarsening of the ontology
+ *  action the config resolves for this call (`coarseAction`). Escape-hatch shell
+ *  tools (Bash) carry no ontology action, so they fall back to the command
+ *  classifier (`bashAction`) over the shared `extractBashCommand` (same source as
+ *  the promoted nodes.bash_command column). Every tool node yields a non-NULL
+ *  action; distinct from the free-form `semantics.what`. */
+function toolAction(node: ToolNode, config: SemanticsConfig): Action {
+  const input = parseToolInput(node.tool_input);
+  const ontologyAction = toolOntologyAction(config, node.name, input);
+  if (ontologyAction != null) return coarseAction(ontologyAction);
+  return bashAction(extractBashCommand(input) ?? undefined);
 }
 
 function toolFields(node: ToolNode, config: SemanticsConfig): SemanticFields {
@@ -119,7 +124,7 @@ export function enrichExecutionGraph(
   const actions: Record<string, Action> = {};
   const intents: Record<string, IntentCategory> = {};
   for (const [id, node] of Object.entries(graph.nodes)) {
-    if (node.type === 'tool') actions[id] = toolAction(node);
+    if (node.type === 'tool') actions[id] = toolAction(node, config);
     if (node.type === 'interaction') intents[id] = interactionIntent(node);
     const fields = semanticFieldsOf(node, graph.deltas[id], config);
     if (fields != null) semantics[id] = fields;
