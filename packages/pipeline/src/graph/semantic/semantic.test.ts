@@ -70,11 +70,41 @@ describe('enrichExecutionGraph', () => {
     // The final text turn (no trailing tool call) gets the generic deterministic
     // respond act — no model classifies it more finely.
     expect(semanticsOf(enriched, 'llm1')).toEqual({ what: ['respond'] });
-    // `what` is the derived label; `comment` is the agent's verbatim description.
+    // `what` is the command verb resolved via the ontology command grammar
+    // (`pnpm test` → run tests), not the literal tool name; `comment` is the
+    // agent's verbatim description.
     expect(semanticsOf(enriched, 'tool1')).toEqual({
-      what: ['bash'],
+      what: ['run tests'],
       comment: 'Run the test suite',
     });
+  });
+
+  it('derives escape-hatch (Bash) `what` from the command grammar, not the tool name', () => {
+    const bashNode = (id: string, command: string): CanonicalNode => ({
+      ...tool1,
+      id,
+      tool_input: JSON.stringify({ command }),
+    });
+    const enriched = enrich([
+      interaction,
+      llm1,
+      bashNode('test1', 'pnpm test --filter pipeline'),
+      bashNode('git1', 'git commit -m "x"'),
+      bashNode('grep1', 'grep -rn foo src/'),
+    ]);
+    expect(semanticsOf(enriched, 'test1')?.what).toEqual(['run tests']);
+    expect(semanticsOf(enriched, 'git1')?.what).toEqual(['version control']);
+    expect(semanticsOf(enriched, 'grep1')?.what).toEqual(['search']);
+  });
+
+  it('qualifies an unclassified command with the invoked program (not bare run)', () => {
+    const node: CanonicalNode = {
+      ...tool1,
+      id: 'run1',
+      tool_input: JSON.stringify({ command: 'python3 scripts/build.py' }),
+    };
+    const enriched = enrich([interaction, llm1, node]);
+    expect(semanticsOf(enriched, 'run1')?.what).toEqual(['run python3']);
   });
 
   it('derives a closed action for every tool node (here: pnpm test → test)', () => {

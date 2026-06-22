@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { coarseAction, shellCommandAction } from './action.ts';
+import { coarseAction, commandProgram, shellCommandAction } from './action.ts';
 import { defaultSemanticsConfig } from './defaults.ts';
 
 const config = defaultSemanticsConfig;
@@ -47,6 +47,12 @@ describe('shellCommandAction (ontology command grammar → ontology action id)',
     expect(shellCommandAction(config, 'npm run test')).toBe('test');
   });
 
+  it('classifies search commands (grep/rg/find) as search', () => {
+    expect(shellCommandAction(config, 'grep -rn foo src/')).toBe('search');
+    expect(shellCommandAction(config, 'rg pattern')).toBe('search');
+    expect(shellCommandAction(config, 'find . -name "*.ts"')).toBe('search');
+  });
+
   it('classifies lint/typecheck package scripts as verify and install/build as build', () => {
     expect(shellCommandAction(config, 'pnpm typecheck')).toBe('verify');
     expect(shellCommandAction(config, 'pnpm run lint')).toBe('verify');
@@ -61,8 +67,23 @@ describe('shellCommandAction (ontology command grammar → ontology action id)',
     expect(shellCommandAction(config, '')).toBe('run');
   });
 
+  it('classifies past a leading `cd <path> &&` navigation prefix', () => {
+    expect(shellCommandAction(config, 'cd packages/pipeline && git commit -m x')).toBe('vcs');
+    expect(shellCommandAction(config, 'cd /tmp && pnpm test')).toBe('test');
+    expect(shellCommandAction(config, 'cd src; grep -rn foo')).toBe('search');
+  });
+
   it('a shell command rolls up through coarseAction to a coarse bucket', () => {
     expect(coarseAction(config, shellCommandAction(config, 'git push'))).toBe('vcs');
     expect(coarseAction(config, shellCommandAction(config, 'pnpm install'))).toBe('setup');
+  });
+});
+
+describe('commandProgram (invoked program, for qualifying the generic run action)', () => {
+  it('strips directory prefix, trailing punctuation, and a leading cd', () => {
+    expect(commandProgram('python3 build.py')).toBe('python3');
+    expect(commandProgram('./node_modules/.bin/tsx run.ts')).toBe('tsx');
+    expect(commandProgram('cd pkg && node server.js')).toBe('node');
+    expect(commandProgram(undefined)).toBe('');
   });
 });
