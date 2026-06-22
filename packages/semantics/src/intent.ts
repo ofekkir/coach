@@ -38,22 +38,22 @@ const INTENT_RULES: readonly IntentRule[] = [
   {
     category: 'debug',
     pattern:
-      /\b(debug|fix|bug|broken|error|fail(?:s|ing|ed)?|crash(?:es|ing|ed)?|not working|doesn'?t work|stack ?trace|exception|regress(?:ion)?|reproduce)\b/i,
+      /\b(debug|fix|bug|broken|error|fail(?:s|ing|ed)?|crash(?:es|ing|ed)?|not working|doesn'?t work|stack ?trace|exception|regress(?:ion)?|reproduce|why (?:is|does|isn'?t|doesn'?t).*(?:fail|break|crash|wrong)|unexpected(?:ly)?|misbehav)\b/i,
   },
   {
     category: 'test',
     pattern:
-      /\b(test|tests|testing|unit ?test|integration ?test|coverage|spec|specs|vitest|jest|pytest|assert(?:ion)?s?)\b/i,
+      /\b(test|tests|testing|unit ?test|integration ?test|coverage|spec|specs|vitest|jest|pytest|assert(?:ion)?s?|e2e|end[- ]?to[- ]?end|run (?:the )?(?:tests?|e2e|suite))\b/i,
   },
   {
     category: 'refactor',
     pattern:
-      /\b(refactor|restructure|clean ?up|rename|extract|simplif(?:y|ied)|reorganiz|dedup(?:licate)?|tidy|deduplicate|move (?:the|this)? ?(?:function|method|file|module))\b/i,
+      /\b(refactor|restructur\w*|clean ?up|renam\w*|extract|simplif(?:y|ied|ication)|reorganiz\w*|dedup(?:licate)?|tidy|deduplicate|decoupl\w*|untangl\w*|consolidat\w*|self[- ]?document\w*|duplicat(?:e|ion)|boilerplate|move (?:the|this)? ?(?:function|method|file|module)|(?:separate|split|pull|break) (?:out |apart |up )?the (?:logic|concerns?|responsibilit\w*|presentation|view|render\w*)|separate the logic|replace.*comments?.*(?:with|by)|comments?.*(?:replaced|should be).*(?:function|name))\b/i,
   },
   {
     category: 'explain',
     pattern:
-      /\b(explain|what (?:is|are|does|do)|how (?:does|do|is)|why (?:is|does|do)|understand|describe|walk me through|tell me about|summari[sz]e|document)\b/i,
+      /\b(explain|what (?:is|are|does|do|was)|how (?:does|do|is|can|to)|why (?:is|does|do|are|did|not)|understand|describe|walk me through|tell me about|summari[sz]e|document|remind me|does (?:it|that|this|the)|is (?:it|that|this|there)|are (?:we|there|they)|should (?:it|we|i|the)|can (?:the|it|we|you|i)|which (?:is|one|of)|isn'?t (?:it|that|there)|shouldn'?t)\b|\?\s*$/i,
   },
   {
     category: 'research',
@@ -63,12 +63,12 @@ const INTENT_RULES: readonly IntentRule[] = [
   {
     category: 'ops',
     pattern:
-      /\b(deploy|deployment|build|ci\/?cd|pipeline|release|publish|install|upgrade|dependenc(?:y|ies)|version|commit|push|pull ?request|pr\b|merge|branch|rebase|config(?:ure|uration)?|env(?:ironment)? ?var|docker|kubernetes|k8s)\b/i,
+      /\b(deploy|deployment|ci\/?cd|pipeline|release|publish|install|upgrade|dependenc(?:y|ies)|version|commit|push|pull ?request|pr\b|merge|branch|rebase|config(?:ure|uration)?|env(?:ironment)? ?var|docker|kubernetes|k8s)\b/i,
   },
   {
     category: 'feature',
     pattern:
-      /\b(add|implement|create|build|introduce|support|new |feature|enable|wire up|set up|scaffold|write (?:a|the|some)? ?(?:function|component|endpoint|module|class|script))\b/i,
+      /\b(add|implement|create|build|introduce|support|new |feature|enable|wire up|set up|scaffold|break (?:it|this|them|the \w+) down into (?:\w+ )*steps?|break (?:it|this) down|turn .* into (?:\w+ )*steps?|step ?-?by ?-?step|write (?:a|the|some)? ?(?:function|component|endpoint|module|class|script))\b/i,
   },
 ];
 
