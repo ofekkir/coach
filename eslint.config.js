@@ -203,6 +203,20 @@ export default tseslint.config(
       'sonarjs/no-duplicate-string': 'off',
     },
   },
+  // Ladle stories are fixture catalogs: literal prop values (sizes, percentages,
+  // sample ids/text) and multiple story renders per file are the whole point, not
+  // smells. Relax the same rules as tests; the components they exercise stay strict.
+  {
+    files: ['**/*.stories.tsx'],
+    rules: {
+      'max-lines': 'off',
+      'max-lines-per-function': 'off',
+      'no-magic-numbers': 'off',
+      '@typescript-eslint/no-magic-numbers': 'off',
+      'sonarjs/no-duplicate-string': 'off',
+      'react/no-multi-comp': 'off',
+    },
+  },
   // Ban barrel files everywhere except each package's public src/index.ts.
   {
     ignores: ['**/src/index.ts'],
