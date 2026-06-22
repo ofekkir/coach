@@ -183,15 +183,15 @@
     {
       "id": "respond",
       "group": "meta",
-      "coarse": "other",
+      "coarse": "meta",
       "label": "respond",
       "aliases": ["answer", "report", "converse"],
-      "description": "Emit a final assistant message to the user. The act within it is what the model classifies."
+      "description": "Emit a final assistant message or artifact to the user. The act within it is what the model classifies."
     },
     {
       "id": "clarify",
       "group": "meta",
-      "coarse": "other",
+      "coarse": "meta",
       "label": "ask the user",
       "aliases": ["ask", "question"],
       "description": "Ask the user a question / request a decision."
@@ -207,7 +207,7 @@
     {
       "id": "generate-title",
       "group": "harness",
-      "coarse": "other",
+      "coarse": "meta",
       "label": "generate session title",
       "aliases": [],
       "description": "Harness-internal call that names the session."
@@ -215,7 +215,7 @@
     {
       "id": "predict",
       "group": "harness",
-      "coarse": "other",
+      "coarse": "meta",
       "label": "predict next user prompt",
       "aliases": ["suggest"],
       "description": "Harness-internal call that fabricates a likely next user input (suggestion mode)."
@@ -223,7 +223,7 @@
     {
       "id": "load-schema",
       "group": "harness",
-      "coarse": "other",
+      "coarse": "meta",
       "label": "load tool schema",
       "aliases": [],
       "description": "Harness-internal deferred-tool schema load."
@@ -247,6 +247,7 @@
     "vcs",
     "setup",
     "mcp",
+    "meta",
     "research",
     "delegate",
     "plan",

@@ -22,6 +22,13 @@ describe('coarseAction (ontology-action rollup, read from the ontology)', () => 
     expect(coarseAction(config, 'invoke')).toBe('mcp');
   });
 
+  it('rolls meta/harness actions up to the meta bucket, not other', () => {
+    for (const id of ['load-schema', 'clarify', 'respond', 'generate-title', 'predict']) {
+      expect(coarseAction(config, id)).toBe('meta');
+    }
+    expect(coarseAction(config, 'plan')).toBe('plan');
+  });
+
   it('falls back to the escape action bucket for an unknown or undefined id', () => {
     // escape action is `act`, whose coarse bucket is `other`.
     expect(coarseAction(config, 'not-an-action')).toBe('other');
