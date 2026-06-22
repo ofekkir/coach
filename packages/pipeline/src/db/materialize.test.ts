@@ -134,6 +134,21 @@ describe('repo_path worktree normalization invariant', () => {
     expect(normalizeRepoPath(undefined, MAIN_CWD)).toBeUndefined();
     expect(normalizeRepoPath('', MAIN_CWD)).toBeUndefined();
   });
+
+  it('anchors an out-of-project home .claude config file at .claude/', () => {
+    expect(normalizeRepoPath('/Users/ofek/.claude/plans/x.md', MAIN_CWD)).toBe(
+      '.claude/plans/x.md',
+    );
+    expect(normalizeRepoPath('/Users/ofek/.claude/projects/p/memory/MEMORY.md', MAIN_CWD)).toBe(
+      '.claude/projects/p/memory/MEMORY.md',
+    );
+  });
+
+  it('leaves a project-rooted .claude config file anchored at .claude/', () => {
+    expect(normalizeRepoPath(`${MAIN_CWD}/.claude/settings.json`, MAIN_CWD)).toBe(
+      '.claude/settings.json',
+    );
+  });
 });
 
 describe('sessions cwd/branch + nodes.repo_path columns', () => {

@@ -27,12 +27,26 @@ function stripLeadingSlashes(path: string): string {
   return path.slice(i);
 }
 
-function stripWorktreeSegment(path: string): string {
+export function stripWorktreeSegment(path: string): string {
   const claudeWorktree = afterSegment(path, WORKTREES_MARKER);
   if (claudeWorktree != null) return claudeWorktree;
   const gitWorktree = afterSegment(path, 'worktrees/');
   if (gitWorktree != null) return gitWorktree;
   return path;
+}
+
+const CLAUDE_DIR_MARKER = '/.claude/';
+
+/** Anchors a path that lives under a `.claude/` directory at that segment, so a
+ *  config file's repo-relative identity starts at `.claude/` regardless of where
+ *  the `.claude/` dir sits (project root, home, anywhere). Worktree paths are
+ *  excluded — they collapse via `stripWorktreeSegment` to their repo-relative
+ *  source path, not to `.claude/`. Returns the path unchanged when no anchor. */
+function anchorClaudeDir(path: string): string {
+  if (path.includes(WORKTREES_MARKER)) return path;
+  const at = path.indexOf(CLAUDE_DIR_MARKER);
+  if (at < 0) return path;
+  return path.slice(at + 1);
 }
 
 function stripCwdPrefix(path: string, cwd: string | undefined): string {
@@ -51,7 +65,7 @@ export function normalizeRepoPath(
   if (filePath == null || filePath === '') return undefined;
   const deWorktreed = stripWorktreeSegment(filePath);
   const relative = deWorktreed === filePath ? stripCwdPrefix(filePath, cwd) : deWorktreed;
-  const cleaned = stripLeadingSlashes(relative);
+  const cleaned = stripLeadingSlashes(anchorClaudeDir(relative));
   return cleaned === '' ? undefined : cleaned;
 }
 
