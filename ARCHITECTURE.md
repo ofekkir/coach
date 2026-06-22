@@ -320,9 +320,15 @@ not a reshape.
   `repo_path` (`db/repo-path.ts`): the file path a tool touched, derived from `tool_input`, collapsed
   to a single repo-relative form so the SAME file accessed under two different git worktrees yields ONE
   `repo_path`. The rule strips any `…/.claude/worktrees/<id>/<rest>` (or bare `worktrees/<id>/`) segment
-  to `<rest>`, else makes the path relative to the session's (worktree-normalized) `cwd`; the result
+  to `<rest>`, else makes the path relative to the session's (worktree-normalized) `cwd`; a path that
+  lives under any other `.claude/` directory (e.g. the home `~/.claude/projects|plans`) anchors at that
+  `.claude/` segment so config files outside the project still read as `.claude/<rest>`; the result
   never contains `/.claude/worktrees/` and never has a leading `/`. No hard-coded prefix. This lives in
   the pipeline because the graph→DB mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it.
+  The stage-6 path→object grounding (`graph/semantic/tool-intent.ts`) reuses the same worktree strip
+  (`stripWorktreeSegment`) before applying the ontology path conventions, so a source file edited inside
+  a worktree grounds to its real object type (source code, documentation) instead of matching the
+  `.claude/` agent-config rule on its raw absolute path.
   Beside those base tables sit four **VIEWs** (`db/views/`, one file each), not materialized tables —
   all computed on read against `nodes`, so they **can never disagree with it**, yet still expose flat,
   documented surfaces (`describe_schema` renders a view spec exactly like a table; only the `view` SELECT

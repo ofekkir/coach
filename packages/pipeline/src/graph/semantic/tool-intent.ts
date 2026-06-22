@@ -10,6 +10,8 @@ import {
   type ToolSemantics,
 } from '@coach/semantics';
 
+import { stripWorktreeSegment } from '../../db/repo-path.ts';
+
 import { extractBashCommand } from './derive.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -62,7 +64,8 @@ function structureQualifier(config: SemanticsConfig, path: string): string | und
  *  otherwise render the convention object type plus any structural qualifier
  *  (`source code (package=pipeline)`). Unknown type → just the basename (the full
  *  path is preserved on the canonical node for detail display). */
-function renderPathObject(config: SemanticsConfig, path: string): string {
+function renderPathObject(config: SemanticsConfig, rawPath: string): string {
+  const path = stripWorktreeSegment(rawPath);
   const known = wellKnownLabel(config, path);
   if (known != null) return known;
   const type = groundedType(config, path);
