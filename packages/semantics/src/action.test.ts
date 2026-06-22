@@ -1,76 +1,67 @@
 import { describe, expect, it } from 'vitest';
-import { ACTIONS, classifyAction, type Action } from './action.ts';
+import { coarseAction, shellCommandAction } from './action.ts';
+import { defaultSemanticsConfig } from './defaults.ts';
 
-describe('classifyAction', () => {
-  it('maps read/search tools to explore', () => {
-    expect(classifyAction('Read')).toBe('explore');
-    expect(classifyAction('Grep')).toBe('explore');
-    expect(classifyAction('Glob')).toBe('explore');
+const config = defaultSemanticsConfig;
+const coarseSet = new Set(config.ontology.coarseActions);
+
+describe('coarseAction (ontology-action rollup, read from the ontology)', () => {
+  it('rolls read/search/review up to explore', () => {
+    expect(coarseAction(config, 'read')).toBe('explore');
+    expect(coarseAction(config, 'search')).toBe('explore');
+    expect(coarseAction(config, 'review')).toBe('explore');
   });
 
-  it('maps Write to author and edit tools to edit', () => {
-    expect(classifyAction('Write')).toBe('author');
-    expect(classifyAction('Edit')).toBe('edit');
-    expect(classifyAction('MultiEdit')).toBe('edit');
+  it('rolls the verification family up to verify and fetch/search-web to research', () => {
+    for (const id of ['lint', 'format', 'typecheck', 'verify']) {
+      expect(coarseAction(config, id)).toBe('verify');
+    }
+    expect(coarseAction(config, 'fetch')).toBe('research');
+    expect(coarseAction(config, 'search-web')).toBe('research');
+    expect(coarseAction(config, 'invoke')).toBe('mcp');
   });
 
-  it('maps web tools to research, Task to delegate, plan tools to plan', () => {
-    expect(classifyAction('WebFetch')).toBe('research');
-    expect(classifyAction('WebSearch')).toBe('research');
-    expect(classifyAction('Task')).toBe('delegate');
-    expect(classifyAction('TodoWrite')).toBe('plan');
-    expect(classifyAction('ExitPlanMode')).toBe('plan');
+  it('falls back to the escape action bucket for an unknown or undefined id', () => {
+    // escape action is `act`, whose coarse bucket is `other`.
+    expect(coarseAction(config, 'not-an-action')).toBe('other');
+    expect(coarseAction(config, undefined)).toBe('other');
   });
 
-  it('maps any mcp__* tool to mcp regardless of command', () => {
-    expect(classifyAction('mcp__coach__query')).toBe('mcp');
-    expect(classifyAction('mcp__github__create_issue', 'git status')).toBe('mcp');
+  it('only ever returns a declared coarseActions id', () => {
+    for (const a of config.ontology.actions)
+      expect(coarseSet.has(coarseAction(config, a.id))).toBe(true);
   });
+});
 
-  it('classifies git/gh Bash commands as vcs', () => {
-    expect(classifyAction('Bash', 'git commit -m "x"')).toBe('vcs');
-    expect(classifyAction('Bash', '  gh pr create')).toBe('vcs');
+describe('shellCommandAction (ontology command grammar → ontology action id)', () => {
+  it('classifies git/gh commands as vcs', () => {
+    expect(shellCommandAction(config, 'git commit -m "x"')).toBe('vcs');
+    expect(shellCommandAction(config, '  gh pr create')).toBe('vcs');
   });
 
   it('classifies test runners as test (direct and via package runner)', () => {
-    expect(classifyAction('Bash', 'pytest tests/')).toBe('test');
-    expect(classifyAction('Bash', 'vitest run')).toBe('test');
-    expect(classifyAction('Bash', 'pnpm test')).toBe('test');
-    expect(classifyAction('Bash', 'npm run test')).toBe('test');
+    expect(shellCommandAction(config, 'pytest tests/')).toBe('test');
+    expect(shellCommandAction(config, 'vitest run')).toBe('test');
+    expect(shellCommandAction(config, 'pnpm test')).toBe('test');
+    expect(shellCommandAction(config, 'npm run test')).toBe('test');
   });
 
-  it('classifies lint/typecheck as verify', () => {
-    expect(classifyAction('Bash', 'pnpm typecheck')).toBe('verify');
-    expect(classifyAction('Bash', 'pnpm run lint')).toBe('verify');
-    expect(classifyAction('Bash', 'eslint .')).toBe('run');
+  it('classifies lint/typecheck package scripts as verify and install/build as build', () => {
+    expect(shellCommandAction(config, 'pnpm typecheck')).toBe('verify');
+    expect(shellCommandAction(config, 'pnpm run lint')).toBe('verify');
+    expect(shellCommandAction(config, 'pnpm install')).toBe('build');
+    expect(shellCommandAction(config, 'make all')).toBe('build');
+    expect(shellCommandAction(config, 'pip install requests')).toBe('build');
   });
 
-  it('classifies install/build/make as setup', () => {
-    expect(classifyAction('Bash', 'pnpm install')).toBe('setup');
-    expect(classifyAction('Bash', 'pnpm build')).toBe('setup');
-    expect(classifyAction('Bash', 'make all')).toBe('setup');
-    expect(classifyAction('Bash', 'pip install requests')).toBe('setup');
+  it('falls back to the grammar default (run) for an unclassified or empty command', () => {
+    expect(shellCommandAction(config, 'ls -la')).toBe('run');
+    expect(shellCommandAction(config, undefined)).toBe('run');
+    expect(shellCommandAction(config, '')).toBe('run');
   });
 
-  it('falls back to run for an unclassified Bash command and empty command', () => {
-    expect(classifyAction('Bash', 'ls -la')).toBe('run');
-    expect(classifyAction('Bash')).toBe('run');
-    expect(classifyAction('Bash', '')).toBe('run');
-  });
-
-  it('falls back to other for an unknown tool name', () => {
-    expect(classifyAction('SomeFutureTool')).toBe('other');
-    expect(classifyAction(undefined)).toBe('other');
-  });
-
-  it('only ever returns a value from the closed ACTIONS set', () => {
-    const set = new Set<Action>(ACTIONS);
-    const samples: ReturnType<typeof classifyAction>[] = [
-      classifyAction('Read'),
-      classifyAction('Bash', 'git push'),
-      classifyAction('mcp__x__y'),
-      classifyAction('???'),
-    ];
-    for (const action of samples) expect(set.has(action)).toBe(true);
+  it('a shell command rolls up through coarseAction to a coarse bucket', () => {
+    expect(coarseAction(config, shellCommandAction(config, 'git push'))).toBe('vcs');
+    expect(coarseAction(config, shellCommandAction(config, 'pnpm install'))).toBe('setup');
   });
 });

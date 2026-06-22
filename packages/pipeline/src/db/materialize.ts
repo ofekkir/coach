@@ -5,7 +5,7 @@
 // Records are sparse: a column absent from a record serializes to NULL, so each
 // builder only sets the columns its node/edge type actually has.
 
-import type { Action, IntentCategory } from '@coach/semantics';
+import type { IntentCategory } from '@coach/semantics';
 import type { Agent, CanonicalNode, Session } from '../types.ts';
 import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
@@ -99,7 +99,7 @@ function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
 
 function typeNodeRecord(
   node: CanonicalNode,
-  action: Action | undefined,
+  action: string | undefined,
   cwd: string | undefined,
   intent: IntentCategory | undefined,
 ): Record<string, unknown> {
@@ -136,7 +136,7 @@ function typeNodeRecord(
 
 function nodeRecord(
   node: CanonicalNode,
-  actions: Readonly<Record<string, Action>>,
+  actions: Readonly<Record<string, string>>,
   intents: Readonly<Record<string, IntentCategory>>,
   seq: Map<string, number>,
   cwdBySession: ReadonlyMap<string, string | undefined>,

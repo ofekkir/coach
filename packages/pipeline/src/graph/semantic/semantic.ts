@@ -9,21 +9,19 @@ import type {
 import type { ExecutionGraph } from '../types.ts';
 import {
   actionLabel,
-  classifyAction,
   classifyIntent,
-  type Action,
+  coarseAction,
   type IntentCategory,
   type SemanticsConfig,
 } from '@coach/semantics';
 import {
-  extractBashCommand,
   markerLabel,
   parseToolInput,
   responseText,
   responseToolCall,
   structuralPrefix,
 } from './derive.ts';
-import { toolComment, toolPhrases } from './tool-intent.ts';
+import { toolComment, toolOntologyAction, toolPhrases } from './tool-intent.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Semantic enrichment stage — a PURE TABLE PASS. It iterates the node table and,
@@ -62,13 +60,14 @@ function inferenceFields(
   return { what: [node.model] };
 }
 
-/** The closed `action` bucket for a tool node. Reads the Bash command via the
- *  shared `extractBashCommand` (same source of truth as the promoted
- *  nodes.bash_command column); every tool node yields a non-NULL action. Distinct
- *  from `semantics.what`. */
-function toolAction(node: ToolNode): Action {
-  const command = extractBashCommand(parseToolInput(node.tool_input));
-  return classifyAction(node.name, command ?? undefined);
+/** The closed `action` bucket for a tool node — a coarsening of the ontology
+ *  action the config resolves for this call. `toolOntologyAction` resolves a single
+ *  ontology action id (tool spec, shell command grammar, or `invoke` for MCP), and
+ *  `coarseAction` rolls it up via the ontology's `coarse` field. Every tool node
+ *  yields a non-NULL bucket; distinct from the free-form `semantics.what`. */
+function toolAction(node: ToolNode, config: SemanticsConfig): string {
+  const input = parseToolInput(node.tool_input);
+  return coarseAction(config, toolOntologyAction(config, node.name, input));
 }
 
 function toolFields(node: ToolNode, config: SemanticsConfig): SemanticFields {
@@ -116,10 +115,10 @@ export function enrichExecutionGraph(
   config: SemanticsConfig,
 ): ExecutionGraph {
   const semantics: Record<string, SemanticFields> = {};
-  const actions: Record<string, Action> = {};
+  const actions: Record<string, string> = {};
   const intents: Record<string, IntentCategory> = {};
   for (const [id, node] of Object.entries(graph.nodes)) {
-    if (node.type === 'tool') actions[id] = toolAction(node);
+    if (node.type === 'tool') actions[id] = toolAction(node, config);
     if (node.type === 'interaction') intents[id] = interactionIntent(node);
     const fields = semanticFieldsOf(node, graph.deltas[id], config);
     if (fields != null) semantics[id] = fields;

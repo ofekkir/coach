@@ -26,6 +26,16 @@
       "target": { "field": "file_path", "kind": "path" },
       "phrase": "read {object}"
     },
+    "NotebookRead": {
+      "action": "read",
+      "target": { "field": "notebook_path", "kind": "path" },
+      "phrase": "read {object}"
+    },
+    "LS": {
+      "action": "search",
+      "target": { "field": "path", "kind": "path" },
+      "phrase": "list {object}"
+    },
     "Edit": {
       "action": "edit",
       "target": { "field": "file_path", "kind": "path" },
