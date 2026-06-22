@@ -1,21 +1,19 @@
-import type { CanonicalNode, ErrorKind, MessageDeltas, ToolNode } from '../../types.ts';
-import type { ExecutionGraph } from '../types.ts';
-
-// ════════════════════════════════════════════════════════════════════════════
-// Tool result/error matching — a PURE TABLE PASS over the mechanical execution
-// graph (after stage 5, before semantic enrichment). A tool call's result is NOT
-// on the tool node itself: it arrives as a `tool_result` block, keyed by
-// `tool_use_id`, in the request messages of the inference that consumed it (its
-// stage-5 `requestMessagesDelta`). This module indexes those blocks by
-// `tool_use_id`, matches each `tool` node to its result, and annotates the node
-// with `is_error`, a deterministic `error_kind`, and a ≤500-char `result_summary`.
+// Tool result/error matching — a canonical-stage pass (stage 3) that completes
+// each `tool` node with its outcome. A tool call's result is NOT on the tool node
+// as it arrives: it comes back as a `tool_result` block, keyed by `tool_use_id`,
+// in the `request_messages` of the inference that consumed it. This indexes those
+// blocks across the session's `llm_request` nodes and annotates each matched tool
+// node with `is_error`, a deterministic `error_kind`, `output_size`, and (on
+// failures only) a ≤500-char `error_message`.
 //
-// Tool calls with NO matching result are REPORTED (returned in `unmatched`, never
-// silently dropped); their `is_error` stays absent (NULL). No LLM — every field
-// is read or rule-derived from the trace. Pure module (no node:* imports).
-// ════════════════════════════════════════════════════════════════════════════
+// `request_messages` is populated by BOTH the native and OTEL canonical paths, so
+// this one pass is harness-agnostic — no separate graph stage, no `deltas`. Tool
+// calls with no matching result keep `is_error` NULL (queryable as such), never
+// silently coerced. No LLM — every field is read or rule-derived. Pure module.
 
-const RESULT_SUMMARY_MAX = 500;
+import type { CanonicalNode, ErrorKind, RequestMessage, ToolNode } from '../../types.ts';
+
+const ERROR_MESSAGE_MAX = 500;
 
 /** A tool_result block as it appears in an inference's request messages. `content`
  *  is the result/error text (a string, or an array of `{ text }` blocks). */
@@ -31,18 +29,19 @@ function isToolResultBlock(block: unknown): block is ToolResultBlock {
   return candidate.type === 'tool_result' && typeof candidate.tool_use_id === 'string';
 }
 
-function resultBlocksOf(deltas: MessageDeltas | undefined): ToolResultBlock[] {
-  return (deltas?.requestMessagesDelta ?? []).flatMap((message) =>
+function resultBlocksOf(messages: readonly RequestMessage[] | undefined): ToolResultBlock[] {
+  return (messages ?? []).flatMap((message) =>
     Array.isArray(message.content) ? message.content.filter(isToolResultBlock) : [],
   );
 }
 
-/** tool_use_id → its tool_result block, indexed over every inference's request
- *  messages. Last write wins (a tool_use_id appears in exactly one result). */
-function indexResultsByToolUseId(graph: ExecutionGraph): Map<string, ToolResultBlock> {
+/** tool_use_id → its tool_result block, indexed over every llm_request node's
+ *  request messages. Last write wins (a tool_use_id appears in exactly one result). */
+function indexResultsByToolUseId(nodes: readonly CanonicalNode[]): Map<string, ToolResultBlock> {
   const byId = new Map<string, ToolResultBlock>();
-  for (const deltas of Object.values(graph.deltas)) {
-    for (const block of resultBlocksOf(deltas)) byId.set(block.tool_use_id, block);
+  for (const node of nodes) {
+    if (node.type !== 'llm_request') continue;
+    for (const block of resultBlocksOf(node.request_messages)) byId.set(block.tool_use_id, block);
   }
   return byId;
 }
@@ -66,8 +65,8 @@ function resultText(content: unknown): string {
 function summarize(text: string): string | undefined {
   const trimmed = text.trim();
   if (trimmed.length === 0) return undefined;
-  if (trimmed.length <= RESULT_SUMMARY_MAX) return trimmed;
-  return `${trimmed.slice(0, RESULT_SUMMARY_MAX - 1).trimEnd()}…`;
+  if (trimmed.length <= ERROR_MESSAGE_MAX) return trimmed;
+  return `${trimmed.slice(0, ERROR_MESSAGE_MAX - 1).trimEnd()}…`;
 }
 
 // ── error_kind classifier (deterministic, no LLM) ──────────────────────────────
@@ -144,46 +143,30 @@ function annotateTool(tool: ToolNode, result: ToolResultBlock): ToolNode {
   return {
     ...tool,
     is_error: isError,
+    output_size: text.length,
     ...(isError ? { error_kind: classifyErrorKind(text) } : {}),
-    ...(summary != null ? { result_summary: summary } : {}),
+    ...(isError && summary != null ? { error_message: summary } : {}),
   };
 }
 
 function annotatedNode(
   node: CanonicalNode,
   resultsByToolUseId: ReadonlyMap<string, ToolResultBlock>,
-  unmatched: string[],
 ): CanonicalNode {
   if (node.type !== 'tool' || node.tool_use_id == null) return node;
   const result = resultsByToolUseId.get(node.tool_use_id);
-  if (result == null) {
-    unmatched.push(node.id);
-    return node;
-  }
-  return annotateTool(node, result);
-}
-
-/** The outcome of matching: the graph with tool nodes annotated, plus the ids of
- *  tool calls that had no matching result (reported, never dropped). */
-export interface ToolResultMatch {
-  readonly graph: ExecutionGraph;
-  readonly unmatchedToolIds: readonly string[];
+  return result == null ? node : annotateTool(node, result);
 }
 
 /**
- * Matches every `tool` node to its `tool_result` (by `tool_use_id`) and annotates
- * it with `is_error`, `error_kind`, and `result_summary`. The node table is
- * rebuilt with the annotations; deltas, edges and entities are returned unchanged.
- * Pure and deterministic. Unmatched tool calls are returned in `unmatchedToolIds`.
+ * Completes every `tool` node with its outcome (`is_error`, `error_kind`,
+ * `output_size`, `error_message`) by matching its `tool_use_id` to the
+ * `tool_result` block in the consuming inference's request messages. Pure and
+ * deterministic; nodes without a matched result are returned unchanged.
  */
-export function matchToolResults(graph: ExecutionGraph): ToolResultMatch {
-  const resultsByToolUseId = indexResultsByToolUseId(graph);
-  const unmatchedToolIds: string[] = [];
-  const nodes: Record<string, CanonicalNode> = {};
-  for (const [id, node] of Object.entries(graph.nodes)) {
-    nodes[id] = annotatedNode(node, resultsByToolUseId, unmatchedToolIds);
-  }
-  return { graph: { ...graph, nodes }, unmatchedToolIds };
+export function attachToolResults(nodes: readonly CanonicalNode[]): CanonicalNode[] {
+  const resultsByToolUseId = indexResultsByToolUseId(nodes);
+  return nodes.map((node) => annotatedNode(node, resultsByToolUseId));
 }
 
 export { classifyErrorKind };

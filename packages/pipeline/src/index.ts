@@ -46,11 +46,6 @@ export { deltasOf, nodeData, resolve, semanticsOf } from './graph/types.ts';
 // @coach/semantics — import config types from there).
 export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 
-// Tool result/error matching (stage 5.5; deterministic, no LLM) — matches each
-// tool node to its tool_result by tool_use_id and annotates is_error/error_kind/
-// result_summary. Unmatched calls are reported, never dropped.
-export { matchToolResults, type ToolResultMatch } from './graph/result/result.ts';
-
 // Orchestration
 export { buildVizResultFromExecutionGraph, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';
