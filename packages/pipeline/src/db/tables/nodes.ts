@@ -33,7 +33,7 @@ export const NODES: TableSpec = {
     // prettier-ignore
     { name: 'end_time_ns', sqlType: 'BIGINT', doc: 'Span end in nanoseconds (BIGINT, full-precision int64).' },
     // prettier-ignore
-    { name: 'seq', sqlType: 'INTEGER', doc: 'Dense 0..n-1 rank of this node within its owning interaction (every node sharing interaction_id), by start_time_ns ascending, ties broken by id — a deterministic TOTAL order where start_time_ns alone is only partial (ties possible). The materialized form of ROW_NUMBER() OVER (PARTITION BY interaction_id ORDER BY start_time_ns, id): a gap-free positional index for adjacency self-joins (see `transitions`) and "n-th step" arithmetic.' },
+    { name: 'seq', sqlType: 'INTEGER', doc: 'Dense 0..n-1 rank of this node within its owning interaction (every node sharing interaction_id), by start_time_ns ascending, ties broken by id — a deterministic TOTAL order where start_time_ns alone is only partial (ties possible). The materialized form of ROW_NUMBER() OVER (PARTITION BY interaction_id ORDER BY start_time_ns, id): a gap-free positional index for "n-th step" / "next step" (seq+1) arithmetic and adjacency self-joins.' },
     { name: 'duration_ms', sqlType: 'DOUBLE', doc: 'Span wall-clock in ms.' },
     { name: 'model', sqlType: 'VARCHAR', doc: 'llm_request: model id.' },
     { name: 'source', sqlType: 'VARCHAR', doc: 'llm_request: emitting loop/source.' },

@@ -248,13 +248,7 @@ describe('derived + per-type relations are views', () => {
     const { enrichedGraph } = runPipeline(files);
     const sql = materializeSql(enrichedGraph);
 
-    for (const name of [
-      'interaction_metrics',
-      'transitions',
-      'llm_requests',
-      'tools',
-      'interactions',
-    ]) {
+    for (const name of ['interaction_metrics', 'llm_requests', 'tools', 'interactions']) {
       expect(sql.some((s) => s.startsWith(`CREATE VIEW ${name} AS`))).toBe(true);
       expect(sql.some((s) => s.startsWith(`CREATE TABLE ${name} `))).toBe(false);
       expect(sql.some((s) => s.startsWith(`INSERT INTO ${name} `))).toBe(false);

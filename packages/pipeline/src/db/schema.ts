@@ -11,7 +11,7 @@
 //   containment / causal_edges       — the two edge relations over those nodes
 //   threads                          — layout lanes (grouping, not causality)
 //   agents / sessions                — the dimension entities (FK targets, not nodes)
-//   interaction_metrics / transitions — derived rollups, as VIEWs over `nodes`
+//   interaction_metrics              — derived per-interaction rollup, a VIEW over `nodes`
 //   llm_requests / tools / interactions — per-type VIEWs (typed projections of `nodes`)
 
 import { NODES } from './tables/nodes.ts';
@@ -23,7 +23,6 @@ import { THREADS } from './tables/threads.ts';
 import { AGENTS } from './tables/agents.ts';
 import { SESSIONS } from './tables/sessions.ts';
 import { INTERACTION_METRICS } from './views/interaction-metrics.ts';
-import { TRANSITIONS } from './views/transitions.ts';
 import { LLM_REQUESTS } from './views/llm-requests.ts';
 import { TOOLS } from './views/tools.ts';
 import { INTERACTIONS } from './views/interactions.ts';
@@ -41,7 +40,6 @@ export const TABLES: readonly TableSpec[] = [
   AGENTS,
   SESSIONS,
   INTERACTION_METRICS,
-  TRANSITIONS,
   LLM_REQUESTS,
   TOOLS,
   INTERACTIONS,

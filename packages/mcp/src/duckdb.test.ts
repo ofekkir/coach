@@ -46,13 +46,7 @@ describe('temp-db store built from a graph', () => {
       "SELECT table_name FROM information_schema.tables WHERE table_type = 'VIEW' ORDER BY table_name",
     );
     const names = views.rows.map((r) => r.table_name);
-    for (const name of [
-      'interaction_metrics',
-      'transitions',
-      'llm_requests',
-      'tools',
-      'interactions',
-    ]) {
+    for (const name of ['interaction_metrics', 'llm_requests', 'tools', 'interactions']) {
       expect(names).toContain(name);
     }
   });
@@ -74,14 +68,6 @@ describe('temp-db store built from a graph', () => {
       "SELECT (SELECT SUM(tool_count) FROM interaction_metrics) AS m, (SELECT COUNT(*) FROM nodes WHERE type = 'tool') AS n",
     );
     expect(Number(res.rows[0]?.m)).toBe(Number(res.rows[0]?.n));
-  });
-
-  it('transitions has exactly tool_count−1 rows per interaction', async () => {
-    const res = await store.query(
-      'SELECT (SELECT COUNT(*) FROM transitions) AS t, ' +
-        '(SELECT SUM(CASE WHEN tool_count > 0 THEN tool_count - 1 ELSE 0 END) FROM interaction_metrics) AS expected',
-    );
-    expect(Number(res.rows[0]?.t)).toBe(Number(res.rows[0]?.expected));
   });
 
   it('keeps the views read-only too', async () => {
