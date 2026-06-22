@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
+
 import { buildVizUrl, startVizServer } from './viz-server.ts';
 
 const APP_DIST_INDEX = fileURLToPath(new URL('../../app/dist/index.html', import.meta.url));

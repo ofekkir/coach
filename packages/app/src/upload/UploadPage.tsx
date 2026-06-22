@@ -1,6 +1,7 @@
 import type { VizResult } from '@coach/pipeline';
-import { PipelineOutputLoader } from './PipelineOutputLoader/PipelineOutputLoader.tsx';
+
 import { slate } from './palette.ts';
+import { PipelineOutputLoader } from './PipelineOutputLoader/PipelineOutputLoader.tsx';
 
 interface Props {
   onResults: (results: VizResult[]) => void;

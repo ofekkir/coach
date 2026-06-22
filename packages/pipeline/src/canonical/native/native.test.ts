@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
+
 import { aggregate } from '../../aggregate/aggregate.ts';
-import { TempoTraceSchema } from '../tempo.schema.ts';
 import type { CanonicalNode, ToolNode } from '../../types.ts';
 import { sessionEntityId } from '../../types.ts';
+import { TempoTraceSchema } from '../tempo.schema.ts';
 import { transformTrace } from '../transform/transform.ts';
+
 import { nativeSessionToTrace } from './native.ts';
 
 function countLlmsByParent(llms: CanonicalNode[]): Map<string, number> {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import { createStore, type Connection } from './query-core.ts';
 import type { RawResult } from './result.ts';
 

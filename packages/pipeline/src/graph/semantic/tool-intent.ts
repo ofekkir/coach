@@ -9,6 +9,7 @@ import {
   type ToolOverride,
   type ToolSemantics,
 } from '@coach/semantics';
+
 import { extractBashCommand } from './derive.ts';
 
 // ════════════════════════════════════════════════════════════════════════════

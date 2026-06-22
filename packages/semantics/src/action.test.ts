@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { coarseAction, shellCommandAction } from './action.ts';
 import { defaultSemanticsConfig } from './defaults.ts';
 

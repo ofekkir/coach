@@ -9,13 +9,14 @@ import type {
   HookNode,
 } from '../../types.ts';
 import { sessionEntityId } from '../../types.ts';
+
+import { parseSpans } from './parse.ts';
+import type { ParsedSpan } from './parse.ts';
 import {
   extractRequestMessages,
   extractResponseMessages,
   extractStopReason,
 } from './request-body.ts';
-import { parseSpans } from './parse.ts';
-import type { ParsedSpan } from './parse.ts';
 
 // The id/timing/parent/sessionId fields every span-derived node shares. `sessionId`
 // is the FK → Session entity, denormalized onto every node (resolved once per

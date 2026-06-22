@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExecutionGraph, ResolvedNode } from '@coach/pipeline';
 import { resolve } from '@coach/pipeline';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { DetailsPanel } from '../DetailsPanel/DetailsPanel.tsx';
+import { FlowInner } from '../FlowInner/FlowInner.tsx';
+import type { Elements } from '../FlowInner/FlowInner.tsx';
 import {
   allExpandableIds,
   agentRoot,
@@ -8,13 +12,10 @@ import {
   initialExpanded,
   revealPath,
 } from '../layout/queries.ts';
-import type { Elements } from '../FlowInner/FlowInner.tsx';
-import { FlowInner } from '../FlowInner/FlowInner.tsx';
-import { DetailsPanel } from '../DetailsPanel/DetailsPanel.tsx';
-import { TopBar } from '../TopBar/TopBar.tsx';
-import { summarizeRun } from '../TopBar/stats.ts';
-import { fonts, tokens } from '../theme.ts';
 import type { TraceRFNodeData } from '../layout/types.ts';
+import { fonts, tokens } from '../theme.ts';
+import { summarizeRun } from '../TopBar/stats.ts';
+import { TopBar } from '../TopBar/TopBar.tsx';
 
 function selectedData(elements: Elements, selectedId: string | null): TraceRFNodeData | null {
   if (selectedId == null) return null;

@@ -5,10 +5,11 @@ import type {
   SessionInputs,
   TempoTrace,
 } from '../types.ts';
+
 import { enrichTrace } from './enrich/enrich.ts';
 import { nativeSessionToTrace } from './native/native.ts';
-import { transformTrace } from './transform/transform.ts';
 import { attachToolResults } from './result/result.ts';
+import { transformTrace } from './transform/transform.ts';
 
 function joinTraces(traces: readonly TempoTrace[]): TempoTrace {
   return { batches: traces.flatMap((t) => t.batches) };

@@ -11,12 +11,13 @@
 // it before dispatch. Data-bound tools read through the session, which throws a
 // clear message until a dataset is loaded.
 
-import { z, type ZodRawShape } from 'zod';
 import { resolve as resolveNode, TABLES } from '@coach/pipeline';
 import { defaultSemanticsConfig } from '@coach/semantics';
+import { z, type ZodRawShape } from 'zod';
+
+import { EXAMPLE_QUERIES } from './examples.ts';
 import type { CausalDirection } from './query-core.ts';
 import type { Session } from './session.ts';
-import { EXAMPLE_QUERIES } from './examples.ts';
 import { startVizServer } from './viz-server.ts';
 
 export interface Tool {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { decodeRawBody, extractRequestMessages } from './request-body.ts';
 
 const REQ = { messages: [{ role: 'user', content: 'hello' }] };

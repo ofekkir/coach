@@ -1,6 +1,7 @@
-import { ellipsis, fonts, glyphFor, tokens } from '../theme.ts';
 import type { NodeCard } from '../format/format.ts';
 import { NW } from '../layout/types.ts';
+import { ellipsis, fonts, glyphFor, tokens } from '../theme.ts';
+
 import { Glyph } from './Glyph.tsx';
 
 // The colored depth rail that marks a level banner's place in the hierarchy.

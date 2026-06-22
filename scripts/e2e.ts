@@ -1,9 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+
 import { log } from '@coach/logger';
+import { dumpPipelineOutputs } from '@coach/mcp';
 import { runPipeline } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
-import { dumpPipelineOutputs } from '@coach/mcp';
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 

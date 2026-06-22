@@ -5,10 +5,11 @@
 // the directory's trace/native files run through the pipeline, then materialized.
 
 import type { ExecutionGraph } from '@coach/pipeline';
-import type { Store } from './query-core.ts';
-import { loadPipelineResult, type Dataset } from './load.ts';
-import { createStore } from './store.ts';
+
 import { dumpPipelineOutputs } from './dump.ts';
+import { loadPipelineResult, type Dataset } from './load.ts';
+import type { Store } from './query-core.ts';
+import { createStore } from './store.ts';
 
 /** What `load_dataset` reports back: where it loaded from and how much it found. */
 export interface DatasetSummary {

@@ -1,6 +1,6 @@
 import { assembleSemanticsConfig, type SemanticsConfig } from './config.ts';
-import codingOntology from './data/ontology/coding.json' with { type: 'json' };
 import claudeCodeAgent from './data/agents/claude-code.json' with { type: 'json' };
+import codingOntology from './data/ontology/coding.json' with { type: 'json' };
 
 // The default semantics pair — coding domain × claude-code agent — assembled from
 // the bundled JSON artifacts. Importing (not disk-reading) the JSON keeps this

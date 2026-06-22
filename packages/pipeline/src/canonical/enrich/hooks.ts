@@ -1,4 +1,5 @@
 import type { LogEntry } from '../../types.ts';
+
 import { lastEndedBefore, narrowestContaining } from './id-utils.ts';
 import type { SpanMeta } from './id-utils.ts';
 

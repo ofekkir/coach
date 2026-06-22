@@ -1,7 +1,8 @@
-import { useState } from 'react';
 import type { VizResult } from '@coach/pipeline';
-import { App } from '../viz/App/App.tsx';
+import { useState } from 'react';
+
 import { UploadPage } from '../upload/UploadPage.tsx';
+import { App } from '../viz/App/App.tsx';
 
 // Manual-intake path: no `?data` boot param, so the user picks a pre-computed
 // pipeline output file from the upload page; the chosen file renders in <App>.

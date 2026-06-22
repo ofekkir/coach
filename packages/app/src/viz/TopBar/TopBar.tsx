@@ -1,5 +1,6 @@
-import { fonts, tokens } from '../theme.ts';
 import { formatRunCost, formatRunDuration } from '../format/format.ts';
+import { fonts, tokens } from '../theme.ts';
+
 import { FocusInput } from './FocusInput.tsx';
 import type { RunStats } from './stats.ts';
 

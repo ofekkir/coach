@@ -3,8 +3,8 @@
 // a directory `load_dataset`, then hands back a URL that boots the app pointed at a
 // chosen data file (and optional focus node). No framework: just `node:http`.
 
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

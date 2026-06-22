@@ -6,13 +6,15 @@
 // builder only sets the columns its node/edge type actually has.
 
 import type { IntentCategory } from '@coach/semantics';
-import type { Agent, CanonicalNode, Session } from '../types.ts';
-import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
+
 import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
-import { TABLES } from './schema.ts';
-import type { ColumnSpec, TableSpec } from './spec.ts';
-import { seqByNodeId } from './seq.ts';
+import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
+import type { Agent, CanonicalNode, Session } from '../types.ts';
+
 import { filePathFromToolInput, normalizeRepoPath } from './repo-path.ts';
+import { TABLES } from './schema.ts';
+import { seqByNodeId } from './seq.ts';
+import type { ColumnSpec, TableSpec } from './spec.ts';
 
 const INSERT_CHUNK = 200;
 

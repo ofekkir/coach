@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { INTENT_CATEGORIES, classifyIntent, type IntentCategory } from './intent.ts';
 
 describe('classifyIntent', () => {

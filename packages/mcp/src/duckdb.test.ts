@@ -2,12 +2,14 @@ import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { DuckDBInstance } from '@duckdb/node-api';
-import type { Store } from './query-core.ts';
-import { loadDataset } from './load.ts';
-import { createStore } from './store.ts';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { writePersistedDb } from './duckdb.ts';
+import { loadDataset } from './load.ts';
+import type { Store } from './query-core.ts';
+import { createStore } from './store.ts';
 
 const FIXTURE = fileURLToPath(
   new URL('../../pipeline/fixtures/otel/fetch-website', import.meta.url),

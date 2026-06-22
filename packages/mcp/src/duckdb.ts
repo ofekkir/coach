@@ -15,8 +15,10 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
+
 import { materializeSql, type ExecutionGraph } from '@coach/pipeline';
+import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
+
 import { type Connection } from './query-core.ts';
 import type { RawResult } from './result.ts';
 

@@ -1,4 +1,5 @@
 import type { ResolvedNode } from '@coach/pipeline';
+
 import type { NodeCard } from '../format/format.ts';
 import { fonts, monoLabel, tokens } from '../theme.ts';
 

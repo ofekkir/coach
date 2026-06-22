@@ -7,6 +7,7 @@
 
 import { spawn } from 'node:child_process';
 import { platform } from 'node:os';
+
 import { startVizServer } from '../src/viz-server.ts';
 
 const DEFAULT_DATA_FILE = '06-enriched-graph.json';

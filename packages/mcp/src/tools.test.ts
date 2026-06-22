@@ -1,8 +1,10 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import type { ResolvedNode } from '@coach/pipeline';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import type { QueryResult } from './result.ts';
 import { createSession, type Session } from './session.ts';
 import { createTools, type Tool } from './tools.ts';

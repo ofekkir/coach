@@ -7,7 +7,9 @@
 
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
 import type { PipelineResult } from '@coach/pipeline';
+
 import { writePersistedDb } from './duckdb.ts';
 
 const JSON_INDENT = 2;

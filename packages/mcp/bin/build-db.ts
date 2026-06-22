@@ -7,8 +7,9 @@
 
 import { mkdirSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { loadDataset } from '../src/load.ts';
+
 import { writePersistedDb } from '../src/duckdb.ts';
+import { loadDataset } from '../src/load.ts';
 
 const dir = process.argv[2];
 if (dir == null || dir.length === 0) {

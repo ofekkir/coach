@@ -1,4 +1,5 @@
 import type { IntentCategory } from '@coach/semantics';
+
 import type { Agent, CanonicalNode, MessageDeltas, SemanticFields, Session } from '../types.ts';
 
 // ════════════════════════════════════════════════════════════════════════════

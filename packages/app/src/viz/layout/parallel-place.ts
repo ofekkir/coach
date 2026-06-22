@@ -1,4 +1,5 @@
 import type { ExecutionNode, Thread } from '@coach/pipeline';
+
 import { estimateNodeH } from './estimate.ts';
 import type { ParallelLevel } from './parallel.ts';
 import { cardOf, nodeOf, placeStep, pushExecNode } from './place-members.ts';

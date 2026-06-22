@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { defaultSemanticsConfig } from '@coach/semantics';
+import { describe, expect, it } from 'vitest';
+
 import {
   extractBashCommand,
   extractFilePath,

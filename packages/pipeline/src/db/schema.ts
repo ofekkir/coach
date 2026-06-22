@@ -14,19 +14,19 @@
 //   interaction_metrics              — derived per-interaction rollup, a VIEW over `nodes`
 //   llm_requests / tools / interactions — per-type VIEWs (typed projections of `nodes`)
 
-import { NODES } from './tables/nodes.ts';
-import { DELTAS } from './tables/deltas.ts';
-import { SEMANTICS } from './tables/semantics.ts';
-import { CONTAINMENT } from './tables/containment.ts';
-import { CAUSAL_EDGES } from './tables/causal-edges.ts';
-import { THREADS } from './tables/threads.ts';
+import type { TableSpec } from './spec.ts';
 import { AGENTS } from './tables/agents.ts';
+import { CAUSAL_EDGES } from './tables/causal-edges.ts';
+import { CONTAINMENT } from './tables/containment.ts';
+import { DELTAS } from './tables/deltas.ts';
+import { NODES } from './tables/nodes.ts';
+import { SEMANTICS } from './tables/semantics.ts';
 import { SESSIONS } from './tables/sessions.ts';
+import { THREADS } from './tables/threads.ts';
 import { INTERACTION_METRICS } from './views/interaction-metrics.ts';
+import { INTERACTIONS } from './views/interactions.ts';
 import { LLM_REQUESTS } from './views/llm-requests.ts';
 import { TOOLS } from './views/tools.ts';
-import { INTERACTIONS } from './views/interactions.ts';
-import type { TableSpec } from './spec.ts';
 
 // Materialized tables first, then VIEWs — every view selects from `nodes` (created
 // first), so the relations a view reads already exist when `materializeSql` emits it.

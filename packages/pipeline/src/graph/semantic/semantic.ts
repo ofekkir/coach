@@ -1,3 +1,11 @@
+import {
+  actionLabel,
+  classifyIntent,
+  coarseAction,
+  type IntentCategory,
+  type SemanticsConfig,
+} from '@coach/semantics';
+
 import type {
   CanonicalNode,
   InteractionNode,
@@ -7,13 +15,7 @@ import type {
   ToolNode,
 } from '../../types.ts';
 import type { ExecutionGraph } from '../types.ts';
-import {
-  actionLabel,
-  classifyIntent,
-  coarseAction,
-  type IntentCategory,
-  type SemanticsConfig,
-} from '@coach/semantics';
+
 import {
   markerLabel,
   parseToolInput,

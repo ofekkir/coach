@@ -1,5 +1,6 @@
 import type { CanonicalNode, MessageDeltas } from '../../types.ts';
 import type { CausalEdge, ExecutionNode, Thread } from '../types.ts';
+
 import { gapMsBetween, startGapMsBetween } from './thread.ts';
 
 // ════════════════════════════════════════════════════════════════════════════

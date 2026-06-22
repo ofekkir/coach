@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import type {
   Agent,
   LlmRequestNode,
@@ -7,6 +6,8 @@ import type {
   ToolExecutionNode,
   ToolNode,
 } from '@coach/pipeline';
+import { describe, expect, it } from 'vitest';
+
 import {
   buildAgentCard,
   buildNodeCard,

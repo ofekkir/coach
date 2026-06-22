@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
 import { pino } from 'pino';
+import { describe, it, expect } from 'vitest';
+
 import { log, createLogger } from './logger.ts';
 
 describe('logger exports', () => {

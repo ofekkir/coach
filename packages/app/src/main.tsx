@@ -1,11 +1,12 @@
+import type { VizResult } from '@coach/pipeline';
 import { ReactFlowProvider } from '@xyflow/react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from './viz/App/App.tsx';
+
 import { ErrorScreen } from './boot/ErrorScreen.tsx';
 import { ManualRoot } from './boot/ManualRoot.tsx';
 import { loadPipelineOutput } from './data-source.ts';
-import type { VizResult } from '@coach/pipeline';
+import { App } from './viz/App/App.tsx';
 
 interface BootParams {
   dataUrl: string | null;

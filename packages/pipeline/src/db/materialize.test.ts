@@ -1,9 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
+
+import type { ExecutionGraph } from '../graph/types.ts';
 import { runPipeline } from '../orchestrate.ts';
 import type { CanonicalNode, UploadedFile } from '../types.ts';
-import type { ExecutionGraph } from '../graph/types.ts';
+
 import { buildRecords, materializeSql } from './materialize.ts';
 import { normalizeRepoPath } from './repo-path.ts';
 

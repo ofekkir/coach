@@ -1,6 +1,8 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { roleFor } from '../theme.ts';
+
 import { SIDE_HANDLE, type TraceRFNode } from '../layout/types.ts';
+import { roleFor } from '../theme.ts';
+
 import { renderAnchor, renderBanner } from './levels.tsx';
 import { renderStep } from './step.tsx';
 

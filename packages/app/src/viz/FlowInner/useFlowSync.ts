@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import {
   useEdgesState,
   useNodesState,
@@ -7,6 +6,8 @@ import {
   type OnNodesChange,
 } from '@xyflow/react';
 import type { Edge } from '@xyflow/react';
+import { useEffect, useRef } from 'react';
+
 import type { RFNode } from '../layout/types.ts';
 
 // Delay (ms) before the one-time auto fit-to-view, letting the DOM settle first.

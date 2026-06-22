@@ -1,5 +1,6 @@
-import type { CanonicalNode, InteractionNode, MessageDeltas } from '../../types.ts';
 import type { AgentGraph } from '../../aggregate/aggregate.ts';
+import type { CanonicalNode, InteractionNode, MessageDeltas } from '../../types.ts';
+import type { Session } from '../../types.ts';
 import type {
   AgentExecution,
   ExecutionGraph,
@@ -8,7 +9,7 @@ import type {
   SessionExecution,
   Thread,
 } from '../types.ts';
-import type { Session } from '../../types.ts';
+
 import { buildCausalEdges, type NodeResolver } from './causal.ts';
 import {
   buildChildrenOf,

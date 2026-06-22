@@ -4,8 +4,9 @@
 // analyst surface. The Store/QueryResult/CausalDirection types live in ./query-core.ts.
 
 import type { ExecutionGraph } from '@coach/pipeline';
-import { createStore as createCoreStore, type Store } from './query-core.ts';
+
 import { createDuckDbConnection } from './duckdb.ts';
+import { createStore as createCoreStore, type Store } from './query-core.ts';
 
 /** Builds a read-only DuckDB-backed Store from a stage-6 (enriched) execution graph.
  *  The DB is rebuilt per dataset; for the small graphs coach holds this is ms. */
