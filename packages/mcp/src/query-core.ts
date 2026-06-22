@@ -46,7 +46,7 @@ function subtreeSql(id: string): string {
   SELECT n.id, n.type, n.parent, n.name, n.model, n.duration_ms, n.tool_input, n.prompt
   FROM nodes n JOIN sub ON n.id = sub.id
   WHERE n.id <> ${lit}
-  ORDER BY n.start_time`;
+  ORDER BY n.start_time_ns`;
 }
 
 function causalSql(id: string, direction: CausalDirection): string {
@@ -65,7 +65,7 @@ function causalSql(id: string, direction: CausalDirection): string {
   )
   SELECT n.id, n.type, n.name, n.model, n.duration_ms
   FROM nodes n JOIN walk ON n.id = walk.id
-  ORDER BY n.start_time`;
+  ORDER BY n.start_time_ns`;
 }
 
 // ── Store factory ────────────────────────────────────────────────────────────

@@ -29,11 +29,11 @@ export const NODES: TableSpec = {
     },
     { name: 'interaction_id', sqlType: 'VARCHAR', doc: 'FK → owning interaction node id.' },
     // prettier-ignore
-    { name: 'start_time', sqlType: 'BIGINT', doc: 'Span start, nanoseconds. BIGINT holds the full int64 ns value losslessly (a DOUBLE/JS number would not); the digit string survives verbatim in `data`. ORDER BY start_time == ORDER BY seq within an interaction.' },
+    { name: 'start_time_ns', sqlType: 'BIGINT', doc: 'Span start in nanoseconds (the `_ns` names the unit). BIGINT holds the full int64 ns value losslessly (a DOUBLE/JS number would not); the same digits survive verbatim in `data`. ORDER BY start_time_ns == ORDER BY seq within an interaction.' },
     // prettier-ignore
-    { name: 'end_time', sqlType: 'BIGINT', doc: 'Span end, nanoseconds (BIGINT, full-precision int64).' },
+    { name: 'end_time_ns', sqlType: 'BIGINT', doc: 'Span end in nanoseconds (BIGINT, full-precision int64).' },
     // prettier-ignore
-    { name: 'seq', sqlType: 'INTEGER', doc: 'Dense 0..n-1 rank of this node within its owning interaction (every node sharing interaction_id), by start_time ascending. ORDER BY seq == ORDER BY start_time — a stable per-interaction timeline index.' },
+    { name: 'seq', sqlType: 'INTEGER', doc: 'Dense 0..n-1 rank of this node within its owning interaction (every node sharing interaction_id), by start_time_ns ascending, ties broken by id — a deterministic TOTAL order where start_time_ns alone is only partial (ties possible). The materialized form of ROW_NUMBER() OVER (PARTITION BY interaction_id ORDER BY start_time_ns, id): a gap-free positional index for adjacency self-joins (see `transitions`) and "n-th step" arithmetic.' },
     { name: 'duration_ms', sqlType: 'DOUBLE', doc: 'Span wall-clock in ms.' },
     { name: 'model', sqlType: 'VARCHAR', doc: 'llm_request: model id.' },
     { name: 'source', sqlType: 'VARCHAR', doc: 'llm_request: emitting loop/source.' },

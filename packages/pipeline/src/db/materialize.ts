@@ -90,8 +90,8 @@ function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
     parent: node.parent,
     session_id: node.sessionId,
     interaction_id: node.interactionId,
-    start_time: node.start_time_ns,
-    end_time: node.end_time_ns,
+    start_time_ns: node.start_time_ns,
+    end_time_ns: node.end_time_ns,
     duration_ms: node.duration_ms,
     data: node,
   };

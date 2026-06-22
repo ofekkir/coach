@@ -37,15 +37,15 @@ function rowsByInteraction(
 }
 
 describe('seq invariant', () => {
-  it('within each interaction, ORDER BY seq == ORDER BY start_time, dense 0..n-1', () => {
+  it('within each interaction, ORDER BY seq == ORDER BY start_time_ns, dense 0..n-1', () => {
     const groups = rowsByInteraction(nodeRows());
     expect(groups.size).toBeGreaterThan(0);
 
     for (const rows of groups.values()) {
       const byStartTime = [...rows].sort((a, b) =>
-        BigInt(a.start_time as string) < BigInt(b.start_time as string)
+        BigInt(a.start_time_ns as string) < BigInt(b.start_time_ns as string)
           ? -1
-          : BigInt(a.start_time as string) > BigInt(b.start_time as string)
+          : BigInt(a.start_time_ns as string) > BigInt(b.start_time_ns as string)
             ? 1
             : (a.id as string) < (b.id as string)
               ? -1
@@ -78,12 +78,12 @@ describe('promoted file_path / bash_command columns', () => {
 });
 
 describe('numeric BIGINT time columns', () => {
-  it('emits start_time/end_time as the verbatim ns digit strings carried in data', () => {
+  it('emits start_time_ns/end_time_ns as the verbatim ns digit strings carried in data', () => {
     const rows = nodeRows();
     for (const row of rows) {
       const node = row.data as CanonicalNode;
-      expect(String(row.start_time)).toBe(node.start_time_ns);
-      expect(String(row.end_time)).toBe(node.end_time_ns);
+      expect(String(row.start_time_ns)).toBe(node.start_time_ns);
+      expect(String(row.end_time_ns)).toBe(node.end_time_ns);
     }
   });
 
@@ -92,7 +92,7 @@ describe('numeric BIGINT time columns', () => {
     const { enrichedGraph } = runPipeline(files);
     const sql = materializeSql(enrichedGraph);
 
-    expect(sql.some((s) => s.includes('start_time BIGINT'))).toBe(true);
+    expect(sql.some((s) => s.includes('start_time_ns BIGINT'))).toBe(true);
     expect(sql.some((s) => s.includes('seq INTEGER'))).toBe(true);
   });
 });

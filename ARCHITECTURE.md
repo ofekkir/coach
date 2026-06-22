@@ -296,12 +296,14 @@ not a reshape.
   `semantics`), the two edge relations (`containment` / `causal_edges`), `threads` (layout lanes), and
   the `agents` / `sessions` dimension entities. The `nodes` table promotes common + type-specific columns
   and keeps the full raw node in a `data` JSON column (the escape hatch for un-promoted fields). Span
-  timing is the numeric `start_time`/`end_time` **BIGINT** columns — full-precision int64 nanoseconds
-  (a DOUBLE/JS `number` would lose precision), emitted as bare integer literals and never round-tripped
-  through a JS number; the verbatim ns digit strings still survive inside the `data` JSON for anyone who
-  wants them. A dense `seq` INTEGER ranks every node within its owning interaction by `start_time`
-  ascending (`0..n-1`, no gaps): `ORDER BY seq` == `ORDER BY start_time`, a stable per-interaction
-  timeline index. The `sessions` dimension carries `cwd` and
+  timing is the numeric `start_time_ns`/`end_time_ns` **BIGINT** columns — full-precision int64
+  nanoseconds (a DOUBLE/JS `number` would lose precision; the `_ns` suffix names the unit), emitted as
+  bare integer literals and never round-tripped through a JS number; the same digit strings also survive
+  inside the `data` JSON. A dense `seq` INTEGER ranks every node within its owning interaction by
+  `start_time_ns` ascending, ties broken by id (`0..n-1`, no gaps) — the materialized form of a
+  `ROW_NUMBER()` window. It is a deterministic TOTAL order where `start_time_ns` alone is only partial
+  (ties are possible), and a gap-free positional index for adjacency self-joins (`transitions`) and
+  "n-th step" arithmetic: `ORDER BY seq` == `ORDER BY start_time_ns, id`. The `sessions` dimension carries `cwd` and
   `branch` (the working directory + git branch a session ran in; populated for native Claude
   sessions, NULL for OTEL traces, which expose neither). The `nodes` table adds a worktree-normalized
   `repo_path` (`db/repo-path.ts`): the file path a tool touched, derived from `tool_input`, collapsed
