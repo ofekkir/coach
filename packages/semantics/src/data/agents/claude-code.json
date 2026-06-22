@@ -144,6 +144,24 @@
       "phrase": "load {target} tool schema",
       "fallbackPhrase": "load tool schema"
     },
+    "TaskCreate": {
+      "action": "plan",
+      "object": "task-list",
+      "target": { "kind": "none" },
+      "phrase": "create task"
+    },
+    "TaskUpdate": {
+      "action": "plan",
+      "object": "task-list",
+      "target": { "kind": "none" },
+      "phrase": "update task"
+    },
+    "SendUserFile": {
+      "action": "respond",
+      "object": "user",
+      "target": { "kind": "none" },
+      "phrase": "send file to the user"
+    },
     "BashOutput": {
       "action": "read",
       "object": "shell",
