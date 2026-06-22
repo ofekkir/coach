@@ -33,11 +33,13 @@ UploadedFile[]   (*.jsonl · logs.json + trace*.json)
         ▼ 5. execution graph buildExecutionGraph → executionGraph (ExecutionGraph)
                                id-keyed, stage-layered: nodes/deltas/semantics tables + entities;
                                edges are containment (tree) and causal (causalEdges)
+        ▼ 5.5 tool results   matchToolResults → tool nodes get is_error/error_kind/result_summary
+                               (matched by tool_use_id; unmatched calls reported, not dropped)
         ▼ 6. semantic graph  enrichExecutionGraph → ExecutionGraph
                                pure table pass: writes a semantics[id] row per tool / llm_request
                                deterministic; labels come from @coach/semantics (no model)
         │
-        ▼ React Flow graph   (@coach/app, via the buildVizResults adapter)
+        ▼ React Flow graph   (@coach/app renders a pre-computed ExecutionGraph)
 ```
 
 The **execution graph** is the deterministic skeleton — a normalized, id-keyed model that maps 1:1
@@ -51,7 +53,12 @@ display text. The graph is consumed only by the renderer.
 Inputs are classified, then grouped by **session id** — OTEL traces carry `session.id`, native
 `.jsonl` carries `sessionId`, and OTEL logs use their `session_id` (falling back to the traces in
 their directory). A session is assumed wholly OTEL or wholly native. All sessions roll up under a
-single **agent** (multi-agent is out of scope). Use the staging UI to mix files and folders freely.
+single **agent** (multi-agent is out of scope).
+
+The pipeline runs offline (the CLI `pnpm e2e`, or the MCP server). The app no longer runs it in the
+browser: it renders a **pre-computed execution graph**. Load one via the "Load pipeline output"
+button, or boot directly from a URL with `?data=<url>` (fetches the JSON and renders it).
+`?focus=<nodeId>` then reveals, selects, and centers that node — the same effect as the search box.
 
 ### Fixtures
 
@@ -73,7 +80,7 @@ app's "Load pipeline output" button.
 ```bash
 pnpm install
 pnpm check             # typecheck + lint + format + test + knip (same as CI)
-pnpm --filter @coach/app dev   # upload landing page at http://localhost:5173
+pnpm --filter @coach/app dev   # load-pipeline-output landing page at http://localhost:5173
 ```
 
 ## Development

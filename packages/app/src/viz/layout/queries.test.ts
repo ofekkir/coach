@@ -17,6 +17,8 @@ function graph(): ExecutionGraph {
     nodes: {},
     deltas: {},
     semantics: {},
+    actions: {},
+    intents: {},
     data: {
       agent: { id: 'agent-1', userId: 'u-1' },
       sessions: [

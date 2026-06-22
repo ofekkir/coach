@@ -4,6 +4,8 @@
 // Node CLI and the browser app.
 
 export { defaultSemanticsConfig } from './defaults.ts';
+export { coarseAction, shellCommandAction } from './action.ts';
+export { INTENT_CATEGORIES, classifyIntent, type IntentCategory } from './intent.ts';
 export { assembleSemanticsConfig, actionLabel, objectLabel, strField, isRecord } from './config.ts';
 export type {
   AgentSemantics,

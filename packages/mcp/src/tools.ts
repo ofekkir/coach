@@ -1,21 +1,24 @@
 // The analyst-facing tool surface. Seven tools over the session's current
-// dataset: load it, describe the schema, run read-only SQL, and four graph
-// primitives. The point is flexibility — the agent loads data and composes its
-// own queries instead of consuming a fixed set of hardcoded findings. The stage-7
-// analysis is still available verbatim through `get_analysis`, but as one option
-// among many, not the only way in.
+// dataset: load it, describe the schema, run read-only SQL, three graph
+// primitives (resolve / subtree / causal_path), and open the visualization. The
+// point is flexibility — the agent loads data and composes its own queries rather
+// than consuming a fixed set of hardcoded findings. (The stage-7 analysis still
+// runs in the pipeline and drives the viz; it is just not re-exposed as a tool —
+// every rollup it computes is a one-line query over the tables described by
+// `describe_schema`.)
 //
 // Tools carry a Zod input shape; the MCP layer (server.ts) validates args against
 // it before dispatch. Data-bound tools read through the session, which throws a
 // clear message until a dataset is loaded.
 
-import { resolve as resolveNode, type GraphAnalysis } from '@coach/pipeline';
+import { resolve as resolveNode, TABLES } from '@coach/pipeline';
 import { defaultSemanticsConfig } from '@coach/semantics';
-import { TABLES, type CausalDirection } from '@coach/store';
 import { z, type ZodRawShape } from 'zod';
 
 import { EXAMPLE_QUERIES } from './examples.ts';
+import type { CausalDirection } from './query-core.ts';
 import type { Session } from './session.ts';
+import { startVizServer } from './viz-server.ts';
 
 export interface Tool {
   readonly name: string;
@@ -61,31 +64,13 @@ function schemaDescription(): unknown {
   };
 }
 
-// ── get_analysis ─────────────────────────────────────────────────────────────
-
-function findInteraction(analysis: GraphAnalysis, interactionId: string): unknown {
-  for (const session of analysis.sessions) {
-    const match = session.interactions.find((i) => i.interactionId === interactionId);
-    if (match != null) return match;
-  }
-  return null;
-}
-
-function analysisView(analysis: GraphAnalysis, args: Record<string, unknown>): unknown {
-  const interactionId = optionalString(args, 'interactionId');
-  if (interactionId != null) return findInteraction(analysis, interactionId);
-  const sessionId = optionalString(args, 'sessionId');
-  if (sessionId != null) return analysis.sessions.find((s) => s.sessionId === sessionId) ?? null;
-  return analysis;
-}
-
 // ── Tool registry ────────────────────────────────────────────────────────────
 
 function loadDatasetTool(session: Session): Tool {
   return {
     name: 'load_dataset',
     description:
-      'Load a dataset directory (OTEL Tempo traces and/or native session .jsonl logs). Runs the full pipeline over the files and makes the resulting execution graph queryable, replacing any previously loaded dataset. Returns a summary (counts). Call this before querying unless a dataset was preloaded at startup.',
+      'Load a dataset and make it queryable, replacing any previously loaded one. Pass a directory of OTEL Tempo traces / native session .jsonl logs; it is run through the full pipeline and materialized. Returns a summary (counts). Call this before querying unless a dataset was preloaded at startup.',
     inputShape: {
       path: z.string().describe('Absolute path to a directory of trace/native files.'),
     },
@@ -149,16 +134,26 @@ function causalPathTool(session: Session): Tool {
   };
 }
 
-function getAnalysisTool(session: Session): Tool {
+const DEFAULT_VIZ_FILE = '06-enriched-graph.json';
+
+function openVizTool(): Tool {
   return {
-    name: 'get_analysis',
+    name: 'open_viz',
     description:
-      'Return the curated stage-7 analysis (rollups, shape, critical path, longest step, repetitions). Optionally narrow to one interactionId or sessionId. A convenience over the raw tables — use `query` for anything it does not cover.',
+      'Open the interactive graph visualization. Starts a local web server over the built app and the stage JSON dumped into the cwd by the last directory `load_dataset`, and returns a URL. Pass a dumped JSON file name (default `06-enriched-graph.json`) and an optional `focus` node id to center on. Requires the app to be built (`pnpm --filter @coach/app build`).',
     inputShape: {
-      interactionId: z.string().optional().describe('Narrow to one interaction.'),
-      sessionId: z.string().optional().describe('Narrow to one session.'),
+      file: z
+        .string()
+        .optional()
+        .describe('Dumped JSON file name to visualize. Default 06-enriched-graph.json.'),
+      focus: z.string().optional().describe('Node id to center the graph on.'),
     },
-    handle: (args) => Promise.resolve(analysisView(session.dataset().analysis, args)),
+    handle: async (args) => {
+      const file = optionalString(args, 'file') ?? DEFAULT_VIZ_FILE;
+      const focus = optionalString(args, 'focus');
+      const { url } = await startVizServer(file, focus);
+      return { url };
+    },
   };
 }
 
@@ -171,6 +166,6 @@ export function createTools(session: Session): Tool[] {
     resolveTool(session),
     subtreeTool(session),
     causalPathTool(session),
-    getAnalysisTool(session),
+    openVizTool(),
   ];
 }

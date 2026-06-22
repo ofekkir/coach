@@ -62,7 +62,7 @@ function buildInteractionNode(
   parent: string | null,
   sessionId: string,
 ): InteractionNode {
-  return {
+  const node: InteractionNode = {
     ...nodeBase(span, parent, sessionId),
     type: 'interaction',
     session_id: require(span.sessionId, span.id, 'session.id'),
@@ -70,6 +70,9 @@ function buildInteractionNode(
     prompt: require(span.userPrompt, span.id, 'user_prompt'),
     user_id: require(span.userId, span.id, 'user.id'),
   };
+  if (span.cwd != null) node.cwd = span.cwd;
+  if (span.branch != null) node.branch = span.branch;
+  return node;
 }
 
 function applyRequestBody(node: LlmRequestNode, rawRequestBody: string, repair: boolean): void {
@@ -83,6 +86,17 @@ function applyResponseBody(node: LlmRequestNode, rawResponseBody: string): void 
   if (messages != null) node.response_messages = messages;
   const stopReason = extractStopReason(rawResponseBody);
   if (stopReason != null) node.stop_reason = stopReason;
+}
+
+// Cost for an llm_request is ONLY ever the cost the trace itself carries (the
+// OTEL/harness path). Native logs usually don't carry one — and we deliberately do
+// NOT back-compute an estimate from a model price table: a price-table figure is a
+// guess, not what was charged, and once written here it's indistinguishable from a
+// real cost. Absent a traced cost, `cost_usd` stays NULL ("unknown"), never 0.
+function resolveCost(node: LlmRequestNode, span: ParsedSpan): void {
+  if (span.costUsd == null) return;
+  const traced = parseFloat(span.costUsd);
+  if (!isNaN(traced)) node.cost_usd = traced;
 }
 
 function buildLlmRequestNode(
@@ -101,10 +115,7 @@ function buildLlmRequestNode(
   if (span.querySource != null) node.source = span.querySource;
   if (span.rawRequestBody != null) applyRequestBody(node, span.rawRequestBody, repair);
   if (span.rawResponseBody != null) applyResponseBody(node, span.rawResponseBody);
-  if (span.costUsd != null) {
-    const n = parseFloat(span.costUsd);
-    if (!isNaN(n)) node.cost_usd = n;
-  }
+  resolveCost(node, span);
   return node;
 }
 

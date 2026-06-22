@@ -86,6 +86,35 @@ export function parseToolInput(input: string | undefined): Record<string, unknow
   }
 }
 
+// Promoted-column source: the single source of truth for the file path and bash
+// command carried in a tool node's `tool_input`. Both the materializer (nodes.
+// file_path / nodes.bash_command) and the action classifier read from here.
+const PATH_FIELDS = ['file_path', 'notebook_path'] as const;
+
+function firstNonEmptyField(
+  input: Record<string, unknown>,
+  keys: readonly string[],
+): string | null {
+  for (const key of keys) {
+    const value = input[key];
+    if (typeof value === 'string' && value !== '') return value;
+  }
+  return null;
+}
+
+/** The path-bearing field of a file tool's input (Read/Edit/Write → `file_path`,
+ *  NotebookEdit → `notebook_path`), or NULL when none is present. Total: never
+ *  throws — malformed/missing input yields NULL. */
+export function extractFilePath(input: Record<string, unknown>): string | null {
+  return firstNonEmptyField(input, PATH_FIELDS);
+}
+
+/** The shell command of a Bash tool's input (`command`), or NULL when absent.
+ *  Total: never throws — malformed/missing input yields NULL. */
+export function extractBashCommand(input: Record<string, unknown>): string | null {
+  return firstNonEmptyField(input, ['command']);
+}
+
 // ── Structural roles — driven by the block-type strings declared in config ─────
 
 type StructuralRole = SemanticsConfig['agent']['structuralRoles']['rules'][number];

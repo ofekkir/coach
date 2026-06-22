@@ -3,7 +3,6 @@ import { defaultSemanticsConfig, type SemanticsConfig } from '@coach/semantics';
 import { aggregate, type AgentGraph } from './aggregate/aggregate.ts';
 import { toCanonical } from './canonical/canonical.ts';
 import { classifyInputs } from './classify/classify.ts';
-import { analyzeGraph, type GraphAnalysis } from './graph/analysis/analysis.ts';
 import { buildExecutionGraph } from './graph/execution/execution.ts';
 import { startNs } from './graph/execution/thread.ts';
 import { enrichExecutionGraph } from './graph/semantic/semantic.ts';
@@ -26,7 +25,6 @@ export interface PipelineResult {
   agentGraph: AgentGraph; // Stage 4 — node table + agent/session entities
   executionGraph: ExecutionGraph; // Stage 5 — mechanical skeleton
   enrichedGraph: ExecutionGraph; // Stage 6 — deterministic semantic labels
-  analysis: GraphAnalysis; // Stage 7 — mechanical analysis of the enriched graph
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,13 +47,14 @@ function sortByTime(nodes: readonly CanonicalNode[]): CanonicalNode[] {
  * Runs the full pipeline over a flat list of in-memory files, returning every
  * stage's output. Pure and file-system-free — the CLI and the app both call it.
  *
- *   classify → route to sessions → to canonical (per session) → aggregate →
- *   execution graph → semantic enrichment → analysis
+ *   classify → route to sessions → to canonical (per session; tool results
+ *   attached here) → aggregate → execution graph → semantic enrichment
  *
  * Stage 6 enrichment is deterministic and always runs, using `config` (the
- * bundled `defaultSemanticsConfig` unless overridden). Stage 7 analyzes the
- * enriched graph alone. Multi-agent is out of scope: all sessions roll up under
- * a single agent.
+ * bundled `defaultSemanticsConfig` unless overridden) — it is the final stage.
+ * Curated analysis is deliberately NOT a pipeline stage: every rollup it would
+ * compute is a one-line query over the materialized tables (see @coach/mcp).
+ * Multi-agent is out of scope: all sessions roll up under a single agent.
  */
 export function runPipeline(
   files: readonly UploadedFile[],
@@ -72,7 +71,6 @@ export function runPipeline(
   const agentGraph = aggregate(canonicalBySession.map((c) => c.nodes));
   const executionGraph = buildExecutionGraph(agentGraph);
   const enrichedGraph = enrichExecutionGraph(executionGraph, config);
-  const analysis = analyzeGraph(enrichedGraph);
 
   return {
     classified,
@@ -81,28 +79,7 @@ export function runPipeline(
     agentGraph,
     executionGraph,
     enrichedGraph,
-    analysis,
   };
-}
-
-/**
- * Thin adapter for the app's data-source seam: runs the pipeline and wraps the
- * stage-6 enriched graph in the `VizResult` shape the renderer consumes. Always
- * emits one result (single agent), or none when no session was produced.
- */
-export function buildVizResults(files: readonly UploadedFile[]): VizResult[] {
-  const result = runPipeline(files);
-
-  const unsupported = result.classified.filter((c) => c.type === 'unsupported').length;
-  // eslint-disable-next-line no-console
-  if (unsupported > 0) console.warn(`coach: ignored ${String(unsupported)} unsupported file(s)`);
-
-  // No session entity means nothing renderable (empty upload, or inputs that
-  // resolved a session id but produced no canonical nodes — e.g. logs with no trace).
-  if (result.agentGraph.sessions.length === 0) return [];
-
-  const title = result.agentGraph.agent.userId || 'agent';
-  return [{ title, data: result.enrichedGraph }];
 }
 
 /**

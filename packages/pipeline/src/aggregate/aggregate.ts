@@ -70,6 +70,8 @@ function buildSessions(interactions: readonly InteractionNode[], agentId: string
       agentId,
       userId: node.user_id,
       sessionId: node.session_id,
+      cwd: node.cwd,
+      branch: node.branch,
     });
   }
   return [...byHarnessId.values()];

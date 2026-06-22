@@ -115,6 +115,10 @@ export interface Session {
   readonly userId: string;
   readonly sessionId: string; // the harness's own session id
   readonly title?: string;
+  // `string | undefined` (not exact-optional) so the aggregate builder can assign
+  // `node.cwd` straight through under `exactOptionalPropertyTypes`.
+  readonly cwd?: string | undefined; // working directory the session ran in (native only)
+  readonly branch?: string | undefined; // git branch the session ran on (native only)
 }
 
 /** The `Agent` entity id for a user. The single id namespace shared everywhere. */
@@ -187,6 +191,8 @@ export interface InteractionNode extends SpannedNode {
   user_id: string;
   sequence: number;
   prompt: string;
+  cwd?: string; // working directory; native only (carried up to the Session entity)
+  branch?: string; // git branch; native only (carried up to the Session entity)
 }
 
 export interface LlmRequestNode extends SpannedNode {
@@ -201,6 +207,17 @@ export interface LlmRequestNode extends SpannedNode {
   cost_usd?: number;
 }
 
+/** The closed, deterministic taxonomy for a failed tool call, classified from the
+ *  tool_result text/exit info by rule (no LLM). NULL/absent when the call succeeded
+ *  or has no matched result. See `graph/result/result.ts` for the classifier rules. */
+export type ErrorKind =
+  | 'not_found' // file/path/command not found
+  | 'invalid_args' // bad arguments / parse failure / a "no match" edit
+  | 'permission' // permission denied
+  | 'timeout' // timed out
+  | 'nonzero_exit' // a Bash non-zero exit not otherwise classified
+  | 'other'; // an error that matched none of the above
+
 export interface ToolNode extends SpannedNode {
   type: 'tool';
   name?: string;
@@ -210,6 +227,18 @@ export interface ToolNode extends SpannedNode {
    *  block referencing this id). Absent when the trace doesn't carry one. */
   tool_use_id?: string;
   tool_input?: string;
+  /** Tool outcome, attached at canonical construction (`canonical/result/result.ts`)
+   *  from the `tool_result` block matched by `tool_use_id` in the consuming
+   *  inference's `request_messages`. `is_error` is the harness's failure flag
+   *  (absent when no result was matched — those stay NULL, queryable as such).
+   *  `error_kind` is the deterministic classification of a failure (absent when ok).
+   *  `output_size` is the character length of the result content (any outcome).
+   *  `error_message` is a ≤500-char summary of the error text — set only on failures
+   *  (a successful call's content is not stored, only its size). */
+  is_error?: boolean;
+  error_kind?: ErrorKind;
+  output_size?: number;
+  error_message?: string;
 }
 
 export interface ToolExecutionNode extends SpannedNode {

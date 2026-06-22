@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { defaultSemanticsConfig } from '@coach/semantics';
 import { describe, expect, it } from 'vitest';
 
+import type { ExecutionGraph } from './graph/types.ts';
 import { runPipeline } from './orchestrate.ts';
 import type { UploadedFile } from './types.ts';
 
@@ -36,6 +38,22 @@ describe('pipeline e2e', () => {
   // native (span attr stamped by the native builder) and OTEL (attr enriched onto
   // the tool span from its decision log). A session with tool calls must yield
   // causal edges either way — this is the harness-agnostic promise.
+  // Canonical `action` invariant: every tool node carries a non-NULL action drawn
+  // from the closed set, and the per-action counts are identical across two runs of
+  // the same fixture (the derivation is pure — no model, no nondeterminism).
+  it('otel/fetch-website — every tool node has a non-NULL action; counts are deterministic', () => {
+    const files = loadFixtureDir('otel/fetch-website');
+    const first = runPipeline(files).enrichedGraph;
+    const second = runPipeline(files).enrichedGraph;
+
+    const closed: ReadonlySet<string> = new Set(defaultSemanticsConfig.ontology.coarseActions);
+    const toolIds = toolNodeIds(first);
+    expect(toolIds.length).toBeGreaterThan(0);
+    const actions = toolIds.map((id) => first.actions[id]);
+    expect(actions.every((action) => action != null && closed.has(action))).toBe(true);
+    expect(actionCounts(first)).toEqual(actionCounts(second));
+  });
+
   it.each(['native-claude/refactor-code', 'otel/update-claude-config'])(
     '%s — derives causal edges end-to-end',
     (dir) => {
@@ -49,3 +67,18 @@ describe('pipeline e2e', () => {
     },
   );
 });
+
+function toolNodeIds(graph: ExecutionGraph): string[] {
+  return Object.values(graph.nodes)
+    .filter((node) => node.type === 'tool')
+    .map((node) => node.id);
+}
+
+function actionCounts(graph: ExecutionGraph): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const id of toolNodeIds(graph)) {
+    const action = graph.actions[id] ?? 'other';
+    counts[action] = (counts[action] ?? 0) + 1;
+  }
+  return counts;
+}

@@ -30,6 +30,8 @@ export interface NativeEntry {
   readonly isMeta?: boolean;
   readonly message?: NativeMessage;
   readonly requestId?: string;
+  readonly cwd?: string;
+  readonly gitBranch?: string;
 }
 
 export interface LlmSpanMeta {

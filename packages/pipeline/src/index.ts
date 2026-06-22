@@ -6,6 +6,7 @@ export { agentEntityId, PSEUDO_USER_ID, sessionEntityId } from './types.ts';
 export type {
   Agent,
   CanonicalNode,
+  ErrorKind,
   HookNode,
   InputType,
   InteractionNode,
@@ -45,20 +46,12 @@ export { deltasOf, nodeData, resolve, semanticsOf } from './graph/types.ts';
 // @coach/semantics — import config types from there).
 export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 
-// Analysis stage — mechanical derivations over the enriched graph (stage 7).
-// Types live in the module that derives them.
-export {
-  analyzeGraph,
-  type GraphAnalysis,
-  type InteractionAnalysis,
-  type Rollup,
-  type SessionAnalysis,
-  type Shape,
-} from './graph/analysis/analysis.ts';
-export type { Hotspot } from './graph/analysis/hotspots.ts';
-export type { CriticalPath } from './graph/analysis/critical-path.ts';
-export type { Repetition } from './graph/analysis/repetition.ts';
-
 // Orchestration
-export { buildVizResultFromExecutionGraph, buildVizResults, runPipeline } from './orchestrate.ts';
+export { buildVizResultFromExecutionGraph, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';
+
+// Graph → DB SQL (the relational schema specs + the graph→SQL materializer). Pure
+// string generation; the DuckDB engine that runs it lives in @coach/mcp.
+export { materializeSql } from './db/materialize.ts';
+export { TABLES } from './db/schema.ts';
+export type { ColumnSpec, TableSpec } from './db/spec.ts';

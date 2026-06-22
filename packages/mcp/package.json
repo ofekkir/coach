@@ -7,7 +7,9 @@
     ".": "./src/index.ts"
   },
   "bin": {
-    "coach-mcp": "./bin/mcp.ts"
+    "coach-mcp": "./bin/mcp.ts",
+    "coach-build-db": "./bin/build-db.ts",
+    "coach-viz": "./bin/viz.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -18,7 +20,6 @@
   "dependencies": {
     "@coach/pipeline": "workspace:*",
     "@coach/semantics": "workspace:*",
-    "@coach/store": "workspace:*",
     "@duckdb/node-api": "1.5.4-r.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.4.3"

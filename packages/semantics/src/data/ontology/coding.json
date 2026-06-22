@@ -3,11 +3,11 @@
   "kind": "domain-ontology",
   "id": "coding",
   "description": "Closed vocabulary for the software-engineering / coding-agent domain. This file is the SINGLE SOURCE OF TRUTH for action and object ids. Agent tool-semantics files and project-grounding files reference these ids; they must not invent new ones. The vocabulary is intentionally small so a weak model only ever picks from a known set. Add to it deliberately, not per-node.",
-
   "actions": [
     {
       "id": "read",
       "group": "work",
+      "coarse": "explore",
       "label": "read",
       "aliases": ["view", "inspect", "open", "cat"],
       "description": "Look at the content of a file or resource without changing it."
@@ -15,6 +15,7 @@
     {
       "id": "search",
       "group": "work",
+      "coarse": "explore",
       "label": "search",
       "aliases": ["find", "grep", "glob", "locate"],
       "description": "Locate files or matches by name/pattern/content."
@@ -22,6 +23,7 @@
     {
       "id": "write",
       "group": "work",
+      "coarse": "author",
       "label": "write",
       "aliases": ["create", "add"],
       "description": "Create new file content."
@@ -29,6 +31,7 @@
     {
       "id": "edit",
       "group": "work",
+      "coarse": "edit",
       "label": "edit",
       "aliases": ["modify", "update", "patch"],
       "description": "Change existing file content."
@@ -36,6 +39,7 @@
     {
       "id": "delete",
       "group": "work",
+      "coarse": "edit",
       "label": "delete",
       "aliases": ["remove", "rm"],
       "description": "Remove a file or block of content."
@@ -43,6 +47,7 @@
     {
       "id": "refactor",
       "group": "work",
+      "coarse": "edit",
       "label": "refactor",
       "aliases": ["restructure", "rename", "extract"],
       "description": "Restructure code without intended behavior change. A model classification — not deterministically distinguishable from edit."
@@ -50,6 +55,7 @@
     {
       "id": "run",
       "group": "work",
+      "coarse": "run",
       "label": "run",
       "aliases": ["execute", "invoke-command"],
       "description": "Execute a command, script, or program."
@@ -57,6 +63,7 @@
     {
       "id": "build",
       "group": "work",
+      "coarse": "setup",
       "label": "build",
       "aliases": ["compile", "bundle", "emit"],
       "description": "Produce build artifacts."
@@ -64,6 +71,7 @@
     {
       "id": "test",
       "group": "work",
+      "coarse": "test",
       "label": "run tests",
       "aliases": ["test"],
       "description": "Execute a test suite. (Authoring tests is write × test-code, not this.)"
@@ -71,6 +79,7 @@
     {
       "id": "lint",
       "group": "work",
+      "coarse": "verify",
       "label": "lint",
       "aliases": ["check"],
       "description": "Run a linter / static-analysis / dead-code check."
@@ -78,6 +87,7 @@
     {
       "id": "format",
       "group": "work",
+      "coarse": "verify",
       "label": "format",
       "aliases": ["prettify"],
       "description": "Run a code formatter."
@@ -85,6 +95,7 @@
     {
       "id": "typecheck",
       "group": "work",
+      "coarse": "verify",
       "label": "typecheck",
       "aliases": ["tsc"],
       "description": "Run a type checker."
@@ -92,6 +103,7 @@
     {
       "id": "verify",
       "group": "work",
+      "coarse": "verify",
       "label": "verify",
       "aliases": ["validate", "ci"],
       "description": "Run a composite quality gate (e.g. the full CI check)."
@@ -99,6 +111,7 @@
     {
       "id": "vcs",
       "group": "work",
+      "coarse": "vcs",
       "label": "version control",
       "aliases": ["git", "commit", "push", "branch"],
       "description": "Source-control operations (commit, push, branch, rebase, …)."
@@ -106,6 +119,7 @@
     {
       "id": "debug",
       "group": "work",
+      "coarse": "run",
       "label": "debug",
       "aliases": ["diagnose", "investigate"],
       "description": "Diagnose a failure or unexpected behavior."
@@ -113,6 +127,7 @@
     {
       "id": "review",
       "group": "work",
+      "coarse": "explore",
       "label": "review",
       "aliases": ["audit"],
       "description": "Review code for correctness/quality."
@@ -120,6 +135,7 @@
     {
       "id": "fetch",
       "group": "work",
+      "coarse": "research",
       "label": "fetch",
       "aliases": ["download", "curl"],
       "description": "Retrieve a remote resource (URL)."
@@ -127,6 +143,7 @@
     {
       "id": "search-web",
       "group": "work",
+      "coarse": "research",
       "label": "search the web",
       "aliases": ["web-search"],
       "description": "Query a web search engine."
@@ -134,14 +151,15 @@
     {
       "id": "configure",
       "group": "work",
+      "coarse": "setup",
       "label": "configure",
       "aliases": ["setup", "set"],
       "description": "Change configuration or settings."
     },
-
     {
       "id": "plan",
       "group": "meta",
+      "coarse": "plan",
       "label": "plan next steps",
       "aliases": ["think", "reason"],
       "description": "Internal reasoning / planning before acting (e.g. a thinking block)."
@@ -149,6 +167,7 @@
     {
       "id": "invoke",
       "group": "meta",
+      "coarse": "mcp",
       "label": "invoke",
       "aliases": ["call-tool"],
       "description": "The inference act of deciding to call a tool."
@@ -156,6 +175,7 @@
     {
       "id": "delegate",
       "group": "meta",
+      "coarse": "delegate",
       "label": "delegate",
       "aliases": ["spawn-subagent"],
       "description": "Hand work to a subagent."
@@ -163,6 +183,7 @@
     {
       "id": "respond",
       "group": "meta",
+      "coarse": "other",
       "label": "respond",
       "aliases": ["answer", "report", "converse"],
       "description": "Emit a final assistant message to the user. The act within it is what the model classifies."
@@ -170,6 +191,7 @@
     {
       "id": "clarify",
       "group": "meta",
+      "coarse": "other",
       "label": "ask the user",
       "aliases": ["ask", "question"],
       "description": "Ask the user a question / request a decision."
@@ -177,14 +199,15 @@
     {
       "id": "use-skill",
       "group": "meta",
+      "coarse": "delegate",
       "label": "use skill",
       "aliases": ["skill"],
       "description": "Invoke a named skill / slash command."
     },
-
     {
       "id": "generate-title",
       "group": "harness",
+      "coarse": "other",
       "label": "generate session title",
       "aliases": [],
       "description": "Harness-internal call that names the session."
@@ -192,6 +215,7 @@
     {
       "id": "predict",
       "group": "harness",
+      "coarse": "other",
       "label": "predict next user prompt",
       "aliases": ["suggest"],
       "description": "Harness-internal call that fabricates a likely next user input (suggestion mode)."
@@ -199,20 +223,35 @@
     {
       "id": "load-schema",
       "group": "harness",
+      "coarse": "other",
       "label": "load tool schema",
       "aliases": [],
       "description": "Harness-internal deferred-tool schema load."
     },
-
     {
       "id": "act",
       "group": "escape",
+      "coarse": "other",
       "label": "act",
       "aliases": [],
       "description": "ESCAPE HATCH action. Use when no known action fits, so mislabeling is visible as 'unknown' rather than forced into a wrong bucket."
     }
   ],
-
+  "coarseActions": [
+    "explore",
+    "author",
+    "edit",
+    "run",
+    "test",
+    "verify",
+    "vcs",
+    "setup",
+    "mcp",
+    "research",
+    "delegate",
+    "plan",
+    "other"
+  ],
   "objects": [
     {
       "id": "business-logic",
@@ -232,7 +271,12 @@
       "aliases": ["test"],
       "description": "Test code of any kind when the level is unknown."
     },
-    { "id": "unit-test", "label": "unit test", "aliases": [], "description": "Unit-level test." },
+    {
+      "id": "unit-test",
+      "label": "unit test",
+      "aliases": [],
+      "description": "Unit-level test."
+    },
     {
       "id": "e2e-test",
       "label": "e2e test",
@@ -251,7 +295,12 @@
       "aliases": ["package descriptor"],
       "description": "Package/project manifest (package.json, pyproject.toml, Cargo.toml, go.mod, …)."
     },
-    { "id": "lockfile", "label": "lockfile", "aliases": [], "description": "Dependency lockfile." },
+    {
+      "id": "lockfile",
+      "label": "lockfile",
+      "aliases": [],
+      "description": "Dependency lockfile."
+    },
     {
       "id": "build-config",
       "label": "build config",
@@ -354,7 +403,6 @@
       "aliases": [],
       "description": "The human user (target of respond/clarify)."
     },
-
     {
       "id": "unknown",
       "label": "unknown",
@@ -362,7 +410,6 @@
       "description": "ESCAPE HATCH object. Use when no known object type fits."
     }
   ],
-
   "pairings": {
     "policy": "advisory",
     "note": "Unlisted (action, object) pairs are ALLOWED but should be surfaced as low-confidence. This map only records the common, expected pairings used to sanity-check grounding output. It is not a hard whitelist.",
@@ -378,19 +425,38 @@
       "respond": ["user"]
     }
   },
-
-  "escape": { "action": "act", "object": "unknown" },
-
+  "escape": {
+    "action": "act",
+    "object": "unknown"
+  },
   "conventions": {
     "note": "Generic, transferable coding conventions — how files and project layout map to ontology objects regardless of which project. `paths` types a file by role from its name/path (first match wins, case-insensitive); `structure` extracts a structural qualifier (e.g. the monorepo workspace) from generic layout patterns. This deliberately replaces per-project file-organization mapping: anything that is truly project-specific (which dir is which feature, a project's own component names) is NOT encoded here.",
     "paths": {
       "rules": [
-        { "match": "\\.e2e\\.test\\.[tj]sx?$", "object": "e2e-test" },
-        { "match": "\\.(test|spec)\\.[tj]sx?$", "object": "unit-test" },
-        { "match": "(^|/)\\.github/workflows/", "object": "ci-cd" },
-        { "match": "(^|/)(\\.husky/|\\.git/hooks/)", "object": "vcs-artifact" },
-        { "match": "(^|/)\\.gitignore$", "object": "vcs-artifact" },
-        { "match": "(^|/)(\\.claude/|claude\\.md$|agents\\.md$)", "object": "agent-config" },
+        {
+          "match": "\\.e2e\\.test\\.[tj]sx?$",
+          "object": "e2e-test"
+        },
+        {
+          "match": "\\.(test|spec)\\.[tj]sx?$",
+          "object": "unit-test"
+        },
+        {
+          "match": "(^|/)\\.github/workflows/",
+          "object": "ci-cd"
+        },
+        {
+          "match": "(^|/)(\\.husky/|\\.git/hooks/)",
+          "object": "vcs-artifact"
+        },
+        {
+          "match": "(^|/)\\.gitignore$",
+          "object": "vcs-artifact"
+        },
+        {
+          "match": "(^|/)(\\.claude/|claude\\.md$|agents\\.md$)",
+          "object": "agent-config"
+        },
         {
           "match": "(^|/)(tsconfig[^/]*\\.json|(tsup|vite|vitest|jest|babel|webpack|rollup)\\.config\\.[a-z]+)$",
           "object": "build-config"
@@ -399,7 +465,10 @@
           "match": "(^|/)(pnpm-workspace\\.yaml|turbo\\.json|nx\\.json|lerna\\.json|renovate\\.json|knip\\.(json|jsonc|ts)|\\.npmrc|\\.nvmrc)$",
           "object": "build-config"
         },
-        { "match": "(^|/)(eslint\\.config\\.[a-z]+|\\.eslintrc[^/]*)$", "object": "linter-config" },
+        {
+          "match": "(^|/)(eslint\\.config\\.[a-z]+|\\.eslintrc[^/]*)$",
+          "object": "linter-config"
+        },
         {
           "match": "(^|/)(prettier\\.config\\.[a-z]+|\\.prettierrc[^/]*)$",
           "object": "formatter-config"
@@ -412,31 +481,120 @@
           "match": "(^|/)(package\\.json|cargo\\.toml|go\\.mod|pyproject\\.toml|pom\\.xml)$",
           "object": "manifest"
         },
-        { "match": "(^|/)\\.env", "object": "secret" },
-        { "match": "\\.(md|mdx|rst)$", "object": "documentation" },
+        {
+          "match": "(^|/)\\.env",
+          "object": "secret"
+        },
+        {
+          "match": "\\.(md|mdx|rst)$",
+          "object": "documentation"
+        },
         {
           "match": "\\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|kt|swift|c|cc|cpp|h|hpp)$",
           "object": "source-code"
         },
-        { "match": ".*", "object": "unknown" }
+        {
+          "match": ".*",
+          "object": "unknown"
+        }
       ]
     },
     "structure": {
       "note": "Ordered; first capture wins. Group 1 is the qualifier value. Generic monorepo workspace layouts (pnpm/yarn/npm/nx/turborepo).",
-      "rules": [{ "match": "(?:^|/)(?:packages|apps|libs)/([^/]+)/", "qualifier": "package" }]
+      "rules": [
+        {
+          "match": "(?:^|/)(?:packages|apps|libs)/([^/]+)/",
+          "qualifier": "package"
+        }
+      ]
     }
   },
-
   "messageActs": {
     "note": "Closed verb set for the model-residual: the weak model classifies the ACT of a genuine terminal assistant message into one or more of these, pairing each verb with a generic object to form a phrase like 'confirm edit' or 'suggest next steps'. This is a distinct axis from the leaf `actions` above (which are derived deterministically). The model prompt is built from this list — add a verb here rather than editing any prompt.",
     "verbs": [
-      { "verb": "answer", "hint": "directly answers the user's question" },
-      { "verb": "summarize", "hint": "recaps what was done or found" },
-      { "verb": "confirm", "hint": "reports an action completed" },
-      { "verb": "suggest", "hint": "proposes a next step or option" },
-      { "verb": "explain", "hint": "clarifies how or why something works" },
-      { "verb": "acknowledge", "hint": "accepts or agrees, adding no new content" },
-      { "verb": "translate", "hint": "renders text in another language" }
+      {
+        "verb": "answer",
+        "hint": "directly answers the user's question"
+      },
+      {
+        "verb": "summarize",
+        "hint": "recaps what was done or found"
+      },
+      {
+        "verb": "confirm",
+        "hint": "reports an action completed"
+      },
+      {
+        "verb": "suggest",
+        "hint": "proposes a next step or option"
+      },
+      {
+        "verb": "explain",
+        "hint": "clarifies how or why something works"
+      },
+      {
+        "verb": "acknowledge",
+        "hint": "accepts or agrees, adding no new content"
+      },
+      {
+        "verb": "translate",
+        "hint": "renders text in another language"
+      }
     ]
+  },
+  "commands": {
+    "note": "Shell command grammar — the ONE classification surface with no per-tool spec. Escape-hatch tools (Bash) wrap an arbitrary command; the leading token (or, for package runners, the script task) maps to an ontology action, which then rolls up via each action's `coarse`.",
+    "runners": ["pnpm", "npm", "yarn", "npx", "bun", "pnpx"],
+    "tokenRules": [
+      {
+        "match": ["git", "gh", "jj", "hg", "svn"],
+        "action": "vcs"
+      },
+      {
+        "match": ["pytest", "jest", "vitest", "mocha", "rspec", "phpunit"],
+        "action": "test"
+      },
+      {
+        "match": [
+          "make",
+          "cmake",
+          "gradle",
+          "mvn",
+          "bundle",
+          "pip",
+          "pip3",
+          "poetry",
+          "brew",
+          "apt",
+          "apt-get",
+          "docker"
+        ],
+        "action": "build"
+      }
+    ],
+    "taskRules": [
+      {
+        "match": ["test", "test:watch"],
+        "action": "test"
+      },
+      {
+        "match": [
+          "lint",
+          "format",
+          "format:check",
+          "typecheck",
+          "tsc",
+          "check",
+          "eslint",
+          "prettier"
+        ],
+        "action": "verify"
+      },
+      {
+        "match": ["install", "ci", "build", "add", "create"],
+        "action": "build"
+      }
+    ],
+    "default": "run"
   }
 }

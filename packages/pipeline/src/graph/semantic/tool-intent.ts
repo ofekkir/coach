@@ -1,6 +1,7 @@
 import {
   actionLabel,
   objectLabel,
+  shellCommandAction,
   strField,
   type MatchClause,
   type SemanticsConfig,
@@ -8,6 +9,8 @@ import {
   type ToolOverride,
   type ToolSemantics,
 } from '@coach/semantics';
+
+import { extractBashCommand } from './derive.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Tool & command intent — resolved entirely from config.agent.tools and the
@@ -161,14 +164,21 @@ function basePhrase(
   return `${actionLabel(config, resolved.action)} ${objectRender ?? target}`.trim();
 }
 
+const MCP_TOOL_PREFIX = 'mcp__';
+
+/** The agent's configured tool spec for a tool name, falling back to the
+ *  `_unknownTool` catch-all. Undefined only when neither is configured. */
+function toolSpecFor(config: SemanticsConfig, name: string | undefined): ToolSemantics | undefined {
+  return (name != null ? config.agent.tools[name] : undefined) ?? config.agent.tools._unknownTool;
+}
+
 /** Ordered action phrases for a tool call, resolved entirely from config. */
 export function toolPhrases(
   config: SemanticsConfig,
   name: string | undefined,
   input: Record<string, unknown>,
 ): readonly string[] {
-  const tool =
-    (name != null ? config.agent.tools[name] : undefined) ?? config.agent.tools._unknownTool;
+  const tool = toolSpecFor(config, name);
   if (tool == null) return [name != null && name !== '' ? name.toLowerCase() : 'tool'];
   // Escape-hatch tools (Bash, run_command) wrap arbitrary shell — label by tool name only.
   if (tool.escapeHatch) return [name != null ? name.toLowerCase() : 'shell'];
@@ -181,6 +191,25 @@ export function toolPhrases(
     basePhrase(config, name ?? '', tool, resolved, input),
     ...modifierPhrases(tool.modifiers, input),
   ];
+}
+
+/** The single ontology action id a tool call resolves to — the input to the coarse
+ *  `action` rollup (`coarseAction` in @coach/semantics). Non-shell tools use the
+ *  same resolution `toolPhrases` does (`tool.action` after `overrides`); escape-hatch
+ *  shell tools (Bash) resolve their command through the ontology's command grammar
+ *  (`shellCommandAction`); MCP tools (`mcp__*`) resolve to `invoke`. Returns
+ *  `undefined` only for a tool name with no spec at all (caller's rollup falls back
+ *  to the ontology escape action). */
+export function toolOntologyAction(
+  config: SemanticsConfig,
+  name: string | undefined,
+  input: Record<string, unknown>,
+): string | undefined {
+  if (name?.startsWith(MCP_TOOL_PREFIX)) return 'invoke';
+  const tool = toolSpecFor(config, name);
+  if (tool == null) return undefined;
+  if (tool.escapeHatch) return shellCommandAction(config, extractBashCommand(input) ?? undefined);
+  return applyOverrides(tool.overrides, input, { action: tool.action }).action;
 }
 
 /** The agent's own intent annotation for a tool call, read verbatim from the

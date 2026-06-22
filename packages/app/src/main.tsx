@@ -1,31 +1,58 @@
 import type { VizResult } from '@coach/pipeline';
 import { ReactFlowProvider } from '@xyflow/react';
-import { StrictMode, useState } from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { UploadPage } from './upload/UploadPage.tsx';
+import { ErrorScreen } from './boot/ErrorScreen.tsx';
+import { ManualRoot } from './boot/ManualRoot.tsx';
+import { loadPipelineOutput } from './data-source.ts';
 import { App } from './viz/App/App.tsx';
 
-function Root() {
-  const [results, setResults] = useState<VizResult[] | null>(null);
-
-  if (results == null) {
-    return <UploadPage onResults={setResults} />;
-  }
-
-  const result = results[0];
-  if (result == null) return null;
-
-  return <App data={result.data} title={result.title} />;
+interface BootParams {
+  dataUrl: string | null;
+  focusId: string | null;
 }
 
-const root = document.getElementById('root');
-if (root == null) throw new Error('No #root element');
+function readBootParams(): BootParams {
+  const params = new URLSearchParams(window.location.search);
+  return { dataUrl: params.get('data'), focusId: params.get('focus') };
+}
 
-createRoot(root).render(
-  <StrictMode>
-    <ReactFlowProvider>
-      <Root />
-    </ReactFlowProvider>
-  </StrictMode>,
-);
+async function fetchPipelineOutput(url: string): Promise<VizResult> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Could not fetch data (HTTP ${String(response.status)}): ${url}`);
+  }
+  const text = await response.text();
+  return loadPipelineOutput(text, 'coach');
+}
+
+function renderApp(node: React.ReactNode): void {
+  const root = document.getElementById('root');
+  if (root == null) throw new Error('No #root element');
+  createRoot(root).render(
+    <StrictMode>
+      <ReactFlowProvider>{node}</ReactFlowProvider>
+    </StrictMode>,
+  );
+}
+
+async function boot(): Promise<void> {
+  const { dataUrl, focusId } = readBootParams();
+
+  if (dataUrl == null) {
+    renderApp(<ManualRoot focusId={focusId} />);
+    return;
+  }
+
+  try {
+    const result = await fetchPipelineOutput(dataUrl);
+    renderApp(
+      <App data={result.data} title={result.title} initialFocusId={focusId ?? undefined} />,
+    );
+  } catch (err) {
+    renderApp(<ErrorScreen message={err instanceof Error ? err.message : 'Unknown error.'} />);
+  }
+}
+
+void boot();

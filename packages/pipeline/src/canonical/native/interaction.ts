@@ -1,5 +1,5 @@
 import { PSEUDO_USER_ID } from '../../types.ts';
-import type { OtlpSpan } from '../../types.ts';
+import type { OtlpAttribute, OtlpSpan } from '../../types.ts';
 
 import { clampEnd, intAttr, isoToNano, spanB64, strAttr } from './helpers.ts';
 import type { NativeEntry } from './types.ts';
@@ -41,7 +41,18 @@ export function buildInteractionSpan(
         strAttr('session.id', sessionId),
         strAttr('user.id', PSEUDO_USER_ID),
         intAttr('interaction.sequence', seqIdx),
+        ...sessionContextAttrs(humanUser),
       ],
     },
   };
+}
+
+// The session ran in a working directory on a git branch (native entries carry
+// both per-record). Emitted as span attributes only when present so OTEL traces,
+// which lack them, stay NULL.
+function sessionContextAttrs(entry: NativeEntry): OtlpAttribute[] {
+  const attrs: OtlpAttribute[] = [];
+  if (entry.cwd != null) attrs.push(strAttr('cwd', entry.cwd));
+  if (entry.gitBranch != null) attrs.push(strAttr('git.branch', entry.gitBranch));
+  return attrs;
 }

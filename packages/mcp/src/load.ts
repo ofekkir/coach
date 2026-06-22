@@ -1,7 +1,7 @@
 // Dataset intake. Reads a directory of trace/native files off disk into the same
 // flat UploadedFile[] the browser upload produces, runs the pipeline, and keeps
-// the stage-6 enriched graph + the stage-7 analysis. This is the one place in the
-// MCP that touches the filesystem; everything downstream is graph-only.
+// the stage-6 enriched graph. This is the one place in the MCP that touches the
+// filesystem; everything downstream is graph-only.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
@@ -9,15 +9,13 @@ import { basename, join, relative } from 'node:path';
 import {
   runPipeline,
   type ExecutionGraph,
-  type GraphAnalysis,
+  type PipelineResult,
   type UploadedFile,
 } from '@coach/pipeline';
 
 export interface Dataset {
   /** Stage-6 enriched execution graph — the substance the store queries. */
   readonly graph: ExecutionGraph;
-  /** Stage-7 curated analysis — exposed as-is via the `get_analysis` tool. */
-  readonly analysis: GraphAnalysis;
 }
 
 function toUploadedFile(fullPath: string, rootDir: string): UploadedFile {
@@ -36,8 +34,13 @@ function gatherFiles(dir: string, rootDir: string): UploadedFile[] {
   });
 }
 
+/** Loads every file under `dir` and runs the full pipeline, returning every
+ *  stage's output — the directory load uses this to also dump the stage files. */
+export function loadPipelineResult(dir: string): PipelineResult {
+  return runPipeline(gatherFiles(dir, dir));
+}
+
 /** Loads every file under `dir` and runs the full pipeline over them. */
 export function loadDataset(dir: string): Dataset {
-  const { enrichedGraph, analysis } = runPipeline(gatherFiles(dir, dir));
-  return { graph: enrichedGraph, analysis };
+  return { graph: loadPipelineResult(dir).enrichedGraph };
 }

@@ -3,15 +3,20 @@
 // analyses (read-only SQL + graph traversal) instead of consuming the fixed
 // stage-7 findings. See ARCHITECTURE.md → "MCP query surface".
 
-export { loadDataset } from './load.ts';
+export { loadDataset, loadPipelineResult } from './load.ts';
 export type { Dataset } from './load.ts';
+export { dumpPipelineOutputs } from './dump.ts';
+export { startVizServer, buildVizUrl } from './viz-server.ts';
+export type { VizServer } from './viz-server.ts';
 export { createSession } from './session.ts';
 export type { DatasetSummary, Session } from './session.ts';
 export { createStore } from './store.ts';
 export { createTools } from './tools.ts';
 export type { Tool } from './tools.ts';
 export { createMcpServer, serveStdio } from './server.ts';
-export { TABLES } from '@coach/store';
-export type { CausalDirection, ColumnSpec, QueryResult, Store, TableSpec } from '@coach/store';
+export { TABLES } from '@coach/pipeline';
+export type { ColumnSpec, TableSpec } from '@coach/pipeline';
+export type { CausalDirection, Store } from './query-core.ts';
+export type { QueryResult } from './result.ts';
 export { EXAMPLE_QUERIES } from './examples.ts';
 export type { ExampleQuery } from './examples.ts';

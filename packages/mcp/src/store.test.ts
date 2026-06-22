@@ -1,9 +1,9 @@
 import { fileURLToPath } from 'node:url';
 
-import type { Store } from '@coach/store';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { loadDataset } from './load.ts';
+import type { Store } from './query-core.ts';
 import { createStore } from './store.ts';
 
 const FIXTURE = fileURLToPath(

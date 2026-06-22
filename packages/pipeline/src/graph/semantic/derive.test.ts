@@ -1,8 +1,49 @@
 import { defaultSemanticsConfig } from '@coach/semantics';
 import { describe, expect, it } from 'vitest';
 
-import { markerLabel, responseText, structuralPrefix } from './derive.ts';
+import {
+  extractBashCommand,
+  extractFilePath,
+  markerLabel,
+  parseToolInput,
+  responseText,
+  structuralPrefix,
+} from './derive.ts';
 import { toolPhrases } from './tool-intent.ts';
+
+describe('extractFilePath / extractBashCommand (promoted-column source)', () => {
+  it('pulls file_path from a Read input and leaves the command NULL', () => {
+    const input = parseToolInput(JSON.stringify({ file_path: '/tmp/a.ts' }));
+    expect(extractFilePath(input)).toBe('/tmp/a.ts');
+    expect(extractBashCommand(input)).toBeNull();
+  });
+
+  it('pulls notebook_path for NotebookEdit', () => {
+    expect(extractFilePath(parseToolInput(JSON.stringify({ notebook_path: '/n.ipynb' })))).toBe(
+      '/n.ipynb',
+    );
+  });
+
+  it('pulls command from a Bash input and leaves the path NULL', () => {
+    const input = parseToolInput(JSON.stringify({ command: 'ls -la' }));
+    expect(extractBashCommand(input)).toBe('ls -la');
+    expect(extractFilePath(input)).toBeNull();
+  });
+
+  it('returns NULL for both on malformed/missing input and never throws', () => {
+    const malformed = parseToolInput('{not json');
+    expect(extractFilePath(malformed)).toBeNull();
+    expect(extractBashCommand(malformed)).toBeNull();
+
+    const empty = parseToolInput(undefined);
+    expect(extractFilePath(empty)).toBeNull();
+    expect(extractBashCommand(empty)).toBeNull();
+
+    const wrongTypes = parseToolInput(JSON.stringify({ file_path: 42, command: false }));
+    expect(extractFilePath(wrongTypes)).toBeNull();
+    expect(extractBashCommand(wrongTypes)).toBeNull();
+  });
+});
 
 describe('toolPhrases (config-driven)', () => {
   it('derives read intent and the agent well-known path label, not the tool name', () => {

@@ -11,6 +11,9 @@ importers:
       '@coach/logger':
         specifier: workspace:*
         version: link:packages/logger
+      '@coach/mcp':
+        specifier: workspace:*
+        version: link:packages/mcp
       '@coach/pipeline':
         specifier: workspace:*
         version: link:packages/pipeline
@@ -131,9 +134,6 @@ importers:
       '@coach/semantics':
         specifier: workspace:*
         version: link:../semantics
-      '@coach/store':
-        specifier: workspace:*
-        version: link:../store
       '@duckdb/node-api':
         specifier: 1.5.4-r.1
         version: 1.5.4-r.1
@@ -178,19 +178,6 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
-    devDependencies:
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.19)(lightningcss@1.32.0)
-
-  packages/store:
-    dependencies:
-      '@coach/pipeline':
-        specifier: workspace:*
-        version: link:../pipeline
     devDependencies:
       typescript:
         specifier: ^5.7.0

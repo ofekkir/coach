@@ -57,31 +57,13 @@ export function PipelineOutputLoader({ onResults }: { onResults: (results: VizRe
 
   return (
     <div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          margin: '24px 0',
-          color: slate.faint,
-          fontSize: 11,
-          fontWeight: 500,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-        }}
-      >
-        <span style={{ flex: 1, height: 1, background: slate.border }} />
-        or
-        <span style={{ flex: 1, height: 1, background: slate.border }} />
-      </div>
       <div style={cardStyle}>
         <div>
           <p style={{ color: slate.body, fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
             Load pipeline output
           </p>
           <p style={{ color: slate.muted, fontSize: 12, lineHeight: 1.5 }}>
-            Load a pre-computed execution graph (e.g. <code>05-execution-graph.json</code> from{' '}
-            <code>pnpm e2e</code>) — skips the in-browser pipeline.
+            Choose an execution-graph JSON file to render.
           </p>
         </div>
         <div>

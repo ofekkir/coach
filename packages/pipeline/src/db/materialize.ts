@@ -5,15 +5,16 @@
 // Records are sparse: a column absent from a record serializes to NULL, so each
 // builder only sets the columns its node/edge type actually has.
 
-import type {
-  Agent,
-  CanonicalNode,
-  ExecutionGraph,
-  InteractionExecution,
-  Session,
-} from '@coach/pipeline';
+import type { IntentCategory } from '@coach/semantics';
 
-import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
+import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
+import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
+import type { Agent, CanonicalNode, Session } from '../types.ts';
+
+import { filePathFromToolInput, normalizeRepoPath } from './repo-path.ts';
+import { TABLES } from './schema.ts';
+import { seqByNodeId } from './seq.ts';
+import type { ColumnSpec, TableSpec } from './spec.ts';
 
 const INSERT_CHUNK = 200;
 
@@ -32,9 +33,25 @@ function sqlScalar(value: unknown): string {
   return sqlString(JSON.stringify(value));
 }
 
+// BIGINT columns hold nanosecond timestamps that overflow JS `number` and DuckDB
+// DOUBLE, so the value arrives as a digit string (the ns VARCHAR) and is emitted as
+// a bare integer literal — never round-tripped through a JS number.
+function bigintLiteral(value: unknown): string {
+  if (value == null) return 'NULL';
+  if (typeof value !== 'string' && typeof value !== 'number') return 'NULL';
+  const digits = String(value);
+  return /^-?\d+$/.test(digits) ? digits : 'NULL';
+}
+
+function booleanLiteral(value: unknown): string {
+  return typeof value !== 'boolean' ? 'NULL' : value ? 'TRUE' : 'FALSE';
+}
+
 function columnLiteral(column: ColumnSpec, value: unknown): string {
   if (column.sqlType === 'JSON')
     return value == null ? 'NULL' : `CAST(${sqlString(JSON.stringify(value))} AS JSON)`;
+  if (column.sqlType === 'BIGINT') return bigintLiteral(value);
+  if (column.sqlType === 'BOOLEAN') return booleanLiteral(value);
   return sqlScalar(value);
 }
 
@@ -43,6 +60,10 @@ function columnLiteral(column: ColumnSpec, value: unknown): string {
 function createTableSql(table: TableSpec): string {
   const columns = table.columns.map((c) => `${c.name} ${c.sqlType}`).join(', ');
   return `CREATE TABLE ${table.name} (${columns})`;
+}
+
+function createViewSql(table: TableSpec): string {
+  return `CREATE VIEW ${table.name} AS ${table.view ?? ''}`;
 }
 
 function rowLiteral(columns: readonly ColumnSpec[], row: Record<string, unknown>): string {
@@ -78,7 +99,12 @@ function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
   };
 }
 
-function typeNodeRecord(node: CanonicalNode): Record<string, unknown> {
+function typeNodeRecord(
+  node: CanonicalNode,
+  action: string | undefined,
+  cwd: string | undefined,
+  intent: IntentCategory | undefined,
+): Record<string, unknown> {
   if (node.type === 'llm_request')
     return {
       model: node.model,
@@ -88,15 +114,40 @@ function typeNodeRecord(node: CanonicalNode): Record<string, unknown> {
       tokens_out: node.tokens_out,
       cost_usd: node.cost_usd,
     };
-  if (node.type === 'tool')
-    return { name: node.name, tool_use_id: node.tool_use_id, tool_input: node.tool_input };
+  if (node.type === 'tool') {
+    const input = parseToolInput(node.tool_input);
+    return {
+      name: node.name,
+      tool_use_id: node.tool_use_id,
+      tool_input: node.tool_input,
+      file_path: extractFilePath(input),
+      bash_command: extractBashCommand(input),
+      action: action ?? 'other',
+      is_error: node.is_error,
+      error_kind: node.error_kind,
+      output_size: node.output_size,
+      error_message: node.error_message,
+      repo_path: normalizeRepoPath(filePathFromToolInput(node.tool_input), cwd),
+    };
+  }
   if (node.type === 'hook') return { name: node.name };
-  if (node.type === 'interaction') return { sequence: node.sequence, prompt: node.prompt };
+  if (node.type === 'interaction')
+    return { sequence: node.sequence, prompt: node.prompt, intent_category: intent ?? 'other' };
   return {};
 }
 
-function nodeRecord(node: CanonicalNode): Record<string, unknown> {
-  return { ...baseNodeRecord(node), ...typeNodeRecord(node) };
+function nodeRecord(
+  node: CanonicalNode,
+  actions: Readonly<Record<string, string>>,
+  intents: Readonly<Record<string, IntentCategory>>,
+  seq: Map<string, number>,
+  cwdBySession: ReadonlyMap<string, string | undefined>,
+): Record<string, unknown> {
+  return {
+    ...baseNodeRecord(node),
+    ...typeNodeRecord(node, actions[node.id], cwdBySession.get(node.sessionId), intents[node.id]),
+    seq: seq.get(node.id),
+  };
 }
 
 interface GraphStructure {
@@ -133,11 +184,13 @@ function threadRecords(interaction: InteractionExecution): Record<string, unknow
   );
 }
 
-function buildRecords(graph: ExecutionGraph): Record<string, Record<string, unknown>[]> {
+export function buildRecords(graph: ExecutionGraph): Record<string, Record<string, unknown>[]> {
   const nodes = Object.values(graph.nodes);
   const { agents, sessions, interactions } = collectStructure(graph);
+  const seq = seqByNodeId(nodes);
+  const cwdBySession = new Map(sessions.map((s) => [s.id, s.cwd]));
   return {
-    nodes: nodes.map(nodeRecord),
+    nodes: nodes.map((node) => nodeRecord(node, graph.actions, graph.intents, seq, cwdBySession)),
     deltas: Object.entries(graph.deltas).map(([id, d]) => ({
       id,
       request_messages_delta: d.requestMessagesDelta,
@@ -162,15 +215,23 @@ function buildRecords(graph: ExecutionGraph): Record<string, Record<string, unkn
       user_id: s.userId,
       session_id: s.sessionId,
       title: s.title,
+      cwd: s.cwd,
+      branch: s.branch,
     })),
   };
 }
 
-/** The ordered CREATE + INSERT statements that load `graph` into a fresh DuckDB. */
+/**
+ * The ordered DDL + DML that load `graph` into a fresh DuckDB. Materialized tables
+ * emit CREATE TABLE + INSERTs; `view` specs emit a single CREATE VIEW (computed on
+ * read against `nodes`, no rows). Views appear after `nodes` in `TABLES`, so the
+ * relation they select from already exists when the view is created.
+ */
 export function materializeSql(graph: ExecutionGraph): string[] {
   const records = buildRecords(graph);
-  return TABLES.flatMap((table) => [
-    createTableSql(table),
-    ...insertStatements(table, records[table.name] ?? []),
-  ]);
+  return TABLES.flatMap((table) =>
+    table.view != null
+      ? [createViewSql(table)]
+      : [createTableSql(table), ...insertStatements(table, records[table.name] ?? [])],
+  );
 }
