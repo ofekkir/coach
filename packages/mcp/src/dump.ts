@@ -1,4 +1,4 @@
-// Shared stage-output dump. Writes the seven `01..07` stage JSON files plus the
+// Shared stage-output dump. Writes the six `01..06` stage JSON files plus the
 // self-contained `.db` artifact for one pipeline run into a directory, returning
 // the written paths. The `pnpm e2e` CLI and `load_dataset` (on a directory load)
 // both call this so the file names + shapes stay identical — the e2e verification
@@ -42,13 +42,12 @@ function dumpStageJson(result: PipelineResult, outDir: string): string[] {
     dumpJson(outDir, '04-agent-graph', result.agentGraph),
     dumpJson(outDir, '05-execution-graph', result.executionGraph),
     dumpJson(outDir, '06-enriched-graph', { executionGraph: result.enrichedGraph }),
-    dumpJson(outDir, '07-analysis', result.analysis),
   ];
 }
 
 const DB_FILE_NAME = 'graph.db';
 
-/** Writes the seven stage JSON files + the self-contained `.db` for one pipeline
+/** Writes the six stage JSON files + the tables-only `.db` for one pipeline
  *  run into `outDir` (created if missing) and returns every written path. */
 export async function dumpPipelineOutputs(
   result: PipelineResult,

@@ -160,7 +160,7 @@ describe('matchToolResults', () => {
 describe('tool result/error invariant (failed Edit + success)', () => {
   const content = readFixture('native-claude/failed-edit/session.jsonl');
   const files: UploadedFile[] = [{ name: 'session.jsonl', content }];
-  const { enrichedGraph, analysis } = runPipeline(files);
+  const { enrichedGraph } = runPipeline(files);
   const tools = Object.values(enrichedGraph.nodes).filter((n): n is ToolNode => n.type === 'tool');
 
   it('asserts is_error + error_kind + result_summary for the failing Edit', () => {
@@ -179,10 +179,11 @@ describe('tool result/error invariant (failed Edit + success)', () => {
     expect(read?.error_kind).toBeUndefined();
   });
 
-  it('rebases the misleading-file signal on failed edits per file', () => {
-    const files = analysis.sessions.flatMap((s) => s.misleadingFiles);
-    expect(files).toContainEqual(
-      expect.objectContaining({ path: '/repo/foo.ts', failedEditCount: 1 }),
-    );
+  it('exposes the failed edit + its file path — the data the misleading-file query groups on', () => {
+    // The "misleading file" signal is now a query (failed Edit/Write GROUP BY
+    // file_path), not a pipeline finding; this asserts the data it keys on exists.
+    const failedEdit = tools.find((t) => t.is_error === true && t.name === 'Edit');
+    expect(failedEdit).toBeDefined();
+    expect(failedEdit?.tool_input).toContain('/repo/foo.ts');
   });
 });

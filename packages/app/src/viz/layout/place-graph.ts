@@ -31,12 +31,21 @@ function durationOf(node: CanonicalNode): number | undefined {
   return 'duration_ms' in node ? node.duration_ms : undefined;
 }
 
-// The longest step (and its share-of-run) comes from stage-7 analysis, not the
-// layout — set on the ctx for the interaction currently being placed.
-function applyLongestStep(interactionId: string, ctx: Ctx): void {
-  const analysis = ctx.analysisByInteraction.get(interactionId);
-  ctx.longestId = analysis?.longestStep?.nodeId;
-  ctx.interactionDurMs = analysis?.rollup.wallMs;
+// The longest step (and its share-of-run) the renderer accents: the heaviest
+// main-thread member by duration, with the interaction's own wall-clock as the
+// denominator. A render-time pick over the graph — not a shared analysis stage.
+function applyLongestStep(mainThread: Thread | undefined, interactionId: string, ctx: Ctx): void {
+  ctx.interactionDurMs = durationOf(nodeOf(ctx, interactionId));
+  if (mainThread == null) return;
+  let longestId: string | undefined;
+  let longestMs = 0;
+  for (const member of mainThread.members) {
+    const ms = durationOf(nodeOf(ctx, member.id)) ?? 0;
+    if (ms <= longestMs) continue;
+    longestMs = ms;
+    longestId = member.id;
+  }
+  if (longestMs > 0) ctx.longestId = longestId;
 }
 
 function placeInteraction(
@@ -65,7 +74,7 @@ function placeInteraction(
 
   const mainThread = threads.find((t) => t.source === MAIN_THREAD_SOURCE) ?? threads[0];
   const backgroundThreads = threads.filter((t) => t !== mainThread);
-  applyLongestStep(rootId, ctx);
+  applyLongestStep(mainThread, rootId, ctx);
 
   const levels = mainThread != null ? parallelLevelsOf(mainThread, interaction, ctx) : [];
   ctx.criticalIds = new Set(levels.map((l) => l.criticalId));

@@ -3,7 +3,6 @@ import { toCanonical } from './canonical/canonical.ts';
 import { classifyInputs } from './classify/classify.ts';
 import { buildExecutionGraph } from './graph/execution/execution.ts';
 import { startNs } from './graph/execution/thread.ts';
-import { analyzeGraph, type GraphAnalysis } from './graph/analysis/analysis.ts';
 import type { ExecutionGraph, VizResult } from './graph/types.ts';
 import { defaultSemanticsConfig, type SemanticsConfig } from '@coach/semantics';
 import { enrichExecutionGraph } from './graph/semantic/semantic.ts';
@@ -26,7 +25,6 @@ export interface PipelineResult {
   agentGraph: AgentGraph; // Stage 4 — node table + agent/session entities
   executionGraph: ExecutionGraph; // Stage 5 — mechanical skeleton
   enrichedGraph: ExecutionGraph; // Stage 6 — deterministic semantic labels
-  analysis: GraphAnalysis; // Stage 7 — mechanical analysis of the enriched graph
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -50,12 +48,13 @@ function sortByTime(nodes: readonly CanonicalNode[]): CanonicalNode[] {
  * stage's output. Pure and file-system-free — the CLI and the app both call it.
  *
  *   classify → route to sessions → to canonical (per session) → aggregate →
- *   execution graph → tool-result matching → semantic enrichment → analysis
+ *   execution graph → tool-result matching → semantic enrichment
  *
  * Stage 6 enrichment is deterministic and always runs, using `config` (the
- * bundled `defaultSemanticsConfig` unless overridden). Stage 7 analyzes the
- * enriched graph alone. Multi-agent is out of scope: all sessions roll up under
- * a single agent.
+ * bundled `defaultSemanticsConfig` unless overridden) — it is the final stage.
+ * Curated analysis is deliberately NOT a pipeline stage: every rollup it would
+ * compute is a one-line query over the materialized tables (see @coach/mcp).
+ * Multi-agent is out of scope: all sessions roll up under a single agent.
  */
 export function runPipeline(
   files: readonly UploadedFile[],
@@ -71,9 +70,8 @@ export function runPipeline(
 
   const agentGraph = aggregate(canonicalBySession.map((c) => c.nodes));
   const mechanicalGraph = buildExecutionGraph(agentGraph);
-  const { graph: executionGraph, unmatchedToolIds } = matchToolResults(mechanicalGraph);
+  const { graph: executionGraph } = matchToolResults(mechanicalGraph);
   const enrichedGraph = enrichExecutionGraph(executionGraph, config);
-  const analysis = analyzeGraph(enrichedGraph, unmatchedToolIds);
 
   return {
     classified,
@@ -82,7 +80,6 @@ export function runPipeline(
     agentGraph,
     executionGraph,
     enrichedGraph,
-    analysis,
   };
 }
 
