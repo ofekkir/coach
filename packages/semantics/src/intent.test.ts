@@ -41,4 +41,31 @@ describe('classifyIntent', () => {
     const rate = matches / GOLD_SET.length;
     expect(rate).toBeGreaterThanOrEqual(0.8);
   });
+
+  // ── Paraphrased-intent regression set ────────────────────────────────────────
+  // Real prompts that the keyword-literal classifier dumped into `other`. These
+  // carry a clear intent expressed without the canonical verb; the broadened cues
+  // must keep capturing them.
+  const PARAPHRASE_SET: readonly { prompt: string; expected: IntentCategory }[] = [
+    {
+      prompt: 'I feel comments in the code should be replaced by a self documented function names',
+      expected: 'refactor',
+    },
+    { prompt: 'It seems to me like there is duplication in types..', expected: 'refactor' },
+    { prompt: 'I want to separate the logic from visualziation', expected: 'refactor' },
+    { prompt: 'Can you decouple the renderer from the layout engine?', expected: 'refactor' },
+    { prompt: 'Can you run e2e for both session.jsonl files?', expected: 'test' },
+    { prompt: 'run the tests and the vitest suite', expected: 'test' },
+    { prompt: "Let's break it down into etl steps", expected: 'feature' },
+    { prompt: 'Why does the import keep failing unexpectedly?', expected: 'debug' },
+    { prompt: 'What was the query that consumed the most tokens?', expected: 'explain' },
+    { prompt: 'Should it be part of claude.md or Readme.md?', expected: 'explain' },
+    { prompt: 'Is interaction the otel phrase for turn?', expected: 'explain' },
+  ];
+
+  it('classifies paraphrased intent it used to miss', () => {
+    for (const { prompt, expected } of PARAPHRASE_SET) {
+      expect(classifyIntent(prompt), prompt).toBe(expected);
+    }
+  });
 });
