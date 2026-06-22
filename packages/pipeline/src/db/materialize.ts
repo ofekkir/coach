@@ -9,7 +9,8 @@ import type { Action, IntentCategory } from '@coach/semantics';
 import type { Agent, CanonicalNode, Session } from '../types.ts';
 import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
-import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
+import { TABLES } from './schema.ts';
+import type { ColumnSpec, TableSpec } from './spec.ts';
 import { seqByNodeId } from './seq.ts';
 import { filePathFromToolInput, normalizeRepoPath } from './repo-path.ts';
 
@@ -91,8 +92,6 @@ function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
     interaction_id: node.interactionId,
     start_time_ns: node.start_time_ns,
     end_time_ns: node.end_time_ns,
-    start_time: node.start_time_ns,
-    end_time: node.end_time_ns,
     duration_ms: node.duration_ms,
     data: node,
   };

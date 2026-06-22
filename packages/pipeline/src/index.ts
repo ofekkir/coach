@@ -54,4 +54,4 @@ export type { PipelineResult } from './orchestrate.ts';
 // string generation; the DuckDB engine that runs it lives in @coach/mcp.
 export { materializeSql } from './db/materialize.ts';
 export { TABLES } from './db/schema.ts';
-export type { ColumnSpec, TableSpec } from './db/schema.ts';
+export type { ColumnSpec, TableSpec } from './db/spec.ts';
