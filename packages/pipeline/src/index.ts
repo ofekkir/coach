@@ -51,20 +51,6 @@ export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 // result_summary. Unmatched calls are reported, never dropped.
 export { matchToolResults, type ToolResultMatch } from './graph/result/result.ts';
 
-// Analysis stage — mechanical derivations over the enriched graph (stage 7).
-// Types live in the module that derives them.
-export {
-  analyzeGraph,
-  type GraphAnalysis,
-  type InteractionAnalysis,
-  type Rollup,
-  type SessionAnalysis,
-  type Shape,
-} from './graph/analysis/analysis.ts';
-export type { FailedFile, Hotspot } from './graph/analysis/hotspots.ts';
-export type { CriticalPath } from './graph/analysis/critical-path.ts';
-export type { Repetition } from './graph/analysis/repetition.ts';
-
 // Orchestration
 export { buildVizResultFromExecutionGraph, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';

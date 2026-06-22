@@ -1,7 +1,8 @@
-// Worked queries surfaced by `describe_schema`. There is no `get_analysis` tool —
-// every rollup the stage-7 analysis computes is a one-line query over these tables,
-// so the detectors live here verbatim as SQL. The agent learns the patterns and
-// extends them, instead of treating a curated analysis as a closed black box.
+// Worked queries surfaced by `describe_schema`. There is no curated-analysis tool
+// or stage — every rollup an analyst needs (cost, shape, repetition, hotspots,
+// misleading files) is a one-line query over these tables, so they live here
+// verbatim as SQL. The agent learns the patterns and extends them, instead of
+// treating a curated analysis as a closed black box.
 
 export interface ExampleQuery {
   readonly title: string;
@@ -10,7 +11,7 @@ export interface ExampleQuery {
 
 export const EXAMPLE_QUERIES: readonly ExampleQuery[] = [
   {
-    title: 'Cost / token / latency rollup per session (the stage-7 Rollup)',
+    title: 'Cost / token / latency rollup per session',
     sql: `SELECT session_id,
        SUM(cost_usd)                          AS cost_usd,
        SUM(tokens_in)                         AS tokens_in,
@@ -36,8 +37,7 @@ FROM interaction_metrics
 GROUP BY shape`,
   },
   {
-    title:
-      'Redundant tool calls: identical (name, tool_input) ≥2× in one interaction (the stage-7 Repetition)',
+    title: 'Redundant tool calls: identical (name, tool_input) ≥2× in one interaction',
     sql: `SELECT interaction_id, name, tool_input,
        COUNT(*)                       AS occurrences,
        SUM(duration_ms)
@@ -50,7 +50,7 @@ HAVING COUNT(*) >= 2
 ORDER BY occurrences DESC`,
   },
   {
-    title: 'Longest single step in each interaction (the stage-7 Hotspot)',
+    title: 'Longest single step in each interaction',
     sql: `SELECT interaction_id, id, type, name, duration_ms
 FROM (
   SELECT *, ROW_NUMBER() OVER (PARTITION BY interaction_id ORDER BY duration_ms DESC) AS rk
@@ -61,7 +61,7 @@ WHERE rk = 1
 ORDER BY duration_ms DESC`,
   },
   {
-    title: 'Misleading files: most failed Edit/Write calls per file (the stage-7 misleadingFiles)',
+    title: 'Misleading files: most failed Edit/Write calls per file',
     sql: `SELECT file_path,
        COUNT(*)  AS failed_edits,
        list(id)  AS node_ids

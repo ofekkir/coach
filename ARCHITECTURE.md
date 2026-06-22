@@ -40,7 +40,7 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 | Package / dir        | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → analysis, plus orchestration, plus the graph→DB SQL (`db/`: the relational schema specs + `materializeSql`). Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                                                                                                                                                                                                                                 |
+| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → semantic enrichment, plus orchestration, plus the graph→DB SQL (`db/`: the relational schema specs + `materializeSql`). Ends at the enriched graph — curated analysis is queries, not a stage. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                                                                                                                                               |
 | `packages/app`       | React SPA: renders a pre-computed `ExecutionGraph` (loaded from a file or fetched via `?data=<url>`); graph visualization + data-source seam. Does not run the pipeline in the browser.                                                                                                                                                                                                                                                                                                                                                     |
 | `packages/mcp`       | MCP server over the stage-6 graph. Owns the backend-neutral query core (`query-core.ts` + `guard.ts`/`result.ts`: read-only UX guard, capped JSON-safe results, graph traversal) over a `Connection` port, plus the node-api `Connection` (`duckdb.ts`) that runs `@coach/pipeline`'s `materializeSql` into a temp file-backed DuckDB and serves it through a READ_ONLY handle. Exposes read-only SQL + graph-traversal tools so an analyst agent drives its own analyses. Node-only (filesystem + native DuckDB). See "MCP query surface". |
 | `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README.                                                                                                                                                                                                                                                                                                      |
@@ -48,11 +48,12 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Data flow
 
-`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — seven
+`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — six
 named stages, each surfaced as a member: `classified`, `sessions`, `canonicalBySession`,
-`agentGraph`, `executionGraph`, `enrichedGraph`, `analysis`. It is pure and file-system-free; the CLI
-and the app both call it. Stage 6 enrichment is deterministic and always runs (using `config`,
-defaulting to the bundled `defaultSemanticsConfig`). Stage 7 analyzes the enriched graph alone.
+`agentGraph`, `executionGraph`, `enrichedGraph`. It is pure and file-system-free; the CLI
+and the app both call it. Stage 6 enrichment is deterministic, always runs (using `config`,
+defaulting to the bundled `defaultSemanticsConfig`), and is the final stage — curated analysis is
+not a pipeline stage (every rollup is a query; see "MCP query surface").
 `buildVizResultFromExecutionGraph` is a thin adapter that wraps a pre-computed execution graph in the
 `VizResult` shape the renderer consumes (used by the app's pipeline-output loader).
 
@@ -91,7 +92,7 @@ later drop-in with no reshaping. Three concerns are kept strictly separate:
 - **Scope FKs are denormalized onto every node so aggregation is a flat filter, not a parent-walk.**
   `sessionId` is stamped at construction (stage 3, a constant for the pass); `interactionId` (the
   `parent`-closure root — its own id for an interaction node) needs the closure, so it is stamped in
-  stage 4 (`aggregate`). Per-interaction analysis filters `nodes` by `interactionId` instead of
+  stage 4 (`aggregate`). Per-interaction aggregation filters `nodes` by `interactionId` instead of
   walking the containment `tree`.
 - **Agent and session are ENTITIES, not nodes** — dimension rows referenced by FK (`sessionId`
   denormalized onto every node; `agentId` on each session). They never appear in the node table.
@@ -172,9 +173,9 @@ Input files (accumulating — user stages N files/folders before submitting)
                             promoted columns: `is_error` (the harness failure flag),
                             `error_kind` (a deterministic class, NO LLM — see below), and
                             `result_summary` (≤500-char cleanly-truncated result/error
-                            text). Tool calls with NO matching result are REPORTED (their
-                            ids returned in `unmatchedToolIds` → surfaced in analysis
-                            `gaps`), never silently dropped; their `is_error` stays NULL.
+                            text). Tool calls with NO matching result leave `is_error`
+                            NULL (queryable as tool nodes with NULL is_error), never
+                            silently coerced.
                             error_kind rules, matched in priority order against the lower-
                             cased text: a failed-match edit (`no match` / `string to
                             replace` / `not unique`) → invalid_args (it is a bad
@@ -197,32 +198,13 @@ Input files (accumulating — user stages N files/folders before submitting)
                             — no hardcoded tool tables, no model. A genuine terminal
                             assistant message is labeled with the generic `respond`
                             act.
-        │
-        ▼  Stage 7 — graph/analysis/analysis.ts  → analysis: GraphAnalysis
-   analyzeGraph(graph)      mechanical analysis of the ENRICHED graph and
-                            NOTHING ELSE — per interaction: shape (query/agentic),
-                            cost/token/latency rollup, longest step, critical path
-                            (slowest route through causalEdges), redundant tool
-                            calls, and `failureIds` (tool nodes whose matched
-                            result carried is_error=true, from stage 5.5); rolled up
-                            per session and agent. Per session it also emits
-                            `misleadingFiles` — the "misleading file" signal, rebased
-                            on failed edits: Edit/Write tool nodes with is_error=true
-                            grouped by file_path, descending (a file that keeps
-                            rejecting edits is one the agent's mental model of is
-                            wrong). A function of the
-                            `ExecutionGraph` alone, so the live pipeline and the
-                            app's pre-computed-load path share one derivation. (The
-                            MCP does NOT re-expose it — see "MCP query surface"; the
-                            same rollups are one-line SQL.) `longestStep` and the
-                            critical path moved here OUT of the app's
-                            `viz/layout` pass — the moment a second, non-rendering
-                            consumer exists, this derivation can't live in the
-                            renderer. Observations that aren't yet mechanical (retry
-                            vs. benign re-read) plus any unmatched tool calls (from
-                            stage 5.5) are surfaced in `gaps`, never dropped.
-                            Always runs as the final stage of runPipeline.
-        │
+        │   (Stage 6 is the final pipeline stage — there is NO curated-analysis
+        │    stage. Every rollup one would compute — per-interaction shape /
+        │    cost / tokens / longest step, redundant tools, misleading files — is
+        │    a one-line query over the materialized tables; see "MCP query
+        │    surface". The renderer's one need, the longest main-thread step it
+        │    accents, is a small render-time pick in the app's `viz/layout`, not a
+        │    shared stage.)
         ▼  buildVizResultFromExecutionGraph() adapter → VizResult  (execution graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)
 ```
@@ -303,11 +285,13 @@ panel; the raw `canonical` node stays one click away in the JSON viewer.
 
 ## MCP query surface
 
-Stage 7 (`analyzeGraph`) is a **curated, hardcoded** read of the graph — a fixed set of findings.
-`@coach/mcp` is the **flexible** counterpart: it exposes the same stage-6 `ExecutionGraph` as a
-queryable relational surface so an analyst agent composes its own analyses instead of being limited to
-the canned ones. This is the deliberate payoff of the normalized, id-keyed model — the graph "maps 1:1
-to a relational DB" (see the node-data/edge tables above), so making it queryable is a faithful load,
+There is deliberately **no curated-analysis stage or tool**: a fixed set of hardcoded findings is the
+wrong shape for a problem this open-ended. `@coach/mcp` is the **flexible** alternative: it exposes the
+stage-6 `ExecutionGraph` as a queryable relational surface so an analyst agent composes its own
+analyses, and `describe_schema` ships the would-be findings (cost/shape/repetition/hotspot/misleading
+files) as example SQL to extend. This is the deliberate payoff of the normalized, id-keyed model — the
+graph "maps 1:1 to a relational DB" (see the node-data/edge tables above), so making it queryable is a
+faithful load,
 not a reshape.
 
 - **Graph → DB SQL — `@coach/pipeline/db` (pure).** `materializeSql` turns the graph into
@@ -369,19 +353,19 @@ start_time_ns`, a stable per-interaction timeline index. The `sessions` dimensio
 - **Tools (`tools.ts`).** Seven, bound to a session (its current dataset): `load_dataset` (point it at
   a directory — runs the pipeline and makes the graph queryable, replacing any prior dataset),
   `describe_schema` (tables + column docs + the semantic ontology vocabulary + example queries,
-  including the stage-7 detectors written as SQL — works with nothing loaded), `query` (read-only single
+  including the rollup/finding queries written as SQL — works with nothing loaded), `query` (read-only single
   SELECT/WITH; enforced by the read-only engine, capped at ≤1000 rows **and** a serialized-byte budget
   with `truncated` flagging any cut), `resolve` (hydrate a node id across all
   three layers, reusing the pipeline's `resolve`), `subtree` and `causal_path` (traversal primitives
   over the containment tree / causal DAG, so the agent never hand-writes recursive CTEs), and
   `open_viz` (start a local static server over the built app + the stage JSON dumped into the cwd by
   the last directory load, and hand back a boot URL — `?data=<file>&focus=<nodeId>`).
-  There is **no** `get_analysis` tool: every rollup the stage-7 `GraphAnalysis` computes is a one-line
-  query over these tables (`interaction_metrics`, the promoted `is_error`/`file_path`/`action` columns),
-  so the detectors ship as `describe_schema` example queries the agent composes — not a frozen tool.
-  Tools carry a Zod input shape; the MCP layer validates args.
+  There is **no** `get_analysis` tool and no curated-analysis stage: every rollup one would compute is a
+  one-line query over these tables (`interaction_metrics`, the promoted `is_error`/`file_path`/`action`
+  columns), so the findings ship as `describe_schema` example queries the agent composes — not a frozen
+  tool. Tools carry a Zod input shape; the MCP layer validates args.
 - **Stage dump + viz server (`dump.ts`, `viz-server.ts`, `bin/viz.ts`).** `dumpPipelineOutputs(result,
-outDir)` writes the seven `01..07` stage JSON files + a standalone `graph.db` (the tables-only export)
+outDir)` writes the six `01..06` stage JSON files + a standalone `graph.db` (the tables-only export)
   for one pipeline run and returns the written paths; the `pnpm e2e` CLI and a directory `load_dataset`
   both call it (the load dumps into the cwd and reports the paths in its summary). `startVizServer` is a
   dependency-free `node:http` server that serves the built `@coach/app` (`packages/app/dist`, resolved
@@ -397,8 +381,9 @@ outDir)` writes the seven `01..07` stage JSON files + a standalone `graph.db` (t
   directory — omit it and the agent loads at runtime. Load-once / serve-many, one dataset at a time.
   Diagnostics go to **stderr only** — stdout is the JSON-RPC channel.
 
-This is why stage 7 is "a function of the `ExecutionGraph` alone": the same derivation feeds the live
-pipeline, the app, and now this MCP — and the MCP's flexible SQL surface sits beside it, not over it.
+This is the payoff of ending the pipeline at the enriched graph: the same normalized model feeds the
+app's renderer and the MCP's flexible SQL surface, and "analysis" is whatever query the agent writes
+against it — not a fixed set of findings baked into a stage.
 
 ## Intake flow and the data-source seam
 
@@ -443,15 +428,14 @@ error screen rather than a blank page.
 `scripts/viz.ts`, `scripts/enrich.ts`, `scripts/etl.ts` — were removed; `e2e` covers the full
 pipeline.)
 
-| Member file                    | Stage | Contents                                                              |
-| ------------------------------ | ----- | --------------------------------------------------------------------- |
-| `01-classified.json`           | 1     | each file's name/path/type                                            |
-| `02-sessions.json`             | 2     | session id, kind, and member filenames per session                    |
-| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session (each node carries its `sessionId` FK)  |
-| `04-agent-graph.json`          | 4     | `AgentGraph` — the `nodes` table + `agent`/`sessions` entities        |
-| `05-execution-graph.json`      | 5     | `ExecutionGraph` (id-keyed skeleton; `semantics` table empty)         |
-| `06-enriched-graph.json`       | 6     | `ExecutionGraph` with the `semantics` table populated                 |
-| `07-analysis.json`             | 7     | `GraphAnalysis` — mechanical analysis derived from the enriched graph |
+| Member file                    | Stage | Contents                                                             |
+| ------------------------------ | ----- | -------------------------------------------------------------------- |
+| `01-classified.json`           | 1     | each file's name/path/type                                           |
+| `02-sessions.json`             | 2     | session id, kind, and member filenames per session                   |
+| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session (each node carries its `sessionId` FK) |
+| `04-agent-graph.json`          | 4     | `AgentGraph` — the `nodes` table + `agent`/`sessions` entities       |
+| `05-execution-graph.json`      | 5     | `ExecutionGraph` (id-keyed skeleton; `semantics` table empty)        |
+| `06-enriched-graph.json`       | 6     | `ExecutionGraph` with the `semantics` table populated (final stage)  |
 
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one gather all flow through
 the same pipeline. The CLI populates `UploadedFile.path` relative to the gather root so the

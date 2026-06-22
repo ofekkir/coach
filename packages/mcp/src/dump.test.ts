@@ -18,7 +18,6 @@ const EXPECTED_FILES = [
   '04-agent-graph.json',
   '05-execution-graph.json',
   '06-enriched-graph.json',
-  '07-analysis.json',
   'graph.db',
 ];
 
