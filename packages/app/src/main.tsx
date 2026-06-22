@@ -17,26 +17,13 @@ function readBootParams(): BootParams {
   return { dataUrl: params.get('data'), focusId: params.get('focus') };
 }
 
-// Derives a human title from the data url — its filename without the extension,
-// falling back to a generic label when the url has no usable path segment.
-function titleFromUrl(url: string): string {
-  try {
-    const { pathname } = new URL(url, window.location.href);
-    const file = pathname.split('/').pop() ?? '';
-    const name = decodeURIComponent(file).replace(/\.json$/i, '');
-    return name === '' ? 'pipeline output' : name;
-  } catch {
-    return 'pipeline output';
-  }
-}
-
 async function fetchPipelineOutput(url: string): Promise<VizResult> {
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Could not fetch data (HTTP ${String(response.status)}): ${url}`);
   }
   const text = await response.text();
-  return loadPipelineOutput(text, titleFromUrl(url));
+  return loadPipelineOutput(text, 'coach');
 }
 
 function renderApp(node: React.ReactNode): void {
