@@ -115,8 +115,10 @@ export interface Session {
   readonly userId: string;
   readonly sessionId: string; // the harness's own session id
   readonly title?: string;
-  readonly cwd?: string; // working directory the session ran in (native only)
-  readonly branch?: string; // git branch the session ran on (native only)
+  // `string | undefined` (not exact-optional) so the aggregate builder can assign
+  // `node.cwd` straight through under `exactOptionalPropertyTypes`.
+  readonly cwd?: string | undefined; // working directory the session ran in (native only)
+  readonly branch?: string | undefined; // git branch the session ran on (native only)
 }
 
 /** The `Agent` entity id for a user. The single id namespace shared everywhere. */
