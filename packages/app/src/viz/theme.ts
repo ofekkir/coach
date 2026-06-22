@@ -1,54 +1,49 @@
-// ════════════════════════════════════════════════════════════════════════════
-// The single source of truth for the warm / humane / low-saturation graph system.
-// Structure (not color) encodes role; the lone clay accent is spent only on the
-// node that matters — selection, the prompt anchor, the longest/critical step.
-// Replaces the old per-node-type rainbow (`TYPE_COLORS` / `TYPE_FILLS`): a card is
-// neutral unless it is selected or the longest step in its interaction.
-// ════════════════════════════════════════════════════════════════════════════
+// Why: the single source of truth for the warm / humane / low-saturation graph
+// system. Structure (not color) encodes role; the lone clay accent is spent only on
+// the node that matters — selection, the prompt anchor, the longest/critical step. A
+// card stays neutral unless it is selected or the longest step in its interaction.
 
 export const tokens = {
-  paper: '#F1ECE3', // graph canvas background (the dotted field)
-  pageBg: '#EFEAE1', // app page background behind the frame
-  frameBg: '#F4F0E8', // the framed app body behind the canvas/panel
-  surface: '#FFFFFF', // step cards, panels
-  surfaceWarm: '#FCFAF6', // top bar, details panel
-  banner: '#FBF8F2', // level banners
-  inset: '#F3EFE8', // dimmed inset
-  lane: '#F4EFE7', // dimmed background-lane cards
-  line: '#E7E0D5', // hairline borders
-  lineStrong: '#D8CFC0', // frame border, stronger dividers
-  cardBorder: '#E4DCCD', // step card border
-  ink: '#2B2722', // primary text / "deed" glyphs
-  inkBlack: '#221F1A', // headings
-  inkSoft: '#4A443C', // secondary text / glyph strokes
-  inkValue: '#3B362E', // banner value text
-  muted: '#8C8579', // meta text
-  faint: '#A89F8F', // type tags, axis labels
-  faintLane: '#B4AB99', // background-lane meta
-  dot: '#E0D8C8', // canvas dot grid
-  spine: '#D3CAB9', // the rail
-  connector: '#CFC6B6', // neutral edges
-  slash: '#C9C0B0', // breadcrumb separators
-  // ── the one accent, held in reserve ──
-  accent: '#C06A43', // focus: selection, prompt anchor, longest/critical node
-  accentInk: '#9C4F2C', // accent-on-light text
-  accentInkSoft: '#B0673F', // softer accent text (tags)
-  accentBg: '#F6E7DD', // accent tint fill
-  accentBorder: '#E3C3B0', // accent tint border / sub-rail
-  accentRing: '#F1DCCF', // the 3px selection ring
-  accentLane: '#FCF6F1', // nested weak-model card fill
-  accentCallout: '#FCF4EE', // hidden-sub-call callout fill
+  paper: '#F1ECE3',
+  pageBg: '#EFEAE1',
+  frameBg: '#F4F0E8',
+  surface: '#FFFFFF',
+  surfaceWarm: '#FCFAF6',
+  banner: '#FBF8F2',
+  inset: '#F3EFE8',
+  lane: '#F4EFE7',
+  line: '#E7E0D5',
+  lineStrong: '#D8CFC0',
+  cardBorder: '#E4DCCD',
+  ink: '#2B2722',
+  inkBlack: '#221F1A',
+  inkSoft: '#4A443C',
+  inkValue: '#3B362E',
+  muted: '#8C8579',
+  faint: '#A89F8F',
+  faintLane: '#B4AB99',
+  dot: '#E0D8C8',
+  spine: '#D3CAB9',
+  connector: '#CFC6B6',
+  slash: '#C9C0B0',
+  accent: '#C06A43',
+  accentInk: '#9C4F2C',
+  accentInkSoft: '#B0673F',
+  accentBg: '#F6E7DD',
+  accentBorder: '#E3C3B0',
+  accentRing: '#F1DCCF',
+  accentLane: '#FCF6F1',
+  accentCallout: '#FCF4EE',
   accentCalloutBorder: '#EAD3C5',
-  positive: '#5B8C6E', // "carries over" check marks only
-  // ── inset surfaces, dividers, and one-off skins (warm system) ──
-  insetBorder: '#EAE2D4', // border on inset value blocks (metric cards, long-text)
-  divider: '#EDE6DA', // details-panel header/footer hairline
-  shareTrack: '#EFE6DB', // share-of-run bar track (behind the accent fill)
-  bandFill: '#EAE3D6', // parallel-level band backdrop
-  bandBorder: '#DAD0BF', // parallel-level band dashed border
-  bgDash: '#DDD3C2', // background-lane card dashed border
-  nestedTag: '#B89B89', // nested step's mono tag text
-  calloutInk: '#6E4B3A', // hidden-sub-call callout body text
+  positive: '#5B8C6E',
+  insetBorder: '#EAE2D4',
+  divider: '#EDE6DA',
+  shareTrack: '#EFE6DB',
+  bandFill: '#EAE3D6',
+  bandBorder: '#DAD0BF',
+  bgDash: '#DDD3C2',
+  nestedTag: '#B89B89',
+  calloutInk: '#6E4B3A',
 } as const;
 
 export const fonts = {
@@ -56,15 +51,12 @@ export const fonts = {
   mono: "'IBM Plex Mono', ui-monospace, 'SF Mono', monospace",
 } as const;
 
-// ── shared style primitives ──────────────────────────────────────────────────
-// Single-line truncation, spread into any text node that must not wrap.
 export const ellipsis: React.CSSProperties = {
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
 };
 
-// The faint mono micro-label that captions details-panel sections.
 export const monoLabel: React.CSSProperties = {
   fontFamily: fonts.mono,
   fontSize: 9.5,
@@ -72,21 +64,21 @@ export const monoLabel: React.CSSProperties = {
   color: tokens.faintLane,
 };
 
-// The 3px ring + soft drop a node wears when it is selected or the longest step.
+// Why: the 3px ring + soft drop a node wears when it is selected or the longest step.
 export const ACCENT_SHADOW = `0 0 0 3px ${tokens.accentRing}, 0 4px 14px -6px rgba(160,90,50,0.3)`;
 
-// ── Structure encodes role ────────────────────────────────────────────────────
-// A small CSS shape replaces the colored badge. `inference` reads as a hollow
-// mark ("a thought"); `action` as a filled mark ("a deed"); levels as solid
-// fills; the prompt anchor and nested weak-model call wear the accent.
+// Why: a small CSS shape replaces the colored badge. `circle-hollow` reads as a
+// thought (inference); `square-filled` as a deed (action); filled marks are levels;
+// the prompt anchor and nested weak-model call wear the accent. The shape→type
+// mapping is GLYPH_BY_TYPE below.
 export type GlyphKind =
-  | 'diamond-filled' // agent
-  | 'circle-filled' // session
-  | 'circle-ring' // interaction
-  | 'dot-halo' // user_prompt (accent)
-  | 'circle-hollow' // inference (incl. fork/join)
-  | 'square-filled' // action
-  | 'diamond-hollow'; // nested / weak-model inference (accent)
+  | 'diamond-filled'
+  | 'circle-filled'
+  | 'circle-ring'
+  | 'dot-halo'
+  | 'circle-hollow'
+  | 'square-filled'
+  | 'diamond-hollow';
 
 const CIRCLE_HOLLOW: GlyphKind = 'circle-hollow';
 const SQUARE_FILLED: GlyphKind = 'square-filled';
@@ -121,9 +113,9 @@ export function roleFor(type: string): Role {
   return ROLE_BY_TYPE[type] ?? 'step';
 }
 
-// Whether a model id denotes a weak/secondary model. Display heuristic only — the
-// pipeline carries no such flag; the gap between a tool's wall-clock and the weak
-// model running inside it is a coach signal worth surfacing.
+// Why: display heuristic only — the pipeline carries no weak-model flag; the gap
+// between a tool's wall-clock and the weak model running inside it is a coach signal
+// worth surfacing, so the UI infers it from the model id.
 export function isWeakModel(model: string | undefined): boolean {
   return model != null && /haiku/i.test(model);
 }
