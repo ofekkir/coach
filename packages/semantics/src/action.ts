@@ -33,6 +33,23 @@ export function coarseAction(
 
 // ── Shell command grammar resolution (data lives in ontology.commands) ────────--
 
+/** A leading `cd <path> &&` (or `;`) navigation prefix carries no intent — the
+ *  substantive command is what follows. Strip it so the grammar classifies the real
+ *  verb (`cd pkg && git commit` → `git commit`). */
+function stripNavigationPrefix(command: string): string {
+  const match = /^cd\s+\S+\s*(?:&&|;)\s*(.+)$/is.exec(command.trim());
+  return match?.[1]?.trim() ?? command.trim();
+}
+
+/** The program a command invokes — its leading token with any directory prefix and
+ *  trailing punctuation removed (`./node_modules/.bin/eslint` → `eslint`, `git;` →
+ *  `git`). Used to qualify the generic `run` action so the phrase stays meaningful. */
+export function commandProgram(command: string | undefined): string {
+  const token = firstToken(stripNavigationPrefix(command ?? ''));
+  const base = token.split('/').pop() ?? token;
+  return base.replace(/[;|&]+$/, '');
+}
+
 function firstToken(command: string): string {
   return command.trim().split(/\s+/)[0] ?? '';
 }
@@ -55,7 +72,7 @@ function runnerTask(command: string): string {
  */
 export function shellCommandAction(config: SemanticsConfig, command: string | undefined): string {
   const grammar = config.ontology.commands;
-  const cmd = (command ?? '').trim();
+  const cmd = stripNavigationPrefix(command ?? '');
   if (cmd === '') return grammar.default;
   const first = firstToken(cmd);
   if (grammar.runners.includes(first)) {

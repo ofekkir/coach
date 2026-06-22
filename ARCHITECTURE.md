@@ -84,7 +84,12 @@ delegate|plan|other`) so the store can `GROUP BY action` for stable, comparable 
   up — one classification source of truth, no parallel TS table. The shell escape-hatch tools (Bash) are
   the one surface with no per-tool spec, so their command grammar (git→vcs, pytest→test, build→setup) is
   also DATA — the ontology's `commands` block — resolved by `shellCommandAction` into an ontology action,
-  then rolled up the same way (so even Bash flows through the single rollup). `assembleSemanticsConfig`
+  then rolled up the same way (so even Bash flows through the single rollup). The free-form
+  `semantics.what` for a Bash node reuses that same grammar resolution (`escapeHatchPhrase` in
+  `tool-intent.ts`): it renders the resolved action's label (`git commit`→"version control",
+  `grep`→"search") rather than the literal "bash", qualifying the generic `run` fallback with the
+  invoked program (`python3 build.py`→"run python3") so the phrase always names what ran.
+  `assembleSemanticsConfig`
   enforces the integrity: every action's `coarse` is a declared `coarseActions` id and every command rule
   resolves to a real action, so the dimension cannot drift into unaggregatable values. Derived
   deterministically (no LLM) in stage 6 for **every** tool node — never NULL — and surfaces as the

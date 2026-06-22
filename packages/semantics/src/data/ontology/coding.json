@@ -555,6 +555,10 @@
         "action": "test"
       },
       {
+        "match": ["grep", "rg", "ag", "ack", "find", "fd", "locate", "glob"],
+        "action": "search"
+      },
+      {
         "match": [
           "make",
           "cmake",

@@ -1,5 +1,6 @@
 import {
   actionLabel,
+  commandProgram,
   objectLabel,
   shellCommandAction,
   strField,
@@ -172,6 +173,22 @@ function toolSpecFor(config: SemanticsConfig, name: string | undefined): ToolSem
   return (name != null ? config.agent.tools[name] : undefined) ?? config.agent.tools._unknownTool;
 }
 
+/** Phrase for an escape-hatch (shell) tool: the label of the ontology action the
+ *  wrapped command resolves to via the command grammar — the same resolution
+ *  `toolOntologyAction` feeds the coarse rollup. `git commit …` → "version control",
+ *  `pnpm test …` → "run tests", `grep …` → "search". A command the grammar can't
+ *  classify falls to the generic `run` action; qualify it with the invoked program
+ *  (`python3 build.py` → "run python3") so the phrase still names what ran rather
+ *  than the bare tool/action. */
+function escapeHatchPhrase(config: SemanticsConfig, input: Record<string, unknown>): string {
+  const command = extractBashCommand(input) ?? undefined;
+  const action = shellCommandAction(config, command);
+  const label = actionLabel(config, action);
+  if (action !== config.ontology.commands.default) return label;
+  const program = commandProgram(command);
+  return program !== '' ? `${label} ${program}` : label;
+}
+
 /** Ordered action phrases for a tool call, resolved entirely from config. */
 export function toolPhrases(
   config: SemanticsConfig,
@@ -180,8 +197,7 @@ export function toolPhrases(
 ): readonly string[] {
   const tool = toolSpecFor(config, name);
   if (tool == null) return [name != null && name !== '' ? name.toLowerCase() : 'tool'];
-  // Escape-hatch tools (Bash, run_command) wrap arbitrary shell — label by tool name only.
-  if (tool.escapeHatch) return [name != null ? name.toLowerCase() : 'shell'];
+  if (tool.escapeHatch) return [escapeHatchPhrase(config, input)];
   const resolved = applyOverrides(tool.overrides, input, {
     action: tool.action,
     object: tool.object,
