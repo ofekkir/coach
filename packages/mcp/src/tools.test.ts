@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { GraphAnalysis, ResolvedNode } from '@coach/pipeline';
+import type { ResolvedNode } from '@coach/pipeline';
 import type { QueryResult } from './result.ts';
 import { createSession, type Session } from './session.ts';
 import { createTools, type Tool } from './tools.ts';
@@ -40,11 +40,10 @@ describe('createTools', () => {
     rmSync(tmpCwd, { recursive: true, force: true });
   });
 
-  it('exposes the eight analyst tools', () => {
+  it('exposes the seven analyst tools', () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       'causal_path',
       'describe_schema',
-      'get_analysis',
       'load_dataset',
       'open_viz',
       'query',
@@ -101,10 +100,5 @@ describe('createTools', () => {
     const id = ids.rows[0]?.id;
     const resolved = (await tool('resolve').handle({ id })) as ResolvedNode;
     expect(resolved.node.id).toBe(id);
-  });
-
-  it('get_analysis returns the curated stage-7 analysis', async () => {
-    const analysis = (await tool('get_analysis').handle({})) as GraphAnalysis;
-    expect(analysis.sessions.length).toBeGreaterThan(0);
   });
 });

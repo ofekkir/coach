@@ -211,9 +211,10 @@ Input files (accumulating — user stages N files/folders before submitting)
                             grouped by file_path, descending (a file that keeps
                             rejecting edits is one the agent's mental model of is
                             wrong). A function of the
-                            `ExecutionGraph` alone, so the live pipeline, the MCP
-                            reading a persisted graph, and the app's pre-computed-
-                            load path share one derivation. `longestStep` and the
+                            `ExecutionGraph` alone, so the live pipeline and the
+                            app's pre-computed-load path share one derivation. (The
+                            MCP does NOT re-expose it — see "MCP query surface"; the
+                            same rollups are one-line SQL.) `longestStep` and the
                             critical path moved here OUT of the app's
                             `viz/layout` pass — the moment a second, non-rendering
                             consumer exists, this derivation can't live in the
@@ -353,21 +354,19 @@ start_time_ns`, a stable per-interaction timeline index. The `sessions` dimensio
   `Store` (`query-core.ts`): a UX guard (`guard.ts`) + capped, JSON-safe result shaping (`result.ts`) +
   traversal SQL over a `Connection` port — no `node:*` or DB driver, so the same core could later serve
   a browser/WASM backend unchanged.
-- **Engine — DuckDB (read-only boundary).** `@coach/mcp`'s `duckdb.ts` is the node-api layer, two ways
-  in: `createDuckDbConnection(graph)` materializes the graph into a **temp** DuckDB (removed on close),
-  and `openPersistedStore(dbPath)` opens a **pre-built coach DB file untouched** — no pipeline, no
-  materialize. Either way queries run through a `READ_ONLY` handle with `enable_external_access=false`
-  - `lock_configuration=true`. The **engine** is the read-only boundary — there is no keyword
-    blocklist; the `Store`'s guard only rejects non-`SELECT`/multi-statement input for a friendly error.
-    DuckDB was chosen over the workload scale (tiny) — for JSON columns, analytical SQL, and recursive
-    CTEs.
-- **Shippable DB artifact (`coach-build-db`).** `writePersistedDb(graph, dbPath)` materializes a stage-6
-  graph into a self-contained, queryable `.db` that **also carries the enriched graph** in a
-  `_coach_meta` table — so a loader recovers it for the graph-shaped tools (`resolve` / `get_analysis`)
-  and the visualization without re-running anything. `coach-build-db <traces-dir> [out.db]` (root
-  `pnpm build-db`) is the populate step: pipeline in, DB out. The browser can't read a `.db`, which is
-  why the graph rides inside it — one artifact feeds both the MCP's SQL and the viz.
-- **Tools (`tools.ts`).** Eight, bound to a session (its current dataset): `load_dataset` (point it at
+- **Engine — DuckDB (read-only boundary).** `@coach/mcp`'s `duckdb.ts` is the node-api layer. One way
+  in at runtime: `createDuckDbConnection(graph)` materializes the graph into a **temp** DuckDB (removed
+  on close). Queries run through a `READ_ONLY` handle with `enable_external_access=false` +
+  `lock_configuration=true`. The **engine** is the read-only boundary — there is no keyword
+  blocklist; the `Store`'s guard only rejects non-`SELECT`/multi-statement input for a friendly error.
+  DuckDB was chosen over the workload scale (tiny) — for JSON columns, analytical SQL, and recursive
+  CTEs.
+- **`.db` export (`coach-build-db`).** `writePersistedDb(graph, dbPath)` materializes a stage-6 graph
+  into a standalone, queryable `.db` — **the query tables only** (no embedded graph). It's a SQL
+  snapshot for ad-hoc inspection in the duckdb CLI; coach itself does **not** re-load it (the MCP always
+  re-derives from source). `coach-build-db <traces-dir> [out.db]` (root `pnpm build-db`) writes one:
+  pipeline in, `.db` out.
+- **Tools (`tools.ts`).** Seven, bound to a session (its current dataset): `load_dataset` (point it at
   a directory — runs the pipeline and makes the graph queryable, replacing any prior dataset),
   `describe_schema` (tables + column docs + the semantic ontology vocabulary + example queries,
   including the stage-7 detectors written as SQL — works with nothing loaded), `query` (read-only single
@@ -375,28 +374,28 @@ start_time_ns`, a stable per-interaction timeline index. The `sessions` dimensio
   with `truncated` flagging any cut), `resolve` (hydrate a node id across all
   three layers, reusing the pipeline's `resolve`), `subtree` and `causal_path` (traversal primitives
   over the containment tree / causal DAG, so the agent never hand-writes recursive CTEs), and
-  `get_analysis` (the stage-7 `GraphAnalysis` verbatim, as one option among many — not the only way in),
-  and `open_viz` (start a local static server over the built app + the stage JSON dumped into the cwd by
+  `open_viz` (start a local static server over the built app + the stage JSON dumped into the cwd by
   the last directory load, and hand back a boot URL — `?data=<file>&focus=<nodeId>`).
+  There is **no** `get_analysis` tool: every rollup the stage-7 `GraphAnalysis` computes is a one-line
+  query over these tables (`interaction_metrics`, the promoted `is_error`/`file_path`/`action` columns),
+  so the detectors ship as `describe_schema` example queries the agent composes — not a frozen tool.
   Tools carry a Zod input shape; the MCP layer validates args.
 - **Stage dump + viz server (`dump.ts`, `viz-server.ts`, `bin/viz.ts`).** `dumpPipelineOutputs(result,
-outDir)` writes the seven `01..07` stage JSON files + a self-contained `graph.db` for one pipeline run
-  and returns the written paths; the `pnpm e2e` CLI and a **directory** `load_dataset` both call it (a
-  directory load dumps into the cwd and reports the paths in its summary; a `.db` load does not — it's
-  already a built artifact). `startVizServer` is a dependency-free `node:http` server that serves the
-  built `@coach/app` (`packages/app/dist`, resolved relative to the package) plus those dumped JSON
-  files, erroring with a build hint if `dist` is missing. `coach-viz [data-file] [focus]` (its bin) boots
-  the server and opens the browser.
+outDir)` writes the seven `01..07` stage JSON files + a standalone `graph.db` (the tables-only export)
+  for one pipeline run and returns the written paths; the `pnpm e2e` CLI and a directory `load_dataset`
+  both call it (the load dumps into the cwd and reports the paths in its summary). `startVizServer` is a
+  dependency-free `node:http` server that serves the built `@coach/app` (`packages/app/dist`, resolved
+  relative to the package) plus those dumped JSON files, erroring with a build hint if `dist` is missing.
+  `coach-viz [data-file] [focus]` (its bin) boots the server and opens the browser.
 - **Session + loading (`session.ts`, `load.ts`, `server.ts`, `bin/mcp.ts`).** The server holds one
-  mutable session: the dataset currently loaded. `load_dataset` takes either a **`.db`** (opened
-  untouched via `openPersistedStore`, graph recovered from `_coach_meta`, analysis recomputed) or a
-  **directory** of trace/native files (read into the same `UploadedFile[]` the browser produces, run
-  through the pipeline, materialized). Either way it rebuilds the store (closing the previous one);
-  data-bound tools read through `session.store()` / `session.dataset()`, which throw a clear "call
-  load_dataset first" message until something is loaded. `coach-mcp [dir]`
-  (root `pnpm mcp`) serves over stdio (`McpServer`) with an **optional** preload directory — omit it and
-  the agent loads at runtime. Load-once / serve-many, one dataset at a time. Diagnostics go to **stderr
-  only** — stdout is the JSON-RPC channel.
+  mutable session: the dataset currently loaded. `load_dataset` takes a **directory** of trace/native
+  files (read into the same `UploadedFile[]` the browser produces, run through the pipeline,
+  materialized into a fresh temp store) — it always re-derives, there is no load-a-prebuilt-`.db` path.
+  It rebuilds the store (closing the previous one); data-bound tools read through `session.store()` /
+  `session.dataset()`, which throw a clear "call load_dataset first" message until something is loaded.
+  `coach-mcp [dir]` (root `pnpm mcp`) serves over stdio (`McpServer`) with an **optional** preload
+  directory — omit it and the agent loads at runtime. Load-once / serve-many, one dataset at a time.
+  Diagnostics go to **stderr only** — stdout is the JSON-RPC channel.
 
 This is why stage 7 is "a function of the `ExecutionGraph` alone": the same derivation feeds the live
 pipeline, the app, and now this MCP — and the MCP's flexible SQL surface sits beside it, not over it.

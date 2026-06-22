@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { DuckDBInstance } from '@duckdb/node-api';
 import { dumpPipelineOutputs } from './dump.ts';
-import { openPersistedStore } from './duckdb.ts';
 import { loadPipelineResult } from './load.ts';
 
 const FIXTURE = fileURLToPath(
@@ -41,15 +41,18 @@ describe('dumpPipelineOutputs', () => {
     for (const file of EXPECTED_FILES) expect(existsSync(join(outDir, file))).toBe(true);
   });
 
-  it('writes a loadable .db carrying the enriched graph', async () => {
-    const { store, graph } = await openPersistedStore(join(outDir, 'graph.db'));
+  it('writes a queryable .db (tables only, no embedded graph)', async () => {
+    const instance = await DuckDBInstance.create(join(outDir, 'graph.db'), {
+      access_mode: 'read_only',
+    });
+    const conn = await instance.connect();
     try {
-      const nodeCount = Object.keys(graph.nodes).length;
-      expect(nodeCount).toBeGreaterThan(0);
-      const res = await store.query('SELECT count(*) AS n FROM nodes');
-      expect(Number(res.rows[0]?.n)).toBe(nodeCount);
+      const reader = await conn.runAndReadAll('SELECT count(*) AS n FROM nodes');
+      const rows = reader.getRowObjectsJson() as unknown as { n: number }[];
+      expect(Number(rows[0]?.n)).toBeGreaterThan(0);
     } finally {
-      store.close();
+      conn.closeSync();
+      instance.closeSync();
     }
   });
 });

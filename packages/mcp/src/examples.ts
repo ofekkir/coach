@@ -1,6 +1,7 @@
-// Worked queries surfaced by `describe_schema`. The stage-7 detectors are
-// included verbatim as SQL so the agent learns the patterns and can extend them,
-// rather than treating the curated analysis as a closed black box.
+// Worked queries surfaced by `describe_schema`. There is no `get_analysis` tool —
+// every rollup the stage-7 analysis computes is a one-line query over these tables,
+// so the detectors live here verbatim as SQL. The agent learns the patterns and
+// extends them, instead of treating a curated analysis as a closed black box.
 
 export interface ExampleQuery {
   readonly title: string;
@@ -21,11 +22,18 @@ GROUP BY session_id
 ORDER BY cost_usd DESC`,
   },
   {
-    title: 'Interaction shape: query (no tools) vs agentic (≥1 tool)',
-    sql: `SELECT interaction_id,
-       CASE WHEN COUNT(*) FILTER (WHERE type='tool') > 0 THEN 'agentic' ELSE 'query' END AS shape
-FROM nodes
-GROUP BY interaction_id`,
+    title: 'Per-interaction rollup, pre-aggregated (the interaction_metrics view)',
+    sql: `SELECT interaction_id, shape, tool_count, llm_count,
+       tokens_in, tokens_out, cost_usd, duration_ms,
+       first_action, last_action, distinct_files, error_count
+FROM interaction_metrics
+ORDER BY duration_ms DESC`,
+  },
+  {
+    title: 'Interaction shape: direct (no tools) vs agentic (≥1 tool)',
+    sql: `SELECT shape, COUNT(*) AS interactions
+FROM interaction_metrics
+GROUP BY shape`,
   },
   {
     title:
@@ -51,6 +59,17 @@ FROM (
 )
 WHERE rk = 1
 ORDER BY duration_ms DESC`,
+  },
+  {
+    title: 'Misleading files: most failed Edit/Write calls per file (the stage-7 misleadingFiles)',
+    sql: `SELECT file_path,
+       COUNT(*)  AS failed_edits,
+       list(id)  AS node_ids
+FROM nodes
+WHERE type='tool' AND is_error
+  AND name IN ('Edit','Write','MultiEdit','NotebookEdit')
+GROUP BY file_path
+ORDER BY failed_edits DESC`,
   },
   {
     title: 'Reach into un-promoted fields via the JSON escape hatch',
