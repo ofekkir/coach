@@ -13,7 +13,7 @@ const METRIC_FONT = 15;
 const MS_PER_SECOND = 1000;
 const SECONDS_DECIMALS = 2;
 
-// The `what` phrases come from the semantics overlay, not the node.
+// Why: the `what` phrases come from the semantics overlay, not the node.
 function whatOf(resolved: ResolvedNode | undefined): readonly string[] {
   return resolved?.semantics?.what ?? [];
 }
@@ -22,8 +22,8 @@ export function isActionType(type: string): boolean {
   return type === 'action' || type === 'tool';
 }
 
-// The second metric cell — the model for inferences, the tool name for actions,
-// nothing for levels/prompts (whose tag suffix isn't a tool).
+// Why: levels/prompts get no second metric — their tag suffix isn't a tool, so
+// only inferences (model) and actions (tool name) qualify.
 function secondMetric(card: NodeCard): { label: string; value: string } | null {
   if (card.model != null) return { label: 'MODEL', value: card.model };
   const toolName = card.tag.split(' · ')[1];
@@ -145,7 +145,6 @@ function hiddenSubCallCallout(sub: HiddenSubCall): React.ReactNode {
 export interface PanelContent {
   card: NodeCard;
   resolved: ResolvedNode | undefined;
-  // The flattened node + semantics + deltas, fed raw to the JSON viewer.
   raw: Record<string, unknown> | undefined;
   isLongest: boolean;
   hiddenSubCall: HiddenSubCall | undefined;

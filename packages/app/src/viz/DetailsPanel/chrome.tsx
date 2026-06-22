@@ -2,7 +2,6 @@ import type { NodeCard } from '../format/format.ts';
 import { fonts, glyphFor, tokens } from '../theme.ts';
 import { Glyph } from '../TraceNode/Glyph.tsx';
 
-// The selected node's header: glyph + `TYPE · SELECTED` + verb + close.
 export function panelHeader(
   card: NodeCard,
   nested: boolean,
@@ -65,9 +64,8 @@ export function panelHeader(
   );
 }
 
-// The footer: a clearly-interactive toggle (chevron + accent label) revealing the
-// raw node + its id. The accent + chevron mark it as a control, not a caption, so
-// the JSON tree is discoverable. `nodeId` is absent for entity selections (which
+// Why: the accent + chevron mark this toggle as a control, not a caption, so the
+// raw JSON tree is discoverable. `nodeId` is absent for entity selections (which
 // carry no node-table row).
 export function panelFooter(
   nodeId: string | undefined,

@@ -1,5 +1,5 @@
-// Full-screen readable error — shown when a `?data=<url>` boot fetch or parse
-// fails, so the page never crashes to blank.
+// Why: shown when a `?data=<url>` boot fetch or parse fails, so the page
+// never crashes to blank.
 export function ErrorScreen({ message }: { message: string }) {
   return (
     <div

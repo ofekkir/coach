@@ -39,7 +39,7 @@ export function buildToolResultUserIndex(entries: NativeEntry[]): Map<string, Na
   return toolResultUser;
 }
 
-// The CLI tags each inference with a top-level `requestId`; the Claude Desktop
+// Why: The CLI tags each inference with a top-level `requestId`; the Claude Desktop
 // format omits it, so fall back to the assistant `message.id` — both are 1:1 with
 // a single LLM turn and serve equally as the request-grouping key.
 function requestGroupKey(e: NativeEntry): string | null {

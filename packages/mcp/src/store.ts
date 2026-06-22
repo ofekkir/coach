@@ -1,7 +1,6 @@
-// node-api–backed Store. Thin adapter: build the read-only DuckDB connection from a
-// stage-6 graph (see ./duckdb.ts), then hand it to the backend-neutral query core
-// (./query-core.ts). The engine is the read-only boundary; the core adds the
-// analyst surface. The Store/QueryResult/CausalDirection types live in ./query-core.ts.
+// Why: the DuckDB engine is the read-only boundary; the query core adds the analyst
+// surface on top of it. Keeping the boundary in the engine (not the core) means the
+// core stays backend-neutral. Store/QueryResult/CausalDirection live in ./query-core.ts.
 
 import type { ExecutionGraph } from '@coach/pipeline';
 

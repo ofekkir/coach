@@ -39,7 +39,7 @@ function sessionIdFromNative(content: string): string | null {
   return parseEntries(content).sessionId || null;
 }
 
-// Traces always carry `session.id`; logs do not always. This maps each
+// Why: traces always carry `session.id`; logs do not always. This maps each
 // directory to the session id of the traces it contains, so a log with no
 // `session_id` can still attach to its session by directory (the upload layout).
 function mapDirsToSessions(classified: readonly ClassifiedInput[]): Map<string, string> {
@@ -64,10 +64,9 @@ function sessionIdOf(input: ClassifiedInput, dirToSession: Map<string, string>):
   }
 }
 
-// Stage 2: assign each supported input to its session id, then group.
-// A session is assumed wholly OTEL or wholly native; the kind is derived from
-// whether any input in the group is native. Inputs with no resolvable session
-// id (unsupported, or empty/malformed) are dropped here.
+// Why: a session is assumed wholly OTEL or wholly native; the kind is derived
+// from whether any input in the group is native. Inputs with no resolvable
+// session id (unsupported, or empty/malformed) are dropped here.
 export function routeToSessions(classified: readonly ClassifiedInput[]): SessionInputs[] {
   const dirToSession = mapDirsToSessions(classified);
 

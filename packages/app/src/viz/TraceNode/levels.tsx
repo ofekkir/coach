@@ -4,15 +4,12 @@ import { ellipsis, fonts, glyphFor, tokens } from '../theme.ts';
 
 import { Glyph } from './Glyph.tsx';
 
-// The colored depth rail that marks a level banner's place in the hierarchy.
 const BANNER_RAIL: Record<string, string> = {
   agent: tokens.ink,
   session: tokens.inkSoft,
   interaction: tokens.connector,
 };
 
-// A level (agent / session / interaction): a banner, not a step card — different
-// scale, a depth rail, the id in mono. Structure, not color, says "a level above."
 export function renderBanner(card: NodeCard): React.ReactNode {
   return (
     <div
@@ -53,8 +50,6 @@ export function renderBanner(card: NodeCard): React.ReactNode {
   );
 }
 
-// The user-prompt anchor — the goal source the run responds to, and the one
-// level-ish node that wears the accent (border, halo dot, soft shadow).
 export function renderAnchor(card: NodeCard): React.ReactNode {
   return (
     <div

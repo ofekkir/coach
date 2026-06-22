@@ -1,8 +1,6 @@
 #!/usr/bin/env -S node --experimental-strip-types
-// Entry point: `coach-mcp [dataset-dir]` serves the analyst tools over stdio. An
-// optional directory is preloaded through the pipeline; otherwise the agent loads
-// data at runtime via the `load_dataset` tool. Diagnostics go to stderr only —
-// stdout is the MCP JSON-RPC channel.
+// Why: stdout is reserved for the MCP JSON-RPC channel, so all diagnostics
+// must go to stderr only.
 
 import { serveStdio } from '../src/server.ts';
 

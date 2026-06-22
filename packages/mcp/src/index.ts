@@ -1,7 +1,9 @@
-// @coach/mcp — an MCP server that exposes the pipeline's stage-6 execution graph
-// as a queryable relational surface, so an analyst agent can drive its own
-// analyses (read-only SQL + graph traversal) instead of consuming the fixed
-// stage-7 findings. See ARCHITECTURE.md → "MCP query surface".
+/**
+ * @coach/mcp — an MCP server that exposes the pipeline's stage-6 execution graph
+ * as a queryable relational surface, so an analyst agent can drive its own
+ * analyses (read-only SQL + graph traversal) instead of consuming the fixed
+ * stage-7 findings. See ARCHITECTURE.md → "MCP query surface".
+ */
 
 export { loadDataset, loadPipelineResult } from './load.ts';
 export type { Dataset } from './load.ts';

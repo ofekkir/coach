@@ -1,8 +1,6 @@
-// One row per interaction node, every column a plain GROUP BY aggregate over that
-// interaction's nodes. As a VIEW (computed on read against `nodes`) it can never
-// drift from its source — a columnar engine makes a stored copy buy no query power.
-// arg_min/arg_max over `seq` give the first/last tool action; FILTER (...) yields
-// NULL when the interaction has no tool nodes.
+// Why: kept as a VIEW (computed on read against `nodes`) rather than a stored table
+// so it can never drift from its source — on a columnar engine a stored copy would
+// buy no query power.
 
 import type { TableSpec } from '../spec.ts';
 

@@ -1,8 +1,7 @@
-// Graph → SQL. Turns a stage-6 ExecutionGraph into the ordered CREATE + INSERT
-// statements that load it into DuckDB. Pure string generation, driven entirely by
-// the `TABLES` specs in `schema.ts` — add a column there and it flows through here.
+// Why: generation is driven entirely by the `TABLES` specs in `schema.ts` — add a
+// column there and it flows through here without touching this file.
 //
-// Records are sparse: a column absent from a record serializes to NULL, so each
+// Why: records are sparse — a column absent from a record serializes to NULL, so each
 // builder only sets the columns its node/edge type actually has.
 
 import type { IntentCategory } from '@coach/semantics';
@@ -18,8 +17,6 @@ import type { ColumnSpec, TableSpec } from './spec.ts';
 
 const INSERT_CHUNK = 200;
 
-// ── SQL literal encoding ─────────────────────────────────────────────────────
-
 function sqlString(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
@@ -33,7 +30,7 @@ function sqlScalar(value: unknown): string {
   return sqlString(JSON.stringify(value));
 }
 
-// BIGINT columns hold nanosecond timestamps that overflow JS `number` and DuckDB
+// Why: BIGINT columns hold nanosecond timestamps that overflow JS `number` and DuckDB
 // DOUBLE, so the value arrives as a digit string (the ns VARCHAR) and is emitted as
 // a bare integer literal — never round-tripped through a JS number.
 function bigintLiteral(value: unknown): string {
@@ -54,8 +51,6 @@ function columnLiteral(column: ColumnSpec, value: unknown): string {
   if (column.sqlType === 'BOOLEAN') return booleanLiteral(value);
   return sqlScalar(value);
 }
-
-// ── DDL + DML generation ─────────────────────────────────────────────────────
 
 function createTableSql(table: TableSpec): string {
   const columns = table.columns.map((c) => `${c.name} ${c.sqlType}`).join(', ');
@@ -82,8 +77,6 @@ function insertStatements(table: TableSpec, rows: readonly Record<string, unknow
   }
   return statements;
 }
-
-// ── Graph → row records (one builder per table) ──────────────────────────────
 
 function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
   return {

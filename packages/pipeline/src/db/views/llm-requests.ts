@@ -1,13 +1,13 @@
-// Per-type VIEW: the llm_request slice of `nodes`. A columnar table already stores
-// each column separately, so this buys no storage — it is a typed, documented
-// surface (the inference-specific columns, with the per-type NULLs of other types
-// dropped) for the analyst who wants `SELECT * FROM llm_requests`. Traversal, edges,
-// and joins still go through `nodes`; this is a convenience projection, not a table.
+// Why: a columnar table already stores each column separately, so this per-type slice
+// buys no storage — it exists only as a typed, documented surface (the inference-specific
+// columns, with the per-type NULLs of other types dropped) for the analyst who wants
+// `SELECT * FROM llm_requests`. Traversal, edges, and joins still go through `nodes`;
+// this is a convenience projection, not a table.
 
 import { pickColumns, type TableSpec } from '../spec.ts';
 import { NODES } from '../tables/nodes.ts';
 
-// Drives both the SELECT and the documented columns from one list, so they cannot
+// Why: one list drives both the SELECT and the documented columns so they cannot
 // disagree; `pickColumns` reuses the `nodes` column docs verbatim (no drift).
 const COLUMNS = [
   'id',

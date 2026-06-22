@@ -23,8 +23,8 @@ function selectedData(elements: Elements, selectedId: string | null): TraceRFNod
   return node?.type === 'trace' ? node.data : null;
 }
 
-// Resolves the selected id against the node table — entity selections (agent /
-// session containers) carry no node-table row, so they resolve to undefined.
+// Why: entity selections (agent / session containers) carry no node-table row,
+// so they resolve to undefined.
 function selectedResolved(
   graph: ExecutionGraph,
   selectedId: string | null,
@@ -33,14 +33,14 @@ function selectedResolved(
   return resolve(graph, selectedId);
 }
 
-// A focus request — the node to center on plus a monotonic nonce so refocusing the
-// same id (already selected/expanded) still re-triggers the viewport animation.
+// Why: the monotonic nonce lets refocusing the same id (already selected/expanded)
+// still re-trigger the viewport animation.
 export interface FocusRequest {
   id: string;
   nonce: number;
 }
 
-// A `?focus=<nodeId>` boot param fires the same reveal/select/center path as the
+// Why: a `?focus=<nodeId>` boot param fires the same reveal/select/center path as the
 // FocusInput search box, once, after the first render. The ref guards against
 // StrictMode's double-invoke and prop identity changes re-triggering it.
 function useInitialFocus(initialFocusId: string | undefined, onFocusId: (id: string) => boolean) {
@@ -52,8 +52,6 @@ function useInitialFocus(initialFocusId: string | undefined, onFocusId: (id: str
   }, [initialFocusId, onFocusId]);
 }
 
-// The TopBar's expand-all / collapse-all controls over the shared `expanded` set:
-// expand-all opens every expandable id; collapse-all leaves only the agent root.
 function useExpandControls(
   data: ExecutionGraph,
   setExpanded: React.Dispatch<React.SetStateAction<Set<string>>>,
@@ -81,8 +79,7 @@ export function App({ data, title, initialFocusId }: AppProps) {
   const [focus, setFocus] = useState<FocusRequest | null>(null);
   const focusNonce = useRef(0);
 
-  // Reveals (expands ancestors of), selects, and centers the viewport on a node by
-  // id. Returns false when no such node exists so the caller can flag the input.
+  // Why: returns false when no such node exists so the caller can flag the input.
   const onFocusId = useCallback(
     (rawId: string): boolean => {
       const id = rawId.trim();

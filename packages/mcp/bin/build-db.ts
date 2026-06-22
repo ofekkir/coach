@@ -1,9 +1,6 @@
 #!/usr/bin/env -S node --experimental-strip-types
-// `coach-build-db <traces-dir> [out.db]` — runs the pipeline over a directory of
-// trace/native files and writes a standalone, queryable DuckDB (the query tables).
-// It's a SQL snapshot for ad-hoc inspection in the duckdb CLI — the MCP itself
-// re-derives from source rather than loading this. Defaults the output to
-// `out/<dir-name>.db`. Diagnostics go to stderr.
+// Why: this DuckDB is a throwaway SQL snapshot for ad-hoc inspection in the duckdb
+// CLI — the MCP server never loads it, it re-derives the query tables from source.
 
 import { mkdirSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';

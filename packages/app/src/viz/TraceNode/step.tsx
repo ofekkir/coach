@@ -10,14 +10,23 @@ import { NodeBody, type StepPalette } from './NodeBody.tsx';
 const WEIGHT_BOLD = 600;
 const WEIGHT_NORMAL = 400;
 
-// A card is neutral unless the view has a reason to point at it.
-type StepState = 'background' | 'accent' | 'nested' | 'neutral';
+const STATE_BACKGROUND = 'background';
+const STATE_ACCENT = 'accent';
+const STATE_NESTED = 'nested';
+const STATE_NEUTRAL = 'neutral';
+
+// Why: a card is neutral unless the view has a reason to point at it.
+type StepState =
+  | typeof STATE_BACKGROUND
+  | typeof STATE_ACCENT
+  | typeof STATE_NESTED
+  | typeof STATE_NEUTRAL;
 
 function stepStateOf(accent: boolean, lane: TraceRFNodeData['lane'], nested: boolean): StepState {
-  if (lane === 'background') return 'background';
-  if (accent) return 'accent';
-  if (nested) return 'nested';
-  return 'neutral';
+  if (lane === 'background') return STATE_BACKGROUND;
+  if (accent) return STATE_ACCENT;
+  if (nested) return STATE_NESTED;
+  return STATE_NEUTRAL;
 }
 
 interface FullPalette extends StepPalette {
@@ -150,7 +159,6 @@ function stepHeader(
   );
 }
 
-// The critical-path branch of a parallel level sets its wall-clock; this names it.
 function criticalNote(): React.ReactNode {
   return (
     <div
@@ -167,9 +175,11 @@ function criticalNote(): React.ReactNode {
   );
 }
 
-// A step on the spine (or background lane): glyph + mono tag + duration, then the
-// verb-led body. Accent (selection, longest step, or critical branch) is the only
-// color; compact branches in a wide parallel level drop the body to verb-only.
+/**
+ * A step on the spine (or background lane): glyph + mono tag + duration, then the
+ * verb-led body. Accent (selection, longest step, or critical branch) is the only
+ * color; compact branches in a wide parallel level drop the body to verb-only.
+ */
 export function renderStep(data: TraceRFNodeData, selected: boolean): React.ReactNode {
   const { card, lane, nested, isLongest, shareOfRun, isExpanded, hasRFChildren } = data;
   const accent = selected || isLongest || data.critical === true;

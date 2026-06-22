@@ -1,7 +1,6 @@
-// Result shaping: turns a backend's raw rows into the capped, JSON-safe QueryResult
-// the analyst sees. Two ceilings keep a broad query from blowing the agent's context
-// — a row cap AND a hard serialized-byte budget — plus per-cell clipping so a single
-// huge column (e.g. a long `prompt`) can't overflow. `truncated` flags any of these.
+// Why: two ceilings (a row cap AND a hard serialized-byte budget) plus per-cell
+// clipping keep a broad query from blowing the agent's context — a single huge
+// column (e.g. a long `prompt`) can't overflow. `truncated` flags any of these.
 
 export interface RawResult {
   readonly columns: readonly string[];

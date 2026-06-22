@@ -20,31 +20,27 @@ import {
   sortByStart,
 } from './thread.ts';
 
-// ════════════════════════════════════════════════════════════════════════════
-// Stage 5 — the mechanical, layered execution graph from the aggregated node
-// table. Three concerns stay separate (see graph/types.ts): the `nodes` table
-// (canonical data, additive), the `deltas` table (per-node message deltas built
-// here), and the edge layers — containment (`tree`, ids only) and causal
+// Why: Stage 5 keeps three concerns separate (see graph/types.ts): the `nodes`
+// table (canonical data, additive), the `deltas` table (per-node message deltas
+// built here), and the edge layers — containment (`tree`, ids only) and causal
 // (`causalEdges`, a DAG). Entities (agent/session) own the structure; they are
 // not nodes. Threads are a layout grouping only.
-// ════════════════════════════════════════════════════════════════════════════
 
-// Mutable accumulators threaded through the build: the node table (extended with
-// synthesized user_prompt nodes) and the per-node deltas table.
+// Why: nodes is extended in place with synthesized user_prompt nodes and deltas
+// is populated as threads are built, so both accumulators are mutated through the
+// recursion rather than rebuilt per level.
 interface BuildState {
   readonly nodes: Record<string, CanonicalNode>;
   readonly deltas: Record<string, MessageDeltas>;
   readonly childrenOf: Map<string, CanonicalNode[]>;
 }
 
-// The id-only containment tree rooted at `id`: each node carries only its id and
-// its time-ordered children. No embedded data — resolve through the node table.
+// Why: the tree carries ids only, no embedded node data — callers resolve through
+// the node table so canonical data lives in exactly one place.
 function buildTree(id: string, childrenOf: Map<string, CanonicalNode[]>): ExecutionNode {
   const raw = childrenOf.get(id) ?? [];
   return { id, children: sortByStart(raw).map((child) => buildTree(child.id, childrenOf)) };
 }
-
-// ── Interaction level ───────────────────────────────────────────────────────
 
 function groupLlmsByThread(directChildren: readonly CanonicalNode[]): Map<string, CanonicalNode[]> {
   const llmsByThread = new Map<string, CanonicalNode[]>();
@@ -113,8 +109,6 @@ function buildInteractionExecution(
   };
 }
 
-// ── Session level ──────────────────────────────────────────────────────────────
-
 function buildSessionExecution(
   session: Session,
   allNodes: readonly CanonicalNode[],
@@ -130,8 +124,6 @@ function buildSessionExecution(
     interactions: interactions.map((interaction) => buildInteractionExecution(interaction, state)),
   };
 }
-
-// ── Entry point ──────────────────────────────────────────────────────────────
 
 export function buildExecutionGraph(agentGraph: AgentGraph): ExecutionGraph {
   const nodes: Record<string, CanonicalNode> = {};

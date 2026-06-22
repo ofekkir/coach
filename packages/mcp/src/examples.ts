@@ -1,4 +1,4 @@
-// Worked queries surfaced by `describe_schema`. There is no curated-analysis tool
+// Why: worked queries surfaced by `describe_schema`. There is no curated-analysis tool
 // or stage — every rollup an analyst needs (cost, shape, repetition, hotspots,
 // misleading files) is a one-line query over these tables, so they live here
 // verbatim as SQL. The agent learns the patterns and extends them, instead of

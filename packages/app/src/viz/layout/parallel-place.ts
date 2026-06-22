@@ -6,12 +6,11 @@ import { cardOf, nodeOf, placeStep, pushExecNode } from './place-members.ts';
 import type { Ctx } from './types.ts';
 import { CENTERING_DIVISOR, COMPACT_NW, HG, NW, PARALLEL_COMPACT_THRESHOLD, VG } from './types.ts';
 
-// Padding around a parallel-level band, and the headroom above the row for its label.
 const BAND_PAD = 12;
 const BAND_LABEL_H = 22;
 
-// Backdrop node for a parallel level — pushed before its branch cards so it sits
-// behind them; it is non-selectable so clicks pass through to the cards.
+// Why: pushed before its branch cards so it sits behind them, and non-selectable
+// so clicks pass through to the cards.
 function pushBand(
   level: ParallelLevel,
   x: number,
@@ -35,9 +34,9 @@ function startNsOf(node: ExecutionNode, ctx: Ctx): bigint {
   return 'start_time_ns' in canonical ? BigInt(canonical.start_time_ns) : 0n;
 }
 
-// Branches ordered left→right by start time (ascending), so the eye reads the
-// fan-out in dispatch order — a critical branch that isn't leftmost then reveals a
-// scheduling gap worth optimizing.
+// Why: order left→right by start time (ascending) so the eye reads the fan-out in
+// dispatch order — a critical branch that isn't leftmost then reveals a scheduling
+// gap worth optimizing.
 function orderedBranches(
   level: ParallelLevel,
   memberById: ReadonlyMap<string, ExecutionNode>,
@@ -51,10 +50,9 @@ function orderedBranches(
     );
 }
 
-// Lays a parallel level as a centered row inside a faint band: branches spread
-// horizontally between the fork (above) and the join (placed later, below),
-// ordered by start time. The slowest branch is the critical path — it alone wears
-// the accent. Returns the y below the row. `topY` is the y under the fork card.
+// Why: the slowest branch is the critical path, so it alone wears the accent;
+// branches spread horizontally between the fork (above) and the join (placed later,
+// below). Returns the y below the row. `topY` is the y under the fork card.
 function placeLevelRow(
   level: ParallelLevel,
   spineX: number,
@@ -89,9 +87,9 @@ function placeLevelRow(
   return rowY + rowH + VG;
 }
 
-// The main thread, parallel-aware: members walk in order, but a fork's branches
-// are pulled out of the column into a centered row (the join follows below). With
-// no parallel levels it degrades to a clean linear spine.
+// Why: a fork's branches are pulled out of the column into a centered row (the join
+// follows below) so parallelism reads as a fan-out; with no parallel levels it
+// degrades to a clean linear spine.
 export function placeSpine(
   thread: Thread,
   tx: number,

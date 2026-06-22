@@ -1,34 +1,33 @@
-// ════════════════════════════════════════════════════════════════════════════
-// Interaction INTENT_CATEGORY — a CLOSED, deterministic dimension that buckets a
-// whole interaction by what the user asked for, derived from the prompt text.
-// It is the interaction-level analogue of the tool-level `action` (see action.ts):
-// one value from a small fixed set, a pure function of the prompt, reproducible.
-//
-// It is derived by the SAME mechanism as the rest of stage-6 semantics — a pure,
-// config/rule-driven labeler invoked in the enrichment pass (semantic.ts), no LLM.
-// Every interaction MUST resolve to a non-NULL category; `other` is the explicit
-// catch-all when no signal matches (an empty prompt → `other`).
-// ════════════════════════════════════════════════════════════════════════════
+/**
+ * Interaction INTENT_CATEGORY — a CLOSED, deterministic dimension that buckets a
+ * whole interaction by what the user asked for, derived from the prompt text.
+ * It is the interaction-level analogue of the tool-level `action` (see action.ts):
+ * one value from a small fixed set, a pure function of the prompt, reproducible.
+ *
+ * It is derived by the SAME mechanism as the rest of stage-6 semantics — a pure,
+ * config/rule-driven labeler invoked in the enrichment pass (semantic.ts), no LLM.
+ * Every interaction MUST resolve to a non-NULL category; `other` is the explicit
+ * catch-all when no signal matches (an empty prompt → `other`).
+ */
 
 /** The closed intent vocabulary. Order is documentation only. */
 export const INTENT_CATEGORIES = [
-  'debug', // diagnose/fix a failure, error, or broken behavior
-  'feature', // add new capability / build something new
-  'refactor', // restructure/clean up existing code without behavior change
-  'explain', // understand/describe existing code or a concept (no change asked)
-  'test', // write, run, or fix tests
-  'ops', // build/deploy/CI/release/dependency/version-control/config work
-  'research', // gather external information (web, docs, comparisons)
-  'other', // explicit catch-all — never NULL
+  'debug',
+  'feature',
+  'refactor',
+  'explain',
+  'test',
+  'ops',
+  'research',
+  'other',
 ] as const;
 
 /** An interaction intent — one of the closed {@link INTENT_CATEGORIES} values. */
 export type IntentCategory = (typeof INTENT_CATEGORIES)[number];
 
-// Ordered keyword rules: first category whose pattern matches the prompt wins.
-// Order encodes priority — more specific intents (debug, test) are checked before
-// broader ones (feature, ops) so "fix the failing test" classifies as `test`-aware
-// debug only where intended. Patterns are word-boundary anchored, case-insensitive.
+// Why: order encodes priority — more specific intents (debug, test) are checked
+// before broader ones (feature, ops) so "fix the failing test" classifies as
+// `test`-aware debug only where intended; the first matching rule wins.
 interface IntentRule {
   readonly category: IntentCategory;
   readonly pattern: RegExp;

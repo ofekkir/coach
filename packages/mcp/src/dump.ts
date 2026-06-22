@@ -1,4 +1,4 @@
-// Shared stage-output dump. Writes the six `01..06` stage JSON files plus the
+// Why: Shared stage-output dump. Writes the six `01..06` stage JSON files plus the
 // self-contained `.db` artifact for one pipeline run into a directory, returning
 // the written paths. The `pnpm e2e` CLI and `load_dataset` (on a directory load)
 // both call this so the file names + shapes stay identical — the e2e verification
@@ -20,7 +20,7 @@ function dumpJson(outDir: string, stepLabel: string, data: unknown): string {
   return filePath;
 }
 
-// Input-bearing members are projected to names/types so the dumps stay readable;
+// Why: Input-bearing members are projected to names/types so the dumps stay readable;
 // the graph members are dumped in full — they are the point of inspection. The
 // `06-enriched-graph` `{ executionGraph }` wrapper matches what the app's loader
 // (`extractExecutionGraph`) expects.
@@ -58,7 +58,7 @@ export async function dumpPipelineOutputs(
   mkdirSync(outDir, { recursive: true });
   const jsonPaths = dumpStageJson(result, outDir);
   const dbPath = join(outDir, DB_FILE_NAME);
-  // writePersistedDb appends to an existing file (CREATE TABLE would clash on a
+  // Why: writePersistedDb appends to an existing file (CREATE TABLE would clash on a
   // re-dump), so clear any stale .db first — the dump is a fresh artifact.
   rmSync(dbPath, { force: true });
   await writePersistedDb(result.enrichedGraph, dbPath);

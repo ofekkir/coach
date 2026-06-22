@@ -13,13 +13,13 @@ import { placeAgent, sessionWidth } from './place-graph.ts';
 import type { Ctx, RFNode } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, NW, HG } from './types.ts';
 
-// Degraded-graph synthesizers — produce the missing upper ENTITIES (not nodes) so
-// layout always has an agent ▸ session to hang the interactions under.
+// Why: produce the missing upper ENTITIES (not nodes) so layout always has an
+// agent ▸ session to hang the interactions under.
 function syntheticAgent(): Agent {
   return { id: '__agent__', userId: '' };
 }
 
-// Empty sessionId so the renderer falls back to a positional title.
+// Why: empty sessionId makes the renderer fall back to a positional title.
 function syntheticSession(): Session {
   return { id: '__session__', agentId: '__agent__', userId: '', sessionId: '' };
 }
@@ -64,8 +64,8 @@ export function initialExpanded(): Set<string> {
   return new Set<string>();
 }
 
-// Every node id in the subtree that has children — at any depth — so "expand
-// all" reaches nested calls (e.g. an llm_request inside a tool's execution).
+// Why: recurse at any depth so "expand all" reaches nested calls (e.g. an
+// llm_request inside a tool's execution), not just top-level children.
 function expandableSubtreeIds(node: ExecutionNode): string[] {
   if (node.children.length === 0) return [];
   return [node.id, ...node.children.flatMap(expandableSubtreeIds)];
@@ -91,9 +91,8 @@ export function agentRoot(graph: ExecutionGraph): string {
   return toAgent(graph).agent.id;
 }
 
-// The path of expandable ancestor ids — from the matched node up to the agent
-// root — within a member's containment subtree, or null when the target is not
-// in this subtree. Includes the target itself so focusing also opens its children.
+// Why: includes the target itself (not just its ancestors) so focusing also
+// opens its children; returns null when the target is not in this subtree.
 function nodeSubtreePath(node: ExecutionNode, targetId: string): string[] | null {
   if (node.id === targetId) return [node.id];
   for (const child of node.children) {

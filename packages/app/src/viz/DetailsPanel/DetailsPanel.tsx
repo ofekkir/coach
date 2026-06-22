@@ -8,7 +8,7 @@ import { fonts, tokens } from '../theme.ts';
 import { panelFooter, panelHeader } from './chrome.tsx';
 import { isActionType, panelBody } from './sections.tsx';
 
-// The flattened view fed to the raw JSON viewer: the node row with its semantic
+// Why: the flattened view fed to the raw JSON viewer is the node row with its semantic
 // overlay and message deltas merged in (the shape a single DB join would yield).
 function rawView(resolved: ResolvedNode | undefined): Record<string, unknown> | undefined {
   if (resolved == null) return undefined;

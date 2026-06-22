@@ -1,14 +1,13 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 
-import { log } from '@coach/logger';
 import { dumpPipelineOutputs } from '@coach/mcp';
+
+import { log } from '@coach/logger';
 import { runPipeline } from '@coach/pipeline';
 import type { UploadedFile } from '@coach/pipeline';
 
-// ── CLI ───────────────────────────────────────────────────────────────────────
-
-// argv[0]=node, argv[1]=script — user args start after them.
+// Why: argv[0]=node, argv[1]=script — user args start after them.
 const ARGV_USER_START = 2;
 
 const cliArgs = process.argv.slice(ARGV_USER_START);
@@ -35,8 +34,6 @@ function resolveInput(a: string): string {
 const inputDir = resolveInput(arg);
 const outDir = `out/${basename(inputDir)}`;
 
-// ── Gather files (the same flat UploadedFile[] the browser upload produces) ─────
-
 function gatherFiles(dir: string, rootDir: string): UploadedFile[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = join(dir, entry.name);
@@ -50,15 +47,11 @@ function gatherFiles(dir: string, rootDir: string): UploadedFile[] {
   });
 }
 
-// ── Run the pipeline and dump each stage member ────────────────────────────────
-
 const files = gatherFiles(inputDir, inputDir);
 log.info({ files: files.length }, 'gathered input files');
 
-// runPipeline runs all seven stages, including deterministic enrichment + analysis.
 const result = runPipeline(files);
 
-// Shared with the MCP's directory load: writes 01..07 JSON + the self-contained .db.
 const written = await dumpPipelineOutputs(result, outDir);
 for (const path of written) log.info(`  → ${path}`);
 

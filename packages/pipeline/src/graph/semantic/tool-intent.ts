@@ -12,21 +12,12 @@ import {
 
 import { extractBashCommand } from './derive.ts';
 
-// ════════════════════════════════════════════════════════════════════════════
-// Tool & command intent — resolved entirely from config.agent.tools and the
-// ontology's command grammar + path/structure conventions. No hardcoded tool tables.
-// ════════════════════════════════════════════════════════════════════════════
-
-// ── Matching primitives ────────────────────────────────────────────────────────
-
 function matchClause(clause: MatchClause, input: Record<string, unknown>): boolean {
   const value = strField(input, clause.field);
   if (clause.equals != null) return value === clause.equals;
   if (clause.matches != null) return new RegExp(clause.matches, 'i').test(value);
   return false;
 }
-
-// ── Path grounding — convention object type + structural qualifier ─────────────
 
 function basename(path: string): string {
   return path.split('/').pop() ?? path;
@@ -78,8 +69,6 @@ function hostOf(url: string): string {
     .split('/')[0];
   return host != null && host !== '' ? host : url;
 }
-
-// ── Tool intent ────────────────────────────────────────────────────────────────
 
 interface Resolved {
   action?: string | undefined;
@@ -180,7 +169,7 @@ export function toolPhrases(
 ): readonly string[] {
   const tool = toolSpecFor(config, name);
   if (tool == null) return [name != null && name !== '' ? name.toLowerCase() : 'tool'];
-  // Escape-hatch tools (Bash, run_command) wrap arbitrary shell — label by tool name only.
+  // Why: escape-hatch tools (Bash, run_command) wrap arbitrary shell — label by tool name only.
   if (tool.escapeHatch) return [name != null ? name.toLowerCase() : 'shell'];
   const resolved = applyOverrides(tool.overrides, input, {
     action: tool.action,

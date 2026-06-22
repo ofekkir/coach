@@ -1,9 +1,4 @@
-// Backend-neutral query core. Given a `Connection` — a thin port over a SQL engine
-// that already enforces read-only at the engine level (see the DuckDB backend in
-// `duckdb.ts`) — this builds the analyst-facing `Store`: read-only SQL behind a UX
-// guard, graph-traversal primitives, and capped/JSON-safe results.
-//
-// Pure: no node:* and no database driver import, so the same core serves the Node
+// Why: no node:* and no database driver import, so the same core serves the Node
 // DuckDB backend today and a browser/WASM backend later.
 
 import { assertReadOnly } from './guard.ts';
@@ -29,8 +24,6 @@ export interface Store {
   causalPath(id: string, direction: CausalDirection): Promise<QueryResult>;
   close(): void;
 }
-
-// ── Traversal SQL ────────────────────────────────────────────────────────────
 
 function sqlString(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
@@ -67,8 +60,6 @@ function causalSql(id: string, direction: CausalDirection): string {
   FROM nodes n JOIN walk ON n.id = walk.id
   ORDER BY n.start_time_ns`;
 }
-
-// ── Store factory ────────────────────────────────────────────────────────────
 
 /** Wraps a read-only `Connection` in the analyst query surface (guard + caps +
  *  traversal). The connection is responsible for engine-level read-only. */

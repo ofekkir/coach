@@ -66,7 +66,7 @@ function toolResultEntryBlocks(entry: NativeEntry): readonly ContentBlock[] {
   return content;
 }
 
-// The previous inference may have emitted several (parallel) tool_use blocks;
+// Why: the previous inference may have emitted several (parallel) tool_use blocks;
 // every one of their results is fed back to the model as a single user turn.
 function collectPrevToolResultBlocks(
   prevGroup: NativeEntry[],

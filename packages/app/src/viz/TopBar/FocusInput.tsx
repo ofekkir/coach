@@ -2,8 +2,6 @@ import { useState } from 'react';
 
 import { fonts, tokens } from '../theme.ts';
 
-// A jump-to-node box: type/paste a node id and press Enter to reveal, select, and
-// center on it. The border flips to the accent when the id matches nothing.
 export function FocusInput({ onFocus }: { onFocus: (id: string) => boolean }) {
   const [value, setValue] = useState('');
   const [notFound, setNotFound] = useState(false);

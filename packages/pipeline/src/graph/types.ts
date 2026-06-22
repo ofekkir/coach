@@ -2,27 +2,25 @@ import type { IntentCategory } from '@coach/semantics';
 
 import type { Agent, CanonicalNode, MessageDeltas, SemanticFields, Session } from '../types.ts';
 
-// ════════════════════════════════════════════════════════════════════════════
-// Execution graph — a normalized, stage-layered, id-keyed model that maps 1:1 to
-// a relational DB. Three concerns are kept separate:
-//
-//   1. Node data is additive per stage, keyed by a shared node id:
-//        stage 3 (canonical)  normalized node rows      → `nodes`
-//        stage 5              per-node message deltas     → `deltas`
-//        stage 6              per-node what + comment      → `semantics`
-//   2. Edges are two different relations over the same nodes:
-//        containment ("child is contained in time by parent") — the `parent`
-//                     self-FK, surfaced as the `tree` (one parent per node).
-//        causal      ("effect triggered by cause") — its own DAG edge set.
-//   3. Agent and session are ENTITIES (dimension rows referenced by FK), never
-//      graph nodes — they do not appear in the node-data table.
-//
-// A node "points to" its data by id, resolved through a table (`nodeData` /
-// `deltasOf` / `semanticsOf` / `resolve`), never an embedded object. `node.id ==
-// data.id`: one id namespace shared across every layer (1:1 joins).
-// ════════════════════════════════════════════════════════════════════════════
-
-// ── Edge layers ────────────────────────────────────────────────────────────────
+/**
+ * Execution graph — a normalized, stage-layered, id-keyed model that maps 1:1 to
+ * a relational DB. Three concerns are kept separate:
+ *
+ *   1. Node data is additive per stage, keyed by a shared node id:
+ *        stage 3 (canonical)  normalized node rows      → `nodes`
+ *        stage 5              per-node message deltas     → `deltas`
+ *        stage 6              per-node what + comment      → `semantics`
+ *   2. Edges are two different relations over the same nodes:
+ *        containment ("child is contained in time by parent") — the `parent`
+ *                     self-FK, surfaced as the `tree` (one parent per node).
+ *        causal      ("effect triggered by cause") — its own DAG edge set.
+ *   3. Agent and session are ENTITIES (dimension rows referenced by FK), never
+ *      graph nodes — they do not appear in the node-data table.
+ *
+ * A node "points to" its data by id, resolved through a table (`nodeData` /
+ * `deltasOf` / `semanticsOf` / `resolve`), never an embedded object. `node.id ==
+ * data.id`: one id namespace shared across every layer (1:1 joins).
+ */
 
 /** A node in the CONTAINMENT tree ("contains", ordered): a parent contains the
  *  children that run within its time span. Id-only — the node's data lives in the
@@ -46,8 +44,6 @@ export interface CausalEdge {
   readonly toId: string;
   readonly gapMs?: number;
 }
-
-// ── Composition — entities own the structure; the node-graph lives in an interaction
 
 /** A thread is a layout grouping of an interaction's steps into an execution lane.
  *  `source` is the loop that emitted its inferences (e.g. "repl_main_thread"); the
@@ -90,8 +86,6 @@ export interface AgentExecution {
   readonly sessions: readonly SessionExecution[];
 }
 
-// ── Execution graph ────────────────────────────────────────────────────────────
-
 /** The execution graph: three id-keyed node-data tables (`nodes`, `deltas`,
  *  `semantics`) plus the edge/entity composition. Aggregation normally rolls
  *  everything under one agent, but the builder degrades gracefully to
@@ -115,8 +109,6 @@ export type ExecutionGraph = {
   | { readonly kind: 'session'; readonly data: SessionExecution }
   | { readonly kind: 'interaction'; readonly data: InteractionExecution | null }
 );
-
-// ── Resolvers — a node "points to" its data by id, resolved through a table ──────
 
 /** The canonical node data for an id. Throws on a miss — a tree/thread/edge id that
  *  isn't in the node table is a pipeline bug, not a tolerable absence. */
@@ -155,8 +147,6 @@ export function resolve(graph: ExecutionGraph, id: string): ResolvedNode {
     ...(semantics != null ? { semantics } : {}),
   };
 }
-
-// ── App-facing result ─────────────────────────────────────────────────────────
 
 /** One visualisable result produced from the uploaded files (one per agent).
  *  `title` is the tab/agent label. */

@@ -9,8 +9,7 @@ import type {
   ToolNode,
 } from '@coach/pipeline';
 
-// ════════════════════════════════════════════════════════════════════════════
-// Presentation lives in the APP, not the pipeline. The pipeline emits a
+// Why: Presentation lives in the APP, not the pipeline. The pipeline emits a
 // normalized node table (CanonicalNode by id) plus a sparse `semantics` overlay;
 // this module derives a typed `NodeCard` — the curated, at-a-glance summary the
 // renderer draws — from a RESOLVED node (the canonical row + its optional
@@ -19,9 +18,8 @@ import type {
 // never interprets harness-shaped CONTENT (response content blocks, tool_input
 // JSON): that flows untouched into the JSON viewer in the details panel.
 //
-// Agent and session are ENTITIES, not nodes — their cards come from
+// Why: Agent and session are ENTITIES, not nodes — their cards come from
 // `buildAgentCard` / `buildSessionCard`, never the node table.
-// ════════════════════════════════════════════════════════════════════════════
 
 /** A single structural key/value shown on the card body and details header. */
 interface CardField {
@@ -55,10 +53,9 @@ export interface NodeCard {
   readonly prompt?: string;
 }
 
-// Truncation limits (chars) for title lines, and decimal precision for metrics.
 const INTERACTION_TITLE_MAX = 40;
 const SESSION_TITLE_MAX = 24;
-// The prompt anchor allows two lines; clamp so a pasted blob never sizes the card.
+// Why: the prompt anchor allows two lines; clamp so a pasted blob never sizes the card.
 const PROMPT_TITLE_MAX = 120;
 const SUBMS_DECIMALS = 2;
 const COST_DECIMALS = 6;
@@ -158,8 +155,6 @@ function toolTag(name: string | undefined): string {
   return name != null && name !== '' ? `ACTION · ${name.toUpperCase()}` : 'ACTION';
 }
 
-// An enriched tool: a `tool` node with a semantics row. The verb leads from
-// `what`, the structural tool name backs the tag.
 function actionShape(node: ToolNode, semantics: SemanticFields): CardShape {
   return {
     type: 'action',
@@ -169,7 +164,6 @@ function actionShape(node: ToolNode, semantics: SemanticFields): CardShape {
   };
 }
 
-// An enriched inference: an `llm_request` node with a semantics row.
 function inferenceShape(node: LlmRequestNode, semantics: SemanticFields): CardShape {
   return {
     type: 'inference',
@@ -190,7 +184,7 @@ function llmRequestShape(node: LlmRequestNode): CardShape {
   };
 }
 
-// Each builder is typed to the node member its discriminant selects, so field
+// Why: each builder is typed to the node member its discriminant selects, so field
 // access inside is checked against the right shape (no wide-union guards).
 type ShapeBuilders = {
   [N in CanonicalNode as N['type']]?: (node: N, index: number) => CardShape;
@@ -209,7 +203,7 @@ const TYPE_SHAPE_BUILDERS: ShapeBuilders = {
   hook: (n) => ({ type: 'hook', tag: `HOOK · ${n.name.toUpperCase()}`, title: n.name }),
 };
 
-// The semantics overlay relabels a `tool` → action and `llm_request` → inference.
+// Why: the semantics overlay relabels a `tool` → action and `llm_request` → inference.
 // Its presence (not a node type) is what makes a node "enriched".
 function shapeOf(
   node: CanonicalNode,
@@ -218,7 +212,7 @@ function shapeOf(
 ): CardShape {
   if (node.type === 'tool' && semantics != null) return actionShape(node, semantics);
   if (node.type === 'llm_request' && semantics != null) return inferenceShape(node, semantics);
-  // The table is keyed by discriminant; TS can't correlate the lookup with the
+  // Why: the table is keyed by discriminant; TS can't correlate the lookup with the
   // node's narrowed type, so assert the resolved builder accepts this node.
   const builder = TYPE_SHAPE_BUILDERS[node.type] as
     | ((node: CanonicalNode, index: number) => CardShape)
@@ -227,7 +221,7 @@ function shapeOf(
 }
 
 function metricsOf(node: CanonicalNode): CardMetrics {
-  // `in` narrows to the members carrying each field and, since these are only
+  // Why: `in` narrows to the members carrying each field and, since these are only
   // ever set when present, confirms a real value (no extra null guard needed).
   return {
     ...('duration_ms' in node ? { durationMs: node.duration_ms } : {}),

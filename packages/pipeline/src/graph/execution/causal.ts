@@ -3,14 +3,12 @@ import type { CausalEdge, ExecutionNode, Thread } from '../types.ts';
 
 import { gapMsBetween, startGapMsBetween } from './thread.ts';
 
-// ════════════════════════════════════════════════════════════════════════════
-// Causal-flow builder — THE causal edge layer (a DAG). Containment is a separate
-// relation (the `tree`); time-adjacency is a layout grouping, not an edge.
-//
-// Tree/thread nodes are id-only, so this module resolves each node's data and
-// message deltas through a `NodeResolver` (backed by the graph's `nodes`/`deltas`
-// tables). Every step is linked to what CAUSED it, recovered structurally — never
-// from raw timestamps:
+// Why: containment (the `tree`) and time-adjacency (a layout grouping) are
+// deliberately kept as separate relations from the causal edge layer (a DAG)
+// built here. Tree/thread nodes are id-only, so this module resolves each node's
+// data and message deltas through a `NodeResolver` (backed by the graph's
+// `nodes`/`deltas` tables). Every step is linked to what CAUSED it, recovered
+// structurally — never from raw timestamps:
 //
 //   userPrompt ─▶ inference                  the prompt triggered the turn
 //   inference  ─▶ tool        (fan-out)      the response emitted this tool_use id
@@ -21,7 +19,6 @@ import { gapMsBetween, startGapMsBetween } from './thread.ts';
 //
 // One inference fans out to many parallel tools, which fan back into the next.
 // `gapMs` (signed; negative fan-out = dispatched mid-stream) decorates each edge.
-// ════════════════════════════════════════════════════════════════════════════
 
 /** Resolves a tree/thread node id to its canonical data and (stage-5) deltas. */
 export interface NodeResolver {
@@ -53,8 +50,6 @@ function parseHook(node: CanonicalNode): HookEvent | null {
   return { event: node.name.slice(0, i), toolName: node.name.slice(i + 1) || null };
 }
 
-// ── Block extraction (typed; the message bodies are `unknown`) ──────────────────
-
 function isToolUseBlock(block: { type: string }): block is { type: string; id: string } {
   return block.type === 'tool_use' && typeof (block as { id?: unknown }).id === 'string';
 }
@@ -79,13 +74,11 @@ function consumedToolUseIds(inference: ExecutionNode, r: NodeResolver): string[]
   );
 }
 
-// ── Correlation indexes (built once over every node, nested ones included) ──────
-
 interface CausalIndex {
-  readonly emitterOf: ReadonlyMap<string, ExecutionNode>; // tool_use_id → inference that emitted it
-  readonly toolOf: ReadonlyMap<string, ExecutionNode>; // tool_use_id → the tool node
-  readonly postHookOf: ReadonlyMap<string, ExecutionNode>; // tool node id → its PostToolUse hook
-  readonly threadOf: ReadonlyMap<string, number>; // node id → its thread index (descendants included)
+  readonly emitterOf: ReadonlyMap<string, ExecutionNode>;
+  readonly toolOf: ReadonlyMap<string, ExecutionNode>;
+  readonly postHookOf: ReadonlyMap<string, ExecutionNode>;
+  readonly threadOf: ReadonlyMap<string, number>;
 }
 
 function indexThreadMembership(threads: readonly Thread[]): Map<string, number> {
@@ -100,8 +93,8 @@ function flatten(nodes: readonly ExecutionNode[]): ExecutionNode[] {
   return nodes.flatMap((n) => [n, ...flatten(n.children)]);
 }
 
-// Pairs each PostToolUse:<name> hook to the most recent preceding tool of that
-// name (hooks sit adjacent to their tool; they carry no tool_use_id to match on).
+// Why: hooks carry no tool_use_id to match on, so each PostToolUse:<name> hook is
+// paired to the most recent preceding tool of that name (they sit adjacent).
 function pairPostHooksInGroup(
   group: readonly ExecutionNode[],
   postHookOf: Map<string, ExecutionNode>,
@@ -126,8 +119,8 @@ function indexPostHooks(
   return postHookOf;
 }
 
-// The tool node that issues the call (carries tool_use_id), as opposed to its
-// `tool.execution` sub-span (a distinct node type, already excluded by isToolLike).
+// Why: distinguishes the tool node that issues the call (carries tool_use_id) from
+// its `tool.execution` sub-span (a distinct node type, already excluded by isToolLike).
 function isCallableTool(node: ExecutionNode, r: NodeResolver): boolean {
   return isToolLike(r.node(node.id));
 }
@@ -159,17 +152,15 @@ function buildIndex(threads: readonly Thread[], r: NodeResolver): CausalIndex {
   };
 }
 
-// ── Predecessor rules ───────────────────────────────────────────────────────────
-
 function isPreHookFor(prev: ExecutionNode, tool: ExecutionNode, r: NodeResolver): boolean {
   const hook = parseHook(r.node(prev.id));
   return hook?.event === 'PreToolUse' && hook.toolName === toolName(tool, r);
 }
 
-// What caused `node`. Tools: their PreToolUse hook if it directly precedes, else
-// the inference that emitted them. Inferences: the tools they consumed (routed
-// through each tool's PostToolUse hook when present); failing that — and for
-// hooks, waits, executions — the previous sibling in time (`prev`).
+// Why: cause is recovered structurally, not from timestamps. Tools: their PreToolUse
+// hook if it directly precedes, else the inference that emitted them. Inferences: the
+// tools they consumed (routed through each tool's PostToolUse hook when present);
+// failing that — and for hooks, waits, executions — the previous sibling in time (`prev`).
 function predecessorsOf(
   node: ExecutionNode,
   prev: ExecutionNode | null,
@@ -194,10 +185,10 @@ function continuation(prev: ExecutionNode | null): ExecutionNode[] {
   return prev != null ? [prev] : [];
 }
 
-// A tool result that appears in this inference's request is only a CAUSAL fan-in
-// when both live in the same thread. A background loop (session-title, away-
-// summary, …) carries the main thread's history in its requests, but it doesn't
-// *consume* those tool results to continue — so cross-thread matches are skipped.
+// Why: a tool result in this inference's request is only a CAUSAL fan-in when both
+// live in the same thread. A background loop (session-title, away-summary, …) carries
+// the main thread's history in its requests, but it doesn't *consume* those tool
+// results to continue — so cross-thread matches are skipped.
 function fanInPredecessors(
   inference: ExecutionNode,
   index: CausalIndex,
@@ -211,11 +202,9 @@ function fanInPredecessors(
   });
 }
 
-// ── Recursive spine ──────────────────────────────────────────────────────────────
-
-// Containment edges (parent → its own child, e.g. tool → wait/execution) measure
-// the gap from the parent's START — the child runs WITHIN the parent, so end-to-
-// start would read misleadingly negative. Sequential edges use end-to-start.
+// Why: containment edges (parent → its own child, e.g. tool → wait/execution) measure
+// the gap from the parent's START — the child runs WITHIN the parent, so end-to-start
+// would read misleadingly negative. Sequential edges use end-to-start.
 function edgeBetween(from: ExecutionNode, to: ExecutionNode, r: NodeResolver): CausalEdge {
   const fromCanonical = r.node(from.id);
   const toCanonical = r.node(to.id);
@@ -226,12 +215,10 @@ function edgeBetween(from: ExecutionNode, to: ExecutionNode, r: NodeResolver): C
   return { fromId: from.id, toId: to.id, ...(gapMs !== null ? { gapMs } : {}) };
 }
 
-// Walks one time-ordered sibling group, linking each node to its cause and
-// recursing into its children (headed by that node). `head` seeds the running
-// predecessor — the userPrompt for a thread, the parent node for a sub-group.
-// `chainSiblings` is false for a tool's own sub-spans: its wait and execution
-// start together (overlapping), so they are PARALLEL children of the tool, not a
-// wait → execution sequence — each links to the tool head, not to each other.
+// Why: `head` seeds the running predecessor — the userPrompt for a thread, the parent
+// node for a sub-group. `chainSiblings` is false for a tool's own sub-spans: its wait
+// and execution start together (overlapping), so they are PARALLEL children of the
+// tool, not a wait → execution sequence — each links to the tool head, not to each other.
 function spineEdges(
   group: readonly ExecutionNode[],
   head: ExecutionNode | null,

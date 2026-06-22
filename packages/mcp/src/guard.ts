@@ -1,4 +1,4 @@
-// Read-only UX guard. The DATABASE enforces read-only — the engine is the real
+// Why: Read-only UX guard. The DATABASE enforces read-only — the engine is the real
 // boundary: the backend opens a READ_ONLY connection with external access disabled
 // and configuration locked (see @coach/mcp's DuckDB backend). This guard only gives
 // a friendly, fast error for the common mistakes — a non-SELECT statement or a

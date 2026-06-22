@@ -14,8 +14,6 @@ export const LCG_INCREMENT = 1013904223;
 /** Right-shift to take the high byte of a 32-bit word. */
 export const HIGH_BYTE_SHIFT = 24;
 
-// ── Pipeline input ──────────────────────────────────────────────────────────
-
 /** A single in-memory file presented by the caller (browser File.text() or Node fs.readFileSync). */
 export interface UploadedFile {
   /** Filename only, e.g. "session.jsonl" or "trace-abc123.json". Classification keys on this. */
@@ -26,17 +24,14 @@ export interface UploadedFile {
   path?: string;
 }
 
-// ── Stage 1: classification ───────────────────────────────────────────────────
-
 /** What an uploaded file is. `unsupported` is carried through (never silently dropped). */
+// eslint-disable-next-line named-literal/name-union-members -- type-only vocabulary; members are self-descriptive and have no runtime list to name
 export type InputType = 'otel-trace' | 'otel-log' | 'native' | 'unsupported';
 
 export interface ClassifiedInput {
   readonly file: UploadedFile;
   readonly type: InputType;
 }
-
-// ── Stage 2: session routing ──────────────────────────────────────────────────
 
 /** A session is wholly OTEL (logs + traces) or wholly native (one .jsonl). */
 type SessionKind = 'otel' | 'native';
@@ -46,8 +41,6 @@ export interface SessionInputs {
   readonly kind: SessionKind;
   readonly inputs: readonly ClassifiedInput[];
 }
-
-// ── OTLP types (raw input) ────────────────────────────────────────────────────
 
 type OtlpValue =
   | { readonly stringValue: string }
@@ -75,7 +68,7 @@ export interface OtlpBatch {
   readonly scopeSpans: readonly { readonly spans: readonly OtlpSpan[] }[];
 }
 
-// Grafana Tempo's HTTP API response shape for a trace query. This differs from
+// Why: Grafana Tempo's HTTP API response shape for a trace query differs from
 // the standard OTLP proto JSON mapping (which uses `resourceSpans[]`) — Tempo
 // wraps everything in `batches[]` instead.
 export interface TempoTrace {
@@ -100,9 +93,9 @@ export interface LogEntry {
   readonly total_duration_ms?: number | string | null;
 }
 
-// ── Entities — dimension rows, NOT graph nodes ────────────────────────────────
-// Agent and session are owning entities referenced by foreign key, never nodes in
-// the node-data table. Each maps 1:1 to a relational table (`agents`, `sessions`).
+// Why: agent and session are owning entities referenced by foreign key, never
+// nodes in the node-data table. Each maps 1:1 to a relational table (`agents`,
+// `sessions`) — they are dimension rows, not graph nodes.
 
 export interface Agent {
   readonly id: string;
@@ -111,14 +104,14 @@ export interface Agent {
 
 export interface Session {
   readonly id: string;
-  readonly agentId: string; // FK → Agent
+  readonly agentId: string;
   readonly userId: string;
-  readonly sessionId: string; // the harness's own session id
+  readonly sessionId: string;
   readonly title?: string;
-  // `string | undefined` (not exact-optional) so the aggregate builder can assign
+  // Why: `string | undefined` (not exact-optional) so the aggregate builder can assign
   // `node.cwd` straight through under `exactOptionalPropertyTypes`.
-  readonly cwd?: string | undefined; // working directory the session ran in (native only)
-  readonly branch?: string | undefined; // git branch the session ran on (native only)
+  readonly cwd?: string | undefined;
+  readonly branch?: string | undefined;
 }
 
 /** The `Agent` entity id for a user. The single id namespace shared everywhere. */
@@ -132,11 +125,11 @@ export function sessionEntityId(harnessSessionId: string): string {
   return `session-${harnessSessionId}`;
 }
 
-// ── Transformed node (ETL output) ────────────────────────────────────────────
-// Agent and session are entities (above), not node types. "Is this node
+// Why: agent and session are entities (above), not node types. "Is this node
 // enriched?" is answered by the presence of a `semantics[id]` row, so there is no
 // `action`/`inference` node type either — the node type stays mechanical.
 
+/* eslint-disable named-literal/name-union-members -- type-only vocabulary; members are self-descriptive and have no runtime list to name */
 export type NodeType =
   | 'interaction'
   | 'llm_request'
@@ -144,6 +137,7 @@ export type NodeType =
   | 'tool.execution'
   | 'tool.blocked_on_user'
   | 'hook';
+/* eslint-enable named-literal/name-union-members */
 
 export interface RequestMessage {
   role: string;
@@ -166,9 +160,9 @@ export interface ResponseMessage {
 interface BaseNode {
   id: string;
   type: NodeType;
-  parent?: string; // containment FK (self-FK → another node)
-  sessionId: string; // FK → Session entity
-  interactionId?: string; // FK → owning InteractionNode; stamped by stage 4
+  parent?: string;
+  sessionId: string;
+  interactionId?: string;
 }
 
 /** Span-derived nodes always carry real OTLP timing — `parse.ts` computes all
@@ -183,16 +177,14 @@ interface SpannedNode extends BaseNode {
  *  Consumers can filter on this to distinguish real sessions from local ones. */
 export const PSEUDO_USER_ID = 'pseudo_user_id';
 
-// ── Span-derived nodes ────────────────────────────────────────────────────────
-
 export interface InteractionNode extends SpannedNode {
   type: 'interaction';
   session_id: string;
   user_id: string;
   sequence: number;
   prompt: string;
-  cwd?: string; // working directory; native only (carried up to the Session entity)
-  branch?: string; // git branch; native only (carried up to the Session entity)
+  cwd?: string;
+  branch?: string;
 }
 
 export interface LlmRequestNode extends SpannedNode {
@@ -210,13 +202,15 @@ export interface LlmRequestNode extends SpannedNode {
 /** The closed, deterministic taxonomy for a failed tool call, classified from the
  *  tool_result text/exit info by rule (no LLM). NULL/absent when the call succeeded
  *  or has no matched result. See `graph/result/result.ts` for the classifier rules. */
+/* eslint-disable named-literal/name-union-members -- type-only vocabulary; the runtime list lives in `canonical/result/result.ts` (the classifier), not here */
 export type ErrorKind =
-  | 'not_found' // file/path/command not found
-  | 'invalid_args' // bad arguments / parse failure / a "no match" edit
-  | 'permission' // permission denied
-  | 'timeout' // timed out
-  | 'nonzero_exit' // a Bash non-zero exit not otherwise classified
-  | 'other'; // an error that matched none of the above
+  | 'not_found'
+  | 'invalid_args'
+  | 'permission'
+  | 'timeout'
+  | 'nonzero_exit'
+  | 'other';
+/* eslint-enable named-literal/name-union-members */
 
 export interface ToolNode extends SpannedNode {
   type: 'tool';
@@ -254,11 +248,11 @@ export interface HookNode extends SpannedNode {
   name: string;
 }
 
-// Canonical = the mechanical pipeline's output, the value type of the node-data
-// table. No LLM is in this loop; every field is read or derived from the trace.
-// Stays harness-agnostic. The interaction's prompt is `InteractionNode.prompt` —
-// there is no separate prompt node; the renderer derives the spine-head anchor
-// from that field, the way it derives the agent/session cards from entities.
+// Why: the mechanical pipeline's output, the value type of the node-data table.
+// No LLM is in this loop; every field is read or derived from the trace. Stays
+// harness-agnostic. The interaction's prompt is `InteractionNode.prompt` — there
+// is no separate prompt node; the renderer derives the spine-head anchor from
+// that field, the way it derives the agent/session cards from entities.
 export type CanonicalNode =
   | InteractionNode
   | LlmRequestNode
@@ -267,10 +261,10 @@ export type CanonicalNode =
   | ToolBlockedOnUserNode
   | HookNode;
 
-// ── Node-data layers — sparse, additive, all keyed by node id ──────────────────
-// Each layer is its own id-keyed table (`node_deltas`, `node_semantics`) joined
-// 1:1 to the node by id. A node "points to" its data through these tables — never
-// an embedded object, so nothing re-duplicates on serialize/DB.
+// Why: each node-data layer is its own sparse, additive id-keyed table
+// (`node_deltas`, `node_semantics`) joined 1:1 to the node by id. A node "points
+// to" its data through these tables — never an embedded object, so nothing
+// re-duplicates on serialize/DB.
 
 /** Stage 5 — the messages new to an `llm_request` relative to the previous request
  *  in the same thread. `requestMessagesDelta` is the suffix beyond the previous

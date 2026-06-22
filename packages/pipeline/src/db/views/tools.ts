@@ -1,4 +1,4 @@
-// Per-type VIEW: the tool slice of `nodes`. A typed, documented surface (the
+// Why: per-type VIEW: the tool slice of `nodes`. A typed, documented surface (the
 // tool-specific columns, with other types' NULLs dropped) for the analyst who wants
 // `SELECT * FROM tools`. The physical table is still `nodes` — edges, containment,
 // and traversal go through it; this projection buys clarity, not storage.

@@ -4,27 +4,25 @@ import type { RequestMessage, ResponseMessage } from '../../types.ts';
 
 import { toolPhrases } from './tool-intent.ts';
 
-// ════════════════════════════════════════════════════════════════════════════
-// derive.ts — turns a raw llm_request node into deterministic label phrases,
-// reading all harness-specific knowledge from the injected SemanticsConfig. It is
-// HARNESS-AGNOSTIC: the only thing baked in is the pipeline's normalized message
-// shape (a ResponseMessage has a `type`; text blocks have `text`; tool-call blocks
-// have `name`/`input`). Every string that means something to a particular agent —
-// tool names, which block types map to which role, the session-title/suggestion
-// markers — comes from config, not from this file.
-//
-// Three deterministic signals, in the order the stage applies them:
-//   1. markerLabel()      harness-internal calls (session title, suggestion mode)
-//                         that fully determine the label — no model needed.
-//   2. structuralPrefix() roles read from the response shape: a thinking block →
-//                         "plan…", a trailing tool call → "invoke <tool intent>".
-//   3. toolPhrases()      (tool-intent.ts) the tool/command intent itself.
-// What is left — the act of a genuine final text message — is the model's job.
-//
-// Pure module (no node:* imports), like the stage that consumes it.
-// ════════════════════════════════════════════════════════════════════════════
-
-// ── Message-block extraction (the normalized content shape, not agent-specific) ─
+/**
+ * derive.ts — turns a raw llm_request node into deterministic label phrases,
+ * reading all harness-specific knowledge from the injected SemanticsConfig. It is
+ * HARNESS-AGNOSTIC: the only thing baked in is the pipeline's normalized message
+ * shape (a ResponseMessage has a `type`; text blocks have `text`; tool-call blocks
+ * have `name`/`input`). Every string that means something to a particular agent —
+ * tool names, which block types map to which role, the session-title/suggestion
+ * markers — comes from config, not from this file.
+ *
+ * Three deterministic signals, in the order the stage applies them:
+ *   1. markerLabel()      harness-internal calls (session title, suggestion mode)
+ *                         that fully determine the label — no model needed.
+ *   2. structuralPrefix() roles read from the response shape: a thinking block →
+ *                         "plan…", a trailing tool call → "invoke <tool intent>".
+ *   3. toolPhrases()      (tool-intent.ts) the tool/command intent itself.
+ * What is left — the act of a genuine final text message — is the model's job.
+ *
+ * Pure module (no node:* imports), like the stage that consumes it.
+ */
 
 function textFromContent(content: unknown): string {
   if (typeof content === 'string') return content;
@@ -86,9 +84,9 @@ export function parseToolInput(input: string | undefined): Record<string, unknow
   }
 }
 
-// Promoted-column source: the single source of truth for the file path and bash
-// command carried in a tool node's `tool_input`. Both the materializer (nodes.
-// file_path / nodes.bash_command) and the action classifier read from here.
+// Why: single source of truth for the path/command carried in a tool node's
+// `tool_input` — both the materializer (nodes.file_path / nodes.bash_command) and
+// the action classifier read from here, so the field list must not be duplicated.
 const PATH_FIELDS = ['file_path', 'notebook_path'] as const;
 
 function firstNonEmptyField(
@@ -114,8 +112,6 @@ export function extractFilePath(input: Record<string, unknown>): string | null {
 export function extractBashCommand(input: Record<string, unknown>): string | null {
   return firstNonEmptyField(input, ['command']);
 }
-
-// ── Structural roles — driven by the block-type strings declared in config ─────
 
 type StructuralRole = SemanticsConfig['agent']['structuralRoles']['rules'][number];
 
@@ -149,8 +145,6 @@ export function structuralPrefix(
 ): string[] {
   return config.agent.structuralRoles.rules.flatMap((rule) => rolePhrases(config, rule, response));
 }
-
-// ── Harness markers (session-title, suggestion-mode) ───────────────────────────
 
 function jsonHasStringKey(text: string, key: string): boolean {
   if (!text.startsWith('{')) return false;

@@ -1,6 +1,5 @@
 import { ellipsis, fonts, tokens } from '../theme.ts';
 
-// Text colors for the body, resolved by the card's accent/lane state in TraceNode.
 export interface StepPalette {
   title: string;
   sub: string;
@@ -13,8 +12,6 @@ function sharePct(shareOfRun: number): number {
   return Math.round(shareOfRun * SHARE_PCT_BASE);
 }
 
-// The share-of-run bar: a 4px track filled to this step's slice of the
-// interaction's wall-clock, captioned with the percentage.
 function shareBar(shareOfRun: number): React.ReactNode {
   return (
     <>
@@ -45,8 +42,6 @@ function shareBar(shareOfRun: number): React.ReactNode {
   );
 }
 
-// The type ramp inside a step card: the verb leads (sans, 600), the sub-verb and
-// model fall back in weight/size, and the longest step carries a share-of-run bar.
 export function NodeBody({
   title,
   subtitle,

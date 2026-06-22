@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
 
 import type { RFNode } from '../layout/types.ts';
 
-// Delay (ms) before the one-time auto fit-to-view, letting the DOM settle first.
+// Why: delay the one-time auto fit-to-view so the DOM settles before measuring.
 const FIT_DELAY_MS = 40;
 
 interface Elements {

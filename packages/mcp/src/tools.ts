@@ -1,15 +1,10 @@
-// The analyst-facing tool surface. Seven tools over the session's current
-// dataset: load it, describe the schema, run read-only SQL, three graph
-// primitives (resolve / subtree / causal_path), and open the visualization. The
-// point is flexibility — the agent loads data and composes its own queries rather
-// than consuming a fixed set of hardcoded findings. (The stage-7 analysis still
-// runs in the pipeline and drives the viz; it is just not re-exposed as a tool —
-// every rollup it computes is a one-line query over the tables described by
-// `describe_schema`.)
-//
-// Tools carry a Zod input shape; the MCP layer (server.ts) validates args against
-// it before dispatch. Data-bound tools read through the session, which throws a
-// clear message until a dataset is loaded.
+// Why: the surface is deliberately a small set of composable primitives (load,
+// describe, read-only SQL, three graph walks, viz) rather than a fixed set of
+// hardcoded findings — the agent composes its own queries. The stage-7 analysis
+// still runs in the pipeline and drives the viz; it is intentionally not
+// re-exposed as a tool because every rollup it computes is a one-line query over
+// the tables described by `describe_schema`. Data-bound tools read through the
+// session, which throws a clear message until a dataset is loaded.
 
 import { resolve as resolveNode, TABLES } from '@coach/pipeline';
 import { defaultSemanticsConfig } from '@coach/semantics';
@@ -42,8 +37,6 @@ function optionalString(args: Record<string, unknown>, key: string): string | un
 
 const ID_SHAPE = { id: z.string().describe('A node id.') };
 
-// ── describe_schema ──────────────────────────────────────────────────────────
-
 function schemaDescription(): unknown {
   const ontology = defaultSemanticsConfig.ontology;
   return {
@@ -63,8 +56,6 @@ function schemaDescription(): unknown {
     ],
   };
 }
-
-// ── Tool registry ────────────────────────────────────────────────────────────
 
 function loadDatasetTool(session: Session): Tool {
   return {

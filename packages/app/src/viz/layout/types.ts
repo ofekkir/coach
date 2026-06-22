@@ -43,7 +43,9 @@ export const CANVAS_TOP = 50;
 /** Divisor for centering a width around a center-x (`cx - width / CENTERING_DIVISOR`). */
 export const CENTERING_DIVISOR = 2;
 
+/* eslint-disable named-literal/name-union-members -- type-only vocabulary; members are self-descriptive and have no runtime list to name */
 type NodeKind = 'root' | 'session' | 'interaction' | 'member';
+/* eslint-enable named-literal/name-union-members */
 
 export interface TraceRFNodeData extends Record<string, unknown> {
   kind: NodeKind;

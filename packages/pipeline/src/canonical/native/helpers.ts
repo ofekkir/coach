@@ -16,8 +16,8 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-// Deterministic pseudo-random bytes from a seed string (FNV-1a → LCG).
-// Pure arithmetic + Web APIs only — works identically in browser and Node.js.
+// Why: pure arithmetic + Web APIs only (FNV-1a → LCG) so the same seed yields
+// identical bytes in both browser and Node.js — no crypto/node:* dependency.
 function deterministicBytes(seed: string, len: number): Uint8Array {
   let h = FNV_OFFSET_BASIS >>> 0;
   for (let i = 0; i < seed.length; i++) {

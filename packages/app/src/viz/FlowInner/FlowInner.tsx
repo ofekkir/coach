@@ -21,7 +21,7 @@ import { useFlowSync } from './useFlowSync.ts';
 
 const nodeTypes: NodeTypes = { trace: TraceNodeView, band: BandView };
 
-// Delay (ms) before centering on a focused node, letting a freshly-expanded
+// Why: delay before centering on a focused node, letting a freshly-expanded
 // ancestor's layout settle so the target node is placed and measured first.
 const FOCUS_DELAY_MS = 90;
 

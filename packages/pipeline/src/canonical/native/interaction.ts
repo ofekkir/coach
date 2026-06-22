@@ -47,9 +47,8 @@ export function buildInteractionSpan(
   };
 }
 
-// The session ran in a working directory on a git branch (native entries carry
-// both per-record). Emitted as span attributes only when present so OTEL traces,
-// which lack them, stay NULL.
+// Why: native entries carry cwd/git branch per-record; emitted only when present
+// so OTEL traces, which lack them, stay NULL rather than empty strings.
 function sessionContextAttrs(entry: NativeEntry): OtlpAttribute[] {
   const attrs: OtlpAttribute[] = [];
   if (entry.cwd != null) attrs.push(strAttr('cwd', entry.cwd));

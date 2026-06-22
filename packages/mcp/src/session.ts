@@ -1,8 +1,8 @@
-// The server's mutable state: the one dataset currently loaded. `load_dataset`
-// swaps it; every data-bound tool reads through `dataset()` / `store()`, which
-// throw a clear message until something is loaded. Load-once / serve-many — one
-// dataset at a time, replaced on each load. A load always re-derives from source:
-// the directory's trace/native files run through the pipeline, then materialized.
+// Why: the server holds exactly one dataset at a time (load-once / serve-many).
+// `load_dataset` replaces it and every data-bound tool reads through
+// `dataset()` / `store()`, which throw until something is loaded. A load always
+// re-derives from source rather than caching, so reloading a directory picks up
+// edits to its trace/native files.
 
 import type { ExecutionGraph } from '@coach/pipeline';
 
@@ -32,8 +32,6 @@ export interface Session {
   close(): void;
 }
 
-// Counts come straight off the node table — distinct session FKs and the
-// interaction nodes — so the summary needs no separate analysis pass.
 function summarize(dir: string, graph: ExecutionGraph, dumped: readonly string[]): DatasetSummary {
   const nodes = Object.values(graph.nodes);
   return {
@@ -55,9 +53,8 @@ interface Loaded {
   readonly dumped: readonly string[];
 }
 
-// A load re-derives the dataset: run the pipeline over the directory, dump the
-// stage outputs + `.db` into the cwd (so `open_viz` can serve them), and make the
-// graph queryable through a fresh temp DuckDB.
+// Why: the stage outputs and `.db` are dumped into the cwd so `open_viz` can
+// later serve them off disk without re-running the pipeline.
 async function loadFromDir(path: string): Promise<Loaded> {
   const result = loadPipelineResult(path);
   const dataset: Dataset = { graph: result.enrichedGraph };

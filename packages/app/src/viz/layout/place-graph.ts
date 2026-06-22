@@ -18,7 +18,7 @@ import { cardOf, nodeOf, placeThread, pushStructural } from './place-members.ts'
 import type { Ctx } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, HG, LANE_GAP, LG, NW, VG } from './types.ts';
 
-// The loop that emits the spine; every other thread is off-spine housekeeping.
+// Why: this is the source that emits the spine; every other thread is off-spine housekeeping.
 const MAIN_THREAD_SOURCE = 'repl_main_thread';
 
 export function sessionWidth(sv: SessionExecution): number {
@@ -33,7 +33,7 @@ function durationOf(node: CanonicalNode): number | undefined {
   return 'duration_ms' in node ? node.duration_ms : undefined;
 }
 
-// The longest step (and its share-of-run) the renderer accents: the heaviest
+// Why: the longest step (and its share-of-run) the renderer accents: the heaviest
 // main-thread member by duration, with the interaction's own wall-clock as the
 // denominator. A render-time pick over the graph — not a shared analysis stage.
 function applyLongestStep(mainThread: Thread | undefined, interactionId: string, ctx: Ctx): void {
@@ -93,7 +93,7 @@ function placeInteraction(
   return Math.max(mainEndY, laneEndY) + VG;
 }
 
-// Parallel levels (fork → branches → join) detected on the main thread from the
+// Why: parallel levels (fork → branches → join) detected on the main thread from the
 // interaction's causal edges — the critical branch is the slowest by duration.
 function parallelLevelsOf(mainThread: Thread, interaction: InteractionExecution, ctx: Ctx) {
   const memberIds = new Set(mainThread.members.map((m) => m.id));
@@ -103,7 +103,7 @@ function parallelLevelsOf(mainThread: Thread, interaction: InteractionExecution,
   return detectParallelLevels(memberIds, interaction.causalEdges, (id) => durById.get(id) ?? 0);
 }
 
-// Stacks the off-spine threads (session-title, away-summary, …) in a dimmed side
+// Why: stacks the off-spine threads (session-title, away-summary, …) in a dimmed side
 // lane to the right of the spine, never inline on it.
 function placeBackgroundLane(
   backgroundThreads: readonly Thread[],
@@ -128,7 +128,7 @@ function startNsOf(node: CanonicalNode): bigint | null {
 
 const NS_PER_MS = 1_000_000;
 
-// The signed gap (ms) between cause-end and effect-start, computed app-side so the
+// Why: the signed gap (ms) between cause-end and effect-start, computed app-side so the
 // delta shows on every edge whose endpoints carry timing — the pipeline leaves
 // `gapMs` unset on fan-out/fan-in edges, but the timestamps are present. Falls
 // back to the pipeline value when given (it encodes nested-span semantics).
@@ -140,7 +140,7 @@ function gapLabel(edge: CausalEdge, ctx: Ctx): string | undefined {
   return formatGap(Number(start - end) / NS_PER_MS) ?? undefined;
 }
 
-// Draws the interaction's causal flow between the placed nodes. Only edges whose
+// Why: only edges whose
 // both endpoints are placed (visible in the expanded interaction) are drawn — a
 // collapsed member would otherwise leave a dangling edge.
 function placeCausalEdges(interaction: InteractionExecution, ctx: Ctx): void {
@@ -152,7 +152,7 @@ function placeCausalEdges(interaction: InteractionExecution, ctx: Ctx): void {
     });
 }
 
-// The spine-head anchor, derived from `InteractionNode.prompt` (there is no prompt
+// Why: the spine-head anchor, derived from `InteractionNode.prompt` (there is no prompt
 // node). Null when the interaction has no prompt text.
 function promptCardOf(ctx: Ctx, interactionId: string): NodeCard | null {
   const node = nodeOf(ctx, interactionId);
@@ -160,7 +160,7 @@ function promptCardOf(ctx: Ctx, interactionId: string): NodeCard | null {
   return prompt.trim() !== '' ? buildPromptCard(prompt) : null;
 }
 
-// Places the synthesized prompt anchor as the interaction's first child and returns
+// Why: places the synthesized prompt anchor as the interaction's first child and returns
 // its render-only id (`${rootId}__prompt`) — it has no backing node, so it resolves
 // to no row in the details panel, exactly like the agent/session entity cards.
 function placeUserPrompt(card: NodeCard, rootId: string, y: number, ctx: Ctx): string {
@@ -170,7 +170,7 @@ function placeUserPrompt(card: NodeCard, rootId: string, y: number, ctx: Ctx): s
   return id;
 }
 
-// Restores the prompt → first-member edge for every thread. The dropped user_prompt
+// Why: restores the prompt → first-member edge for every thread. The dropped user_prompt
 // node used to seed each thread's spine head; with it gone, the render-only prompt
 // anchor takes over, so background threads (and the main spine) read as triggered by
 // the prompt instead of floating. Cross-lane handles route the background edges

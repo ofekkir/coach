@@ -1,5 +1,5 @@
 #!/usr/bin/env -S node --experimental-strip-types
-// `coach-viz [data-file] [focus-node-id]` — serves the built `@coach/app` plus the
+// Why: `coach-viz [data-file] [focus-node-id]` — serves the built `@coach/app` plus the
 // stage JSON dumped into the cwd (by `pnpm e2e` or a directory `load_dataset`),
 // opens the browser at the boot URL, and keeps serving until interrupted. Defaults
 // the data file to `06-enriched-graph.json`. Errors with a build hint if the app
@@ -21,7 +21,6 @@ const OPEN_COMMANDS: Record<string, string> = {
   linux: 'xdg-open',
 };
 
-// Best-effort browser open; if it can't, the printed URL still works.
 function openBrowser(url: string): void {
   const command = OPEN_COMMANDS[platform()];
   if (command == null) return;

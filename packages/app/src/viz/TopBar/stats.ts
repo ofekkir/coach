@@ -6,12 +6,9 @@ import type {
 } from '@coach/pipeline';
 import { nodeData } from '@coach/pipeline';
 
-// ════════════════════════════════════════════════════════════════════════════
-// Top-bar aggregates — app-side presentation derived from the ExecutionGraph (the
-// "presentation lives in the app" rule). Sums the loaded run's wall-clock, cost
-// and step count for the stat group. Node data is resolved from the graph's node
-// table by id (tree/thread nodes are id-only).
-// ════════════════════════════════════════════════════════════════════════════
+// Why: these aggregates live app-side, not in @coach/pipeline — presentation is
+// derived from the ExecutionGraph in the app layer, never baked into the pipeline.
+// Node data must be looked up by id because tree/thread nodes carry only ids.
 
 export interface RunStats {
   readonly durationMs: number;

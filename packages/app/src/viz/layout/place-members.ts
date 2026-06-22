@@ -8,10 +8,6 @@ import { estimateNodeH } from './estimate.ts';
 import type { Ctx, HiddenSubCall, TraceRFNodeData } from './types.ts';
 import { NESTED_INDENT, VG } from './types.ts';
 
-// ── Resolvers (the seam to the node table) ──────────────────────────────────────
-// A tree/thread node is an id; its data lives in the graph's `nodes` table and its
-// label overlay in `semantics`. These resolve an id to what the layout needs.
-
 export function nodeOf(ctx: Ctx, id: string): CanonicalNode {
   return nodeData(ctx.graph, id);
 }
@@ -68,9 +64,9 @@ function durationOf(node: CanonicalNode): number {
   return 'duration_ms' in node ? node.duration_ms : 0;
 }
 
-// Recursively finds a weak-model inference nested inside a tool (the call lives
-// under the tool's `execution` child), so the details panel can surface the hidden
-// sub-call that often dominates the tool's wall-clock.
+// Why: the weak-model call lives under the tool's `execution` child, not as a
+// direct child, so we descend to surface the hidden sub-call that often dominates
+// the tool's wall-clock.
 function hiddenSubCallOf(node: ExecutionNode, ctx: Ctx): HiddenSubCall | undefined {
   for (const child of node.children) {
     const c = nodeOf(ctx, child.id);
@@ -83,8 +79,6 @@ function hiddenSubCallOf(node: ExecutionNode, ctx: Ctx): HiddenSubCall | undefin
   return undefined;
 }
 
-// Share-of-run flags for a spine step: whether it is the interaction's longest
-// step and, if so, its slice of the interaction's wall-clock (for the bar).
 function shareFlags(
   node: ExecutionNode,
   ctx: Ctx,
@@ -95,9 +89,9 @@ function shareFlags(
   return { isLongest: true, ...(total > 0 ? { shareOfRun: Math.min(1, dur / total) } : {}) };
 }
 
-// Places one execution-graph node as a card. Steps are not expandable: a tool's
-// raw sub-spans (`tool.execution` / `tool.blocked_on_user`) never become cards —
-// only its one meaningful nested inference does, surfaced by `placeStep`.
+// Why: steps are intentionally not expandable — a tool's raw sub-spans
+// (`tool.execution` / `tool.blocked_on_user`) never become cards; only its one
+// meaningful nested inference does, surfaced by `placeStep`.
 type ParallelFlags = Partial<Pick<TraceRFNodeData, 'critical' | 'compact'>>;
 
 export function pushExecNode(
@@ -130,9 +124,9 @@ export function pushExecNode(
   );
 }
 
-// The one meaningful child of a tool: the weak model running *inside* it (e.g.
-// WebFetch's `web_fetch_apply` → claude-haiku). Found by descending through the
-// mechanical `execution`/`blocked_on_user` sub-spans, which are never carded.
+// Why: the meaningful child is the weak model running *inside* the tool (e.g.
+// WebFetch's `web_fetch_apply` → claude-haiku); it hides beneath the mechanical
+// `execution`/`blocked_on_user` sub-spans, which are never carded, so we descend.
 function nestedInferenceNode(node: ExecutionNode, ctx: Ctx): ExecutionNode | undefined {
   for (const child of node.children) {
     if (nodeOf(ctx, child.id).type === 'llm_request') return child;
@@ -142,8 +136,6 @@ function nestedInferenceNode(node: ExecutionNode, ctx: Ctx): ExecutionNode | und
   return undefined;
 }
 
-// Places a step card and, when it is a tool with a weak-model sub-call, the one
-// nested-inference card indented beneath it. Returns the next y.
 export function placeStep(
   member: ExecutionNode,
   tx: number,
@@ -161,9 +153,9 @@ export function placeStep(
   return next;
 }
 
-// Stacks a thread's members in a column (layout only). No member-to-member edges:
-// member order is not causality — the causal flow is drawn by place-graph. Used
-// for the dimmed background lane (always linear).
+// Why: no member-to-member edges are drawn — member order is not causality; the
+// causal flow is drawn by place-graph. This stacks members linearly for the
+// dimmed background lane.
 export function placeThread(
   thread: Thread,
   tx: number,

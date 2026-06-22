@@ -10,8 +10,6 @@ interface ResBody {
   stop_reason?: string;
 }
 
-// ── Raw body decoding (handles double-escaped / truncated JSON) ───────────────
-
 function tryLoad(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
@@ -89,8 +87,6 @@ export function decodeRawBody(raw: string): unknown {
 
   return null;
 }
-
-// ── Request message extraction ────────────────────────────────────────────────
 
 import type { RequestMessage, ResponseMessage } from '../../types.ts';
 

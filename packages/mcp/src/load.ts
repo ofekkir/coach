@@ -1,7 +1,5 @@
-// Dataset intake. Reads a directory of trace/native files off disk into the same
-// flat UploadedFile[] the browser upload produces, runs the pipeline, and keeps
-// the stage-6 enriched graph. This is the one place in the MCP that touches the
-// filesystem; everything downstream is graph-only.
+// Why: this is the one place in the MCP that touches the filesystem; everything
+// downstream is graph-only, so disk access must not leak past this module.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';

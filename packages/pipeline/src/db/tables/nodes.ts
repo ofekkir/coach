@@ -1,6 +1,3 @@
-// The `nodes` table spec — the unified, harness-agnostic node table. The largest
-// spec, in its own file so it has room to grow without crowding the aggregator.
-
 import type { TableSpec } from '../spec.ts';
 
 export const NODES: TableSpec = {

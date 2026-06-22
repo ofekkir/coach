@@ -1,16 +1,16 @@
 import { tokens, type GlyphKind } from '../theme.ts';
 
-// A small CSS shape encoding a node's structural role — the replacement for the
-// old colored badge. Hollow = inference (a thought); filled = action (a deed);
-// solid fills = levels; the accent variants mark the prompt anchor and nested
-// weak-model calls. Every glyph is a single styled span.
+// Why: a CSS shape encodes a node's structural role, replacing the old colored
+// badge. Hollow = inference (a thought); filled = action (a deed); solid fills =
+// levels; the accent variants mark the prompt anchor and nested weak-model calls.
+// Every glyph is a single styled span.
 const BASE: React.CSSProperties = { flexShrink: 0, display: 'inline-block' };
 
 const ROUND = '50%';
 const ROTATE = 'rotate(45deg)';
 
-// Colors for the two accent-sensitive glyphs (inference / action), resolved up
-// front so the shape switch stays a flat lookup.
+// Why: resolve the accent-sensitive colors up front so the shape switch below
+// stays a flat lookup instead of branching on accent in every case.
 function accentColors(accent: boolean): {
   hollowBorder: string;
   hollowBg: string;

@@ -1,7 +1,5 @@
-// MCP wiring. Registers the transport-agnostic tool registry (`tools.ts`) on an
-// MCP server and serves it over stdio. Tools return plain JSON-serializable
-// values; here we wrap them in MCP text content. NB: stdio uses stdout for the
-// JSON-RPC channel — never write logs to stdout, only stderr.
+// Why: stdio transport uses stdout for the JSON-RPC channel — never write logs
+// to stdout, only stderr.
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';

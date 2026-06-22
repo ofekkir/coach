@@ -1,4 +1,3 @@
-// Canonical conversion (used by CLI scripts)
 export { enrichTrace } from './canonical/enrich/enrich.ts';
 export { transformTrace } from './canonical/transform/transform.ts';
 export { TempoTraceSchema } from './canonical/tempo.schema.ts';
@@ -28,7 +27,6 @@ export type {
   UploadedFile,
 } from './types.ts';
 
-// Graph contract — execution graph (normalized, stage-layered, id-keyed)
 export type {
   AgentExecution,
   CausalEdge,
@@ -42,16 +40,15 @@ export type {
 } from './graph/types.ts';
 export { deltasOf, nodeData, resolve, semanticsOf } from './graph/types.ts';
 
-// Semantic enrichment stage (deterministic; semantic vocabulary supplied by
-// @coach/semantics — import config types from there).
+// Why: semantic vocabulary is owned by @coach/semantics — config types are
+// imported from there, not re-exported here, to keep the source of truth single.
 export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 
-// Orchestration
 export { buildVizResultFromExecutionGraph, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';
 
-// Graph → DB SQL (the relational schema specs + the graph→SQL materializer). Pure
-// string generation; the DuckDB engine that runs it lives in @coach/mcp.
+// Why: this emits SQL as pure strings only — the DuckDB engine that executes it
+// lives in @coach/mcp, keeping this package free of a runtime DB dependency.
 export { materializeSql } from './db/materialize.ts';
 export { TABLES } from './db/schema.ts';
 export type { ColumnSpec, TableSpec } from './db/spec.ts';

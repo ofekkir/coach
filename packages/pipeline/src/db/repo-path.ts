@@ -1,4 +1,4 @@
-// Worktree-stripping path normalization. A node's file path is normalized to ONE
+// Why: worktree-stripping path normalization. A node's file path is normalized to ONE
 // repo-relative form regardless of which worktree it was accessed under, so the
 // same file under two worktrees yields the SAME `nodes.repo_path`. Pure string
 // work (no node:path) so the schema + materializeSql stay node:*-free. Rules:
@@ -63,8 +63,6 @@ function safeParseJson(text: string): unknown {
   }
 }
 
-// Tool inputs are serialized JSON; the file-touching tools (Read/Edit/Write/...)
-// carry the absolute path under one of a few well-known keys.
 export function filePathFromToolInput(toolInput: string | undefined): string | undefined {
   if (toolInput == null) return undefined;
   const parsed: unknown = safeParseJson(toolInput);

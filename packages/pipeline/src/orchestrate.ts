@@ -10,8 +10,6 @@ import type { ExecutionGraph, VizResult } from './graph/types.ts';
 import { routeToSessions } from './route/route.ts';
 import type { CanonicalNode, ClassifiedInput, SessionInputs, UploadedFile } from './types.ts';
 
-// ── Public types ──────────────────────────────────────────────────────────────
-
 /**
  * The orchestrator's output: every pipeline stage's result, exposed as a member.
  * The CLI dumps these to disk for inspection; the app reads the graph member it
@@ -19,15 +17,13 @@ import type { CanonicalNode, ClassifiedInput, SessionInputs, UploadedFile } from
  * (`enrichExecutionGraph`) layers deterministic semantic labels onto it.
  */
 export interface PipelineResult {
-  classified: ClassifiedInput[]; // Stage 1 — every file tagged by type
-  sessions: SessionInputs[]; // Stage 2 — supported inputs grouped by session
-  canonicalBySession: { sessionId: string; nodes: CanonicalNode[] }[]; // Stage 3
-  agentGraph: AgentGraph; // Stage 4 — node table + agent/session entities
-  executionGraph: ExecutionGraph; // Stage 5 — mechanical skeleton
-  enrichedGraph: ExecutionGraph; // Stage 6 — deterministic semantic labels
+  classified: ClassifiedInput[];
+  sessions: SessionInputs[];
+  canonicalBySession: { sessionId: string; nodes: CanonicalNode[] }[];
+  agentGraph: AgentGraph;
+  executionGraph: ExecutionGraph;
+  enrichedGraph: ExecutionGraph;
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function sortByTime(nodes: readonly CanonicalNode[]): CanonicalNode[] {
   return [...nodes].sort((a, b) => {
@@ -40,8 +36,6 @@ function sortByTime(nodes: readonly CanonicalNode[]): CanonicalNode[] {
     return diff < 0n ? -1 : diff > 0n ? 1 : 0;
   });
 }
-
-// ── Public API ────────────────────────────────────────────────────────────────
 
 /**
  * Runs the full pipeline over a flat list of in-memory files, returning every

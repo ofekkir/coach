@@ -4,12 +4,10 @@ import { NS_PER_MS } from '../../types.ts';
 /** Sentinel "later than any real timestamp" seed for an earliest-start min-search. */
 const FAR_FUTURE_NS = 99999999999999999999n;
 
-// ── Message delta helpers ───────────────────────────────────────────────────
-
-// Identity key for de-duplicating a message across consecutive requests. Ignores
-// `cache_control`: the API moves the ephemeral cache breakpoint between requests,
-// so the same logical message serializes differently from one turn to the next.
-// Keying on the raw JSON would treat it as new and leak it into the next delta.
+// Why: ignore `cache_control` when keying — the API moves the ephemeral cache
+// breakpoint between requests, so the same logical message serializes differently
+// from one turn to the next. Keying on the raw JSON would treat it as new and
+// leak it into the next delta.
 export function messageKey(msg: RequestMessage): string {
   return JSON.stringify(msg, (key: string, value: unknown) =>
     key === 'cache_control' ? undefined : value,
@@ -43,17 +41,15 @@ export function llmDeltas(
   };
 }
 
-// ── Pure ordering / timing helpers (ported from view-model/format.ts) ──────────
-//
-// These are mechanical, presentation-free. The signed gap is a raw number of
-// milliseconds (gapMs) — the app formats it ("+12ms"). No truncation, no labels.
+// Why: signed gaps are raw millisecond numbers, not formatted strings — the app
+// owns presentation ("+12ms"); these helpers do no truncation or labelling.
 
 function nsOf(ns: string | undefined): bigint {
   return ns != null ? BigInt(ns) : 0n;
 }
 
-// Timing lives on span-derived nodes. These accessors read it across the whole
-// union without forcing a narrow at every call.
+// Why: timing only exists on span-derived members of the union; these accessors
+// read it across the whole union without forcing a narrow at every call site.
 export function startNs(node: CanonicalNode): string | undefined {
   return 'start_time_ns' in node ? node.start_time_ns : undefined;
 }
@@ -62,8 +58,8 @@ function endNs(node: CanonicalNode): string | undefined {
   return 'end_time_ns' in node ? node.end_time_ns : undefined;
 }
 
-// Tie-break order when two nodes share a start timestamp: a blocked-on-user gate
-// sorts before its execution, both before anything else.
+// Why: when two nodes share a start timestamp, a blocked-on-user gate must sort
+// before its execution, and both before anything else.
 const SORT_RANK_BY_TYPE = new Map<string, number>([
   ['tool.blocked_on_user', 0],
   ['tool.execution', 1],
@@ -106,8 +102,6 @@ export function startGapMsBetween(parent: CanonicalNode, child: CanonicalNode): 
   return toMs(BigInt(childStart) - BigInt(parentStart));
 }
 
-// ── Parent → children index ────────────────────────────────────────────────────
-
 export function buildChildrenOf(nodes: readonly CanonicalNode[]): Map<string, CanonicalNode[]> {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const childrenOf = new Map<string, CanonicalNode[]>();
@@ -119,8 +113,6 @@ export function buildChildrenOf(nodes: readonly CanonicalNode[]): Map<string, Ca
   }
   return childrenOf;
 }
-
-// ── Thread assignment (ported verbatim from view-model/thread.ts) ──────────────
 
 interface ThreadReq {
   source: string;

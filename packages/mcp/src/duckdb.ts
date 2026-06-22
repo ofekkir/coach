@@ -1,4 +1,4 @@
-// The node-api DuckDB layer. The MCP always re-derives a dataset from its source
+// Why: The node-api DuckDB layer. The MCP always re-derives a dataset from its source
 // files, so there is one runtime path:
 //
 //   createDuckDbConnection(graph)  — materialize a graph into a TEMP DB, query, then
@@ -22,8 +22,8 @@ import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
 import { type Connection } from './query-core.ts';
 import type { RawResult } from './result.ts';
 
-// Engine-level read-only sandbox: read-only access, no filesystem/network (COPY,
-// read_csv, httpfs, ATTACH, INSTALL), and locked so a query can't re-enable them.
+// Why: locked so a query can't re-enable read-only / external access — the engine
+// is the trust boundary; COPY, read_csv, httpfs, ATTACH and INSTALL stay off.
 const READ_ONLY_CONFIG: Record<string, string> = {
   access_mode: 'read_only',
   enable_external_access: 'false',

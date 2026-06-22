@@ -1,15 +1,12 @@
-// Tool result/error matching — a canonical-stage pass (stage 3) that completes
-// each `tool` node with its outcome. A tool call's result is NOT on the tool node
-// as it arrives: it comes back as a `tool_result` block, keyed by `tool_use_id`,
-// in the `request_messages` of the inference that consumed it. This indexes those
-// blocks across the session's `llm_request` nodes and annotates each matched tool
-// node with `is_error`, a deterministic `error_kind`, `output_size`, and (on
-// failures only) a ≤500-char `error_message`.
+// Why: a tool call's result is NOT on the tool node as it arrives — it comes back
+// as a `tool_result` block, keyed by `tool_use_id`, in the `request_messages` of
+// the inference that consumed it. This indexes those blocks across the session's
+// `llm_request` nodes and annotates each matched tool node with its outcome.
 //
 // `request_messages` is populated by BOTH the native and OTEL canonical paths, so
 // this one pass is harness-agnostic — no separate graph stage, no `deltas`. Tool
 // calls with no matching result keep `is_error` NULL (queryable as such), never
-// silently coerced. No LLM — every field is read or rule-derived. Pure module.
+// silently coerced.
 
 import type { CanonicalNode, ErrorKind, RequestMessage, ToolNode } from '../../types.ts';
 
@@ -46,8 +43,6 @@ function indexResultsByToolUseId(nodes: readonly CanonicalNode[]): Map<string, T
   return byId;
 }
 
-// ── Result text + summary ──────────────────────────────────────────────────────
-
 function blockText(block: unknown): string {
   if (typeof block === 'string') return block;
   if (typeof block !== 'object' || block === null) return '';
@@ -69,13 +64,8 @@ function summarize(text: string): string | undefined {
   return `${trimmed.slice(0, ERROR_MESSAGE_MAX - 1).trimEnd()}…`;
 }
 
-// ── error_kind classifier (deterministic, no LLM) ──────────────────────────────
-// Rules are matched in priority order against the lower-cased error text. The
-// closed set is `not_found | invalid_args | permission | timeout | nonzero_exit |
-// other`. Returns 'other' when nothing more specific matches an error.
-
-// An Edit/Write that fails because the target text wasn't found in the file is a
-// BAD-ARGUMENT failure (the old_string was wrong), NOT a file-not-found. These
+// Why: an Edit/Write that fails because the target text wasn't found in the file is
+// a BAD-ARGUMENT failure (the old_string was wrong), NOT a file-not-found. These
 // phrases are checked before the generic `not_found` rule so they win.
 function isFailedMatch(text: string): boolean {
   return (
@@ -133,8 +123,6 @@ function classifyErrorKind(rawText: string): ErrorKind {
   if (isNonzeroExit(text)) return 'nonzero_exit';
   return 'other';
 }
-
-// ── Annotation ─────────────────────────────────────────────────────────────────
 
 function annotateTool(tool: ToolNode, result: ToolResultBlock): ToolNode {
   const text = resultText(result.content);

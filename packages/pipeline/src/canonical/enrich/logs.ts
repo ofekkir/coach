@@ -83,9 +83,8 @@ function resolveToolEnrichment(
   return { useId: decision.tool_use_id, input: useIdToInput.get(decision.tool_use_id) ?? null };
 }
 
-// Indexes the parent tool span id → its decision-derived enrichment. The
-// decision log lives on the `tool.blocked_on_user` gate span; its data belongs to
-// the parent `tool` span, so attribution maps onto the parent.
+// Why: the decision log lives on the `tool.blocked_on_user` gate span, but its
+// data belongs to the parent `tool` span, so attribution maps onto the parent.
 export function buildToolEnrichmentIndex(
   metas: readonly SpanMeta[],
   allLogs: readonly LogEntry[],

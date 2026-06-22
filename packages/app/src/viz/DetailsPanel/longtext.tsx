@@ -13,7 +13,7 @@ interface LongText {
   quote: boolean;
 }
 
-// The one long-text value worth surfacing in full: the prompt anchor's full text
+// Why: only one long-text value is worth surfacing in full — the prompt anchor's full text
 // (carried on the synthesized card, which has no node), or a tool's instruction to
 // its weak model (the semantic `comment`). Truncated on the card; whole here.
 export function longTextOf(card: NodeCard, resolved: ResolvedNode | undefined): LongText | null {
@@ -38,8 +38,6 @@ function clampStyle(long: boolean, expanded: boolean): React.CSSProperties {
   };
 }
 
-// A long value in a scrollable, height-capped block: collapsed shows ~6 lines
-// with a `show full ▾` toggle, expanded scrolls. Short values skip the toggle.
 export function longTextBlock(
   block: LongText,
   expanded: boolean,

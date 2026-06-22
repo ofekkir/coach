@@ -25,21 +25,12 @@ import {
 } from './derive.ts';
 import { toolComment, toolOntologyAction, toolPhrases } from './tool-intent.ts';
 
-// ════════════════════════════════════════════════════════════════════════════
-// Semantic enrichment stage — a PURE TABLE PASS. It iterates the node table and,
-// for each mechanical `tool` / `llm_request` node, derives its `SemanticFields`
-// (`what` + optional `comment`) and writes a `semantics[id]` row. No tree walk:
-// with deltas in their own layer, enrichment depends only on a node's own data
-// (and its stage-5 deltas, read by id). "Is this enriched?" = "does a
-// `semantics[id]` row exist" — there is no `action`/`inference` node type.
-//
-// Fully deterministic: every label is derived from the injected SemanticsConfig
-// (tool intent, path conventions, structural roles, harness markers). No model.
-// A genuine terminal assistant message (final text, turn does not end in a tool
-// call) is labeled with the generic `respond` act. Pure module (no node:* imports).
-// ════════════════════════════════════════════════════════════════════════════
+// Why: no tree walk — with deltas in their own layer, enrichment depends only on
+// a node's own data (and its stage-5 deltas, read by id), so a flat table pass is
+// sufficient and "is this enriched?" reduces to "does a `semantics[id]` row exist".
+// Fully deterministic by design (every label comes from the injected
+// SemanticsConfig, no model) so the same trace always yields the same labels.
 
-// The ontology action used to label a genuine terminal assistant message.
 const TERMINAL_MESSAGE_ACTION = 'respond';
 
 /** The ordered action phrases for an inference, derived from its own thread-
@@ -54,8 +45,8 @@ function inferenceFields(
   const marker = markerLabel(config, deltas?.requestMessagesDelta ?? [], response);
   if (marker != null) return { what: marker };
   const prefix = structuralPrefix(config, response);
-  // A terminal message is final text that does not precede a tool call. Text that
-  // precedes a tool call is preamble to the action, not a terminal message.
+  // Why: text that precedes a tool call is preamble to the action, not a terminal
+  // message — so a terminal message requires final text and no following tool call.
   const isTerminalMessage = responseText(response) != null && responseToolCall(response) == null;
   if (isTerminalMessage) return { what: [...prefix, actionLabel(config, TERMINAL_MESSAGE_ACTION)] };
   if (prefix.length > 0) return { what: prefix };
@@ -98,8 +89,6 @@ function semanticFieldsOf(
   if (node.type === 'llm_request') return inferenceFields(node, deltas, config);
   return null;
 }
-
-// ── Public entry point ────────────────────────────────────────────────────────
 
 /**
  * Enriches an ExecutionGraph by populating its `semantics` table (one sparse row

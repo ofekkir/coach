@@ -18,9 +18,9 @@ import {
   extractStopReason,
 } from './request-body.ts';
 
-// The id/timing/parent/sessionId fields every span-derived node shares. `sessionId`
-// is the FK → Session entity, denormalized onto every node (resolved once per
-// trace from the interaction span's session.id).
+// Why: `sessionId` is the FK → Session entity, denormalized onto every node
+// (resolved once per trace from the interaction span's session.id) so downstream
+// consumers don't have to walk to the root to recover it.
 function nodeBase(
   span: ParsedSpan,
   parent: string | null,
@@ -88,7 +88,7 @@ function applyResponseBody(node: LlmRequestNode, rawResponseBody: string): void 
   if (stopReason != null) node.stop_reason = stopReason;
 }
 
-// Cost for an llm_request is ONLY ever the cost the trace itself carries (the
+// Why: cost for an llm_request is ONLY ever the cost the trace itself carries (the
 // OTEL/harness path). Native logs usually don't carry one — and we deliberately do
 // NOT back-compute an estimate from a model price table: a price-table figure is a
 // guess, not what was charged, and once written here it's indistinguishable from a
@@ -174,9 +174,9 @@ function spanToNode(
   }
 }
 
-// The Session entity id every node carries as its `sessionId` FK, resolved once
-// from the trace's interaction span (the only span carrying `session.id`). Empty
-// when the trace has no session attribute (a degraded input).
+// Why: resolved once from the trace's interaction span (the only span carrying
+// `session.id`) and returns empty when the trace has no session attribute (a
+// degraded input) rather than throwing, so partial traces still transform.
 function resolveSessionId(spans: readonly ParsedSpan[]): string {
   const harnessSessionId = spans.find((s) => s.sessionId != null)?.sessionId;
   return harnessSessionId != null ? sessionEntityId(harnessSessionId) : '';

@@ -1,24 +1,22 @@
 import { z } from 'zod';
 
-// ════════════════════════════════════════════════════════════════════════════
-// Semantics configuration — the typed, validated form of the bundled artifacts
-// in ./data (ontology/<domain>.json, agents/<agent>.json, projects/<project>.json).
-// Zod schemas are the source of truth for the shapes; the exported types are
-// inferred from them, and the data is validated on assembly (unknown keys such as
-// `note`/`description`/`schemaVersion` are stripped, not errors).
-//
-// This module is pure: the JSON is imported (bundled), never read from disk.
-// `defaults.ts` passes the bundled JSON to assembleSemanticsConfig(), which
-// validates each artifact and enforces that every action/object id resolves
-// against the ontology. The pipeline consumes the assembled SemanticsConfig.
-// ════════════════════════════════════════════════════════════════════════════
-
-// ── Domain ontology (the vocabulary source of truth) ───────────────────────────
+/*
+ * Semantics configuration — the typed, validated form of the bundled artifacts
+ * in ./data (ontology/<domain>.json, agents/<agent>.json, projects/<project>.json).
+ * Zod schemas are the source of truth for the shapes; the exported types are
+ * inferred from them, and the data is validated on assembly (unknown keys such as
+ * `note`/`description`/`schemaVersion` are stripped, not errors).
+ *
+ * This module is pure: the JSON is imported (bundled), never read from disk.
+ * `defaults.ts` passes the bundled JSON to assembleSemanticsConfig(), which
+ * validates each artifact and enforces that every action/object id resolves
+ * against the ontology. The pipeline consumes the assembled SemanticsConfig.
+ */
 
 const OntologyActionSchema = z.object({
   id: z.string(),
   group: z.enum(['work', 'meta', 'harness', 'escape']),
-  // The coarse analytics bucket this fine action rolls up to (a `coarseActions`
+  // Why: the coarse analytics bucket this fine action rolls up to (a `coarseActions`
   // id). Closed activity dimension for `GROUP BY`, distinct from the rich `what`.
   coarse: z.string(),
   label: z.string(),
@@ -26,7 +24,7 @@ const OntologyActionSchema = z.object({
   description: z.string().optional(),
 });
 
-// Shell command grammar — the one classification surface with no per-tool spec.
+// Why: shell command grammar — the one classification surface with no per-tool spec.
 // A leading token (or, for package runners, the script task) maps to an ontology
 // action id; that action's `coarse` then gives the bucket. Lives in the ontology
 // because git/pytest/pnpm are domain knowledge, not per-agent configuration.
@@ -47,7 +45,7 @@ const OntologyObjectSchema = z.object({
 
 const MessageActSchema = z.object({ verb: z.string(), hint: z.string().optional() });
 
-// Transferable coding conventions (domain knowledge, not project-specific): a
+// Why: conventions are transferable domain knowledge, not project-specific — a
 // file's role from its name/path, and a structural qualifier (e.g. the monorepo
 // workspace) from generic layout patterns. Both use regex `match`, first hit wins.
 const ConventionPathRuleSchema = z.object({ match: z.string(), object: z.string() });
@@ -68,8 +66,6 @@ const OntologySchema = z.object({
     .optional(),
   messageActs: z.object({ verbs: z.array(MessageActSchema) }).optional(),
 });
-
-// ── Agent tool semantics ───────────────────────────────────────────────────────
 
 const MatchClauseSchema = z.object({
   field: z.string(),
@@ -144,8 +140,6 @@ const AgentSemanticsSchema = z.object({
   structuralRoles: z.object({ rules: z.array(StructuralRoleRuleSchema) }),
 });
 
-// ── Inferred types ──────────────────────────────────────────────────────────--
-
 export type Ontology = z.infer<typeof OntologySchema>;
 export type OntologyAction = z.infer<typeof OntologyActionSchema>;
 export type MessageAct = z.infer<typeof MessageActSchema>;
@@ -158,8 +152,6 @@ export interface SemanticsConfig {
   ontology: Ontology;
   agent: AgentSemantics;
 }
-
-// ── Shared pure helpers ─────────────────────────────────────────────────────--
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -180,8 +172,6 @@ export function objectLabel(config: SemanticsConfig, id: string | undefined): st
   return config.ontology.objects.find((o) => o.id === id)?.label ?? id;
 }
 
-// ── Assembly + referential-integrity validation ────────────────────────────────
-
 function collectRefs(value: unknown, kind: 'action' | 'object', out: string[]): void {
   if (Array.isArray(value)) {
     for (const item of value) collectRefs(item, kind, out);
@@ -198,9 +188,9 @@ function assertRefsResolve(ontology: Ontology, agent: AgentSemantics): void {
   const objects = new Set(ontology.objects.map((o) => o.id));
   const actionRefs: string[] = [];
   const objectRefs: string[] = [];
-  // Scan the agent and the ontology's own conventions (which reference object ids).
-  collectRefs([agent, ontology.conventions], 'action', actionRefs);
-  collectRefs([agent, ontology.conventions], 'object', objectRefs);
+  const refSources = [agent, ontology.conventions];
+  collectRefs(refSources, 'action', actionRefs);
+  collectRefs(refSources, 'object', objectRefs);
   const unknownActions = [...new Set(actionRefs)].filter((id) => !actions.has(id));
   const unknownObjects = [...new Set(objectRefs)].filter((id) => !objects.has(id));
   if (unknownActions.length > 0 || unknownObjects.length > 0) {
@@ -211,7 +201,7 @@ function assertRefsResolve(ontology: Ontology, agent: AgentSemantics): void {
   }
 }
 
-// Every action's `coarse` must be a declared `coarseActions` id, and every command
+// Why: every action's `coarse` must be a declared `coarseActions` id, and every command
 // rule (plus the default) must resolve to an ontology action id — so the closed
 // `action` dimension and the shell grammar cannot drift into unaggregatable values.
 function assertActionVocabulary(ontology: Ontology): void {

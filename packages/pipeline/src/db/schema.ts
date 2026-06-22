@@ -1,4 +1,4 @@
-// The relational schema the store exposes to an analyst agent. This file is the
+// Why: The relational schema the store exposes to an analyst agent. This file is the
 // AGGREGATOR: each table/view spec lives in its own file under `tables/` and
 // `views/` (one relation per file); `schema.ts` imports them and orders them into
 // `TABLES`. `TABLES` is the SINGLE SOURCE OF TRUTH — a backend builds the DuckDB
@@ -28,7 +28,7 @@ import { INTERACTIONS } from './views/interactions.ts';
 import { LLM_REQUESTS } from './views/llm-requests.ts';
 import { TOOLS } from './views/tools.ts';
 
-// Materialized tables first, then VIEWs — every view selects from `nodes` (created
+// Why: Materialized tables first, then VIEWs — every view selects from `nodes` (created
 // first), so the relations a view reads already exist when `materializeSql` emits it.
 export const TABLES: readonly TableSpec[] = [
   NODES,

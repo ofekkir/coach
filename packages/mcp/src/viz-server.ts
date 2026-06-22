@@ -1,8 +1,3 @@
-// A tiny dependency-free static server for the visualization. It serves the built
-// `@coach/app` (packages/app/dist) plus the stage JSON files dumped into the cwd by
-// a directory `load_dataset`, then hands back a URL that boots the app pointed at a
-// chosen data file (and optional focus node). No framework: just `node:http`.
-
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -11,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 
 const DEFAULT_DATA_FILE = '06-enriched-graph.json';
 
-// packages/mcp/src/viz-server.ts → packages/app/dist
 const APP_DIST = fileURLToPath(new URL('../../app/dist', import.meta.url));
 const INDEX_HTML = 'index.html';
 
@@ -42,9 +36,8 @@ function contentType(filePath: string): string {
   return MIME_TYPES[extname(filePath)] ?? 'application/octet-stream';
 }
 
-// Maps a request path to a file: a dumped JSON file is served from the cwd; every
-// other path is served from the built app (with `/` → index.html). Both are
-// constrained to their root so a `..` path can't escape it.
+// Why: resolved paths are constrained to their root so a `..` segment can't escape
+// the data dir or the app dist (path traversal).
 function resolveRequestFile(urlPath: string, dataDir: string): string | null {
   const clean = normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, '');
   if (clean === '/' || clean === '') return join(APP_DIST, INDEX_HTML);

@@ -13,7 +13,7 @@ const TRANSPARENT_HANDLE: React.CSSProperties = {
   height: 1,
 };
 
-// One custom React-Flow node, dispatched by structural role: levels render as
+// Why: one custom React-Flow node, dispatched by structural role: levels render as
 // banners, the user prompt as the accent anchor, everything else as a step card.
 // Top/bottom handles (no id) carry the vertical spine; the id'd side handles let
 // cross-lane edges exit/enter a card's center-height side instead of its bottom.

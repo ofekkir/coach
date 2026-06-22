@@ -1,19 +1,14 @@
-// ════════════════════════════════════════════════════════════════════════════
-// Canonical node ACTION — resolver LOGIC only. The vocabulary and every mapping
-// are DATA in the ontology (see data/ontology/*.json): the coarse bucket list
-// (`coarseActions`), each fine action's `coarse` rollup, and the shell `commands`
-// grammar. This module just reads them.
-//
+// Why: ACTION is resolver logic only — the vocabulary and every mapping are DATA in
+// the ontology (data/ontology/*.json: the coarse bucket list, each fine action's
+// `coarse` rollup, the shell `commands` grammar); this module just reads them.
 // `action` is a CLOSED, coarse activity dimension for analytics (`GROUP BY action`),
-// distinct from the free-form `semantics.what`. It is NOT a second taxonomy of tool
-// calls — it is a coarsening of the ontology's own action vocabulary: the config
-// layer resolves each tool call to one ontology action id, and `coarseAction` rolls
-// that up via the action's `coarse` field. The one surface with no per-tool spec is
-// shell escape-hatch tools (Bash): their command is classified by the ontology's
-// `commands` grammar (`shellCommandAction`) into an ontology action, then rolled up
-// the same way. Every tool node resolves to a non-NULL bucket; the ontology's escape
-// action is the catch-all.
-// ════════════════════════════════════════════════════════════════════════════
+// distinct from the free-form `semantics.what` — not a second taxonomy of tool calls
+// but a coarsening of the ontology's own action vocabulary: the config layer resolves
+// each tool call to one ontology action id, and `coarseAction` rolls that up via the
+// action's `coarse` field. The one surface with no per-tool spec is shell escape-hatch
+// tools (Bash): their command is classified by the ontology's `commands` grammar
+// (`shellCommandAction`) into an ontology action, then rolled up the same way. Every
+// tool node resolves to a non-NULL bucket; the ontology's escape action is the catch-all.
 
 import type { SemanticsConfig } from './config.ts';
 
@@ -30,8 +25,6 @@ export function coarseAction(
     config.ontology.actions.find((a) => a.id === id)?.coarse;
   return byId(ontologyActionId) ?? byId(config.ontology.escape.action) ?? 'other';
 }
-
-// ── Shell command grammar resolution (data lives in ontology.commands) ────────--
 
 function firstToken(command: string): string {
   return command.trim().split(/\s+/)[0] ?? '';
