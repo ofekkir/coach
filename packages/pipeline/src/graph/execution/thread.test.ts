@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { messageKey } from './thread.ts';
 
 describe('messageKey', () => {

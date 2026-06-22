@@ -1,11 +1,13 @@
+import { defaultSemanticsConfig } from '@coach/semantics';
 import { describe, expect, it } from 'vitest';
+
+import { aggregate } from '../../aggregate/aggregate.ts';
 import type { CanonicalNode } from '../../types.ts';
 import { sessionEntityId } from '../../types.ts';
-import { aggregate } from '../../aggregate/aggregate.ts';
+import { buildExecutionGraph } from '../execution/execution.ts';
 import type { ExecutionGraph } from '../types.ts';
 import { nodeData, semanticsOf } from '../types.ts';
-import { buildExecutionGraph } from '../execution/execution.ts';
-import { defaultSemanticsConfig } from '@coach/semantics';
+
 import { enrichExecutionGraph } from './semantic.ts';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────

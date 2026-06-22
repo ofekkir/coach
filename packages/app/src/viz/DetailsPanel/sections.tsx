@@ -1,9 +1,11 @@
 import type { ResolvedNode } from '@coach/pipeline';
-import { fonts, monoLabel, tokens } from '../theme.ts';
+
 import { type NodeCard } from '../format/format.ts';
-import type { HiddenSubCall } from '../layout/types.ts';
-import { Glyph } from '../TraceNode/Glyph.tsx';
 import { JsonView } from '../JsonView/JsonView.tsx';
+import type { HiddenSubCall } from '../layout/types.ts';
+import { fonts, monoLabel, tokens } from '../theme.ts';
+import { Glyph } from '../TraceNode/Glyph.tsx';
+
 import { longTextBlock, longTextOf } from './longtext.tsx';
 
 const DURATION_FONT = 18;

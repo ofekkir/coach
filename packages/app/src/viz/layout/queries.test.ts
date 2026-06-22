@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import type { ExecutionGraph, ExecutionNode } from '@coach/pipeline';
+import { describe, expect, it } from 'vitest';
+
 import { revealPath } from './queries.ts';
 
 function node(id: string, children: ExecutionNode[] = []): ExecutionNode {

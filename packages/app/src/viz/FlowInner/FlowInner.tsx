@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useMemo } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -9,12 +8,15 @@ import {
   type NodeMouseHandler,
   type NodeTypes,
 } from '@xyflow/react';
+import { useCallback, useEffect, useMemo } from 'react';
+
 import '@xyflow/react/dist/style.css';
-import { tokens } from '../theme.ts';
 import type { FocusRequest } from '../App/App.tsx';
 import type { RFNode } from '../layout/types.ts';
-import { TraceNodeView } from '../TraceNode/TraceNode.tsx';
+import { tokens } from '../theme.ts';
 import { BandView } from '../TraceNode/BandNode.tsx';
+import { TraceNodeView } from '../TraceNode/TraceNode.tsx';
+
 import { useFlowSync } from './useFlowSync.ts';
 
 const nodeTypes: NodeTypes = { trace: TraceNodeView, band: BandView };

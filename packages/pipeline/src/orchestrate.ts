@@ -1,12 +1,13 @@
+import { defaultSemanticsConfig, type SemanticsConfig } from '@coach/semantics';
+
 import { aggregate, type AgentGraph } from './aggregate/aggregate.ts';
 import { toCanonical } from './canonical/canonical.ts';
 import { classifyInputs } from './classify/classify.ts';
+import { analyzeGraph, type GraphAnalysis } from './graph/analysis/analysis.ts';
 import { buildExecutionGraph } from './graph/execution/execution.ts';
 import { startNs } from './graph/execution/thread.ts';
-import { analyzeGraph, type GraphAnalysis } from './graph/analysis/analysis.ts';
-import type { ExecutionGraph, VizResult } from './graph/types.ts';
-import { defaultSemanticsConfig, type SemanticsConfig } from '@coach/semantics';
 import { enrichExecutionGraph } from './graph/semantic/semantic.ts';
+import type { ExecutionGraph, VizResult } from './graph/types.ts';
 import { routeToSessions } from './route/route.ts';
 import type { CanonicalNode, ClassifiedInput, SessionInputs, UploadedFile } from './types.ts';
 

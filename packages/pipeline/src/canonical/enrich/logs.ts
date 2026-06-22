@@ -1,4 +1,5 @@
 import type { LogEntry } from '../../types.ts';
+
 import { b64toHex, narrowestContaining, SPAN_ID_PREFIX } from './id-utils.ts';
 import type { SpanMeta } from './id-utils.ts';
 

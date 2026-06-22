@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
+
 import { runPipeline } from '../../orchestrate.ts';
 import type { UploadedFile } from '../../types.ts';
+
 import { analyzeGraph } from './analysis.ts';
 
 const FIXTURES = join(import.meta.dirname, '../../../fixtures');

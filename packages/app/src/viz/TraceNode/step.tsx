@@ -1,8 +1,9 @@
-import { ACCENT_SHADOW, ellipsis, fonts, glyphFor, isWeakModel, tokens } from '../theme.ts';
 import type { NodeCard } from '../format/format.ts';
 import { formatMetrics } from '../format/format.ts';
 import { BG_NW, COMPACT_NW, NW } from '../layout/types.ts';
 import type { TraceRFNodeData } from '../layout/types.ts';
+import { ACCENT_SHADOW, ellipsis, fonts, glyphFor, isWeakModel, tokens } from '../theme.ts';
+
 import { Glyph } from './Glyph.tsx';
 import { NodeBody, type StepPalette } from './NodeBody.tsx';
 

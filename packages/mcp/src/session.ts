@@ -5,6 +5,7 @@
 // dataset at a time, replaced on each load.
 
 import type { Store } from '@coach/store';
+
 import { loadDataset, type Dataset } from './load.ts';
 import { createStore } from './store.ts';
 

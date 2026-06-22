@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+
 import type { UploadedFile } from '../types.ts';
+
 import { classifyInputs } from './classify.ts';
 
 function file(name: string): UploadedFile {

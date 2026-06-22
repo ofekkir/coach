@@ -7,6 +7,7 @@ import reactPlugin from 'eslint-plugin-react';
 import { createFolderStructure, projectStructurePlugin } from 'eslint-plugin-project-structure';
 import noBarrelFiles from 'eslint-plugin-no-barrel-files';
 import sonarjs from 'eslint-plugin-sonarjs';
+import importX from 'eslint-plugin-import-x';
 
 // TODO: projectStructureParser integration was kept minimal due to parser-layering
 // complexity with typescript-eslint's projectService. The rule enforces PascalCase
@@ -57,6 +58,50 @@ export default tseslint.config(
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
+    },
+  },
+  // Correctness + consistency rules not covered by the strict presets.
+  // - eqeqeq bans loose equality EXCEPT against null, preserving the idiomatic
+  //   `x == null` nullish check (matches null and undefined) used throughout.
+  // - switch-exhaustiveness-check forces every discriminated-union switch to
+  //   handle all variants — adding a node kind becomes a lint error, not a silent miss.
+  // - consistent-type-imports gives an autofix for what verbatimModuleSyntax only
+  //   errors on at typecheck time, so the lint-staged hook fixes it on save.
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        { considerDefaultExhaustiveForUnions: true },
+      ],
+      '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
+    },
+  },
+  // Import hygiene: catch circular imports (the failure mode barrel-banning is meant
+  // to prevent but can still slip through direct imports) and keep import blocks
+  // deterministically ordered to minimize diff noise.
+  {
+    files: ['**/*.{ts,tsx}'],
+    plugins: { 'import-x': importX },
+    settings: {
+      'import-x/resolver-next': [importX.createNodeResolver()],
+    },
+    rules: {
+      'import-x/no-cycle': 'error',
+      'import-x/order': [
+        'error',
+        { 'newlines-between': 'always', alphabetize: { order: 'asc', caseInsensitive: true } },
+      ],
+    },
+  },
+  // Explicit return/argument types on published package boundaries: an internal type
+  // change can't silently widen a package's public contract. Scoped to the public
+  // entrypoints (inference stays the default everywhere internal).
+  {
+    files: ['packages/*/src/index.ts'],
+    rules: {
+      '@typescript-eslint/explicit-module-boundary-types': 'error',
     },
   },
   // React hooks rules for the app package

@@ -1,7 +1,8 @@
 import type { OtlpAttribute, OtlpSpan } from '../../types.ts';
+
 import { clampEnd, isoToNano, intAttr, spanB64, strAttr } from './helpers.ts';
-import type { ContentBlock, LlmSpanMeta, NativeEntry } from './types.ts';
 import { collectContentBlocks, findEntryWithBlock, findTriggeringUser } from './parse.ts';
+import type { ContentBlock, LlmSpanMeta, NativeEntry } from './types.ts';
 
 function extractLlmGroupBounds(group: NativeEntry[]): {
   first: NativeEntry & { timestamp: string };

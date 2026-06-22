@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { SPAN_ID_BYTES, TRACE_ID_BYTES } from '../types.ts';
 
 function b64ByteLength(s: string): number {

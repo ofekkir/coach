@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+
 import type { ClassifiedInput } from '../types.ts';
+
 import { routeToSessions } from './route.ts';
 
 function input(

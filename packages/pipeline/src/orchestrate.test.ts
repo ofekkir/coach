@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
+
 import { buildVizResults, runPipeline } from './orchestrate.ts';
 import { PSEUDO_USER_ID } from './types.ts';
 import type { UploadedFile } from './types.ts';

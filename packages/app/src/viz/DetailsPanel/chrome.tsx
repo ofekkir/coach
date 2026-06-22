@@ -1,5 +1,5 @@
-import { fonts, glyphFor, tokens } from '../theme.ts';
 import type { NodeCard } from '../format/format.ts';
+import { fonts, glyphFor, tokens } from '../theme.ts';
 import { Glyph } from '../TraceNode/Glyph.tsx';
 
 // The selected node's header: glyph + `TYPE · SELECTED` + verb + close.

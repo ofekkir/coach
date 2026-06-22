@@ -6,13 +6,15 @@ import type {
   SessionExecution,
   Thread,
 } from '@coach/pipeline';
-import { estimateNodeH } from './estimate.ts';
+
 import { buildAgentCard, buildPromptCard, buildSessionCard, formatGap } from '../format/format.ts';
 import type { NodeCard } from '../format/format.ts';
+
 import { causalLink, link } from './edges.ts';
-import { cardOf, nodeOf, placeThread, pushStructural } from './place-members.ts';
+import { estimateNodeH } from './estimate.ts';
 import { placeSpine } from './parallel-place.ts';
 import { detectParallelLevels } from './parallel.ts';
+import { cardOf, nodeOf, placeThread, pushStructural } from './place-members.ts';
 import type { Ctx } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, HG, LANE_GAP, LG, NW, VG } from './types.ts';
 

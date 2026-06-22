@@ -1,8 +1,10 @@
 import type { CanonicalNode, ExecutionNode, Thread } from '@coach/pipeline';
 import { nodeData, resolve } from '@coach/pipeline';
-import { estimateNodeH } from './estimate.ts';
+
 import { buildNodeCard, type NodeCard } from '../format/format.ts';
 import { isWeakModel } from '../theme.ts';
+
+import { estimateNodeH } from './estimate.ts';
 import type { Ctx, HiddenSubCall, TraceRFNodeData } from './types.ts';
 import { NESTED_INDENT, VG } from './types.ts';
 

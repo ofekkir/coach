@@ -1,7 +1,9 @@
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import type { GraphAnalysis, ResolvedNode } from '@coach/pipeline';
 import type { QueryResult } from '@coach/store';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { createSession, type Session } from './session.ts';
 import { createTools, type Tool } from './tools.ts';
 

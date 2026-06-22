@@ -1,5 +1,6 @@
-import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
 import type { CanonicalNode } from '../../types.ts';
+import { nodeData, type ExecutionGraph, type InteractionExecution } from '../types.ts';
+
 import { interactionNodes } from './access.ts';
 import { criticalPath, type CriticalPath } from './critical-path.ts';
 import { longestStep, type Hotspot } from './hotspots.ts';

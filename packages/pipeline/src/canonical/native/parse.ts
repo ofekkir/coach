@@ -1,4 +1,4 @@
-import type { NativeEntry } from './types.ts';
+import type { ContentBlock, NativeEntry } from './types.ts';
 
 export function parseEntries(jsonl: string): { sessionId: string; entries: NativeEntry[] } {
   let sessionId = '';
@@ -61,13 +61,13 @@ export function buildRequestGroups(entries: NativeEntry[]): Map<string, NativeEn
   return requestGroups;
 }
 
-function entryBlocks(e: NativeEntry): readonly import('./types.ts').ContentBlock[] {
+function entryBlocks(e: NativeEntry): readonly ContentBlock[] {
   const c = e.message?.content;
   if (c == null || typeof c === 'string') return [];
   return c;
 }
 
-export function collectContentBlocks(group: NativeEntry[]): import('./types.ts').ContentBlock[] {
+export function collectContentBlocks(group: NativeEntry[]): ContentBlock[] {
   return group.flatMap(entryBlocks);
 }
 

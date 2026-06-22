@@ -5,6 +5,7 @@
 
 import type { ExecutionGraph } from '@coach/pipeline';
 import { createStore as createCoreStore, type Store } from '@coach/store';
+
 import { createDuckDbConnection } from './duckdb.ts';
 
 /** Builds a read-only DuckDB-backed Store from a stage-6 (enriched) execution graph.

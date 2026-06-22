@@ -1,9 +1,10 @@
+import type { VizResult } from '@coach/pipeline';
 import { ReactFlowProvider } from '@xyflow/react';
 import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from './viz/App/App.tsx';
+
 import { UploadPage } from './upload/UploadPage.tsx';
-import type { VizResult } from '@coach/pipeline';
+import { App } from './viz/App/App.tsx';
 
 function Root() {
   const [results, setResults] = useState<VizResult[] | null>(null);

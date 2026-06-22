@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
 import type { VizResult } from '@coach/pipeline';
+import { useRef, useState } from 'react';
+
 import { loadPipelineOutput } from '../../data-source.ts';
 import { danger, slate } from '../palette.ts';
 

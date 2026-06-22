@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+
+import { aggregate } from '../../aggregate/aggregate.ts';
 import type { CanonicalNode, RequestMessage, ResponseMessage } from '../../types.ts';
 import { agentEntityId, sessionEntityId } from '../../types.ts';
-import { aggregate } from '../../aggregate/aggregate.ts';
 import type { AgentExecution, ExecutionGraph, ExecutionNode, Thread } from '../types.ts';
 import { deltasOf, nodeData } from '../types.ts';
+
 import { buildExecutionGraph } from './execution.ts';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────

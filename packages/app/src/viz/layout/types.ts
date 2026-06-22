@@ -1,5 +1,6 @@
-import type { Edge, Node } from '@xyflow/react';
 import type { ExecutionGraph, InteractionAnalysis } from '@coach/pipeline';
+import type { Edge, Node } from '@xyflow/react';
+
 import type { NodeCard } from '../format/format.ts';
 
 export const NW = 240;

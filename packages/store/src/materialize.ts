@@ -12,6 +12,7 @@ import type {
   InteractionExecution,
   Session,
 } from '@coach/pipeline';
+
 import { TABLES, type ColumnSpec, type TableSpec } from './schema.ts';
 
 const INSERT_CHUNK = 200;

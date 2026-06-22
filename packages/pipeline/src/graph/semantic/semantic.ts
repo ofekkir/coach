@@ -1,3 +1,5 @@
+import { actionLabel, type SemanticsConfig } from '@coach/semantics';
+
 import type {
   CanonicalNode,
   LlmRequestNode,
@@ -6,7 +8,7 @@ import type {
   ToolNode,
 } from '../../types.ts';
 import type { ExecutionGraph } from '../types.ts';
-import { actionLabel, type SemanticsConfig } from '@coach/semantics';
+
 import {
   markerLabel,
   parseToolInput,

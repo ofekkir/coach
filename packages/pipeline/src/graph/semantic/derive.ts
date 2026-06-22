@@ -1,5 +1,7 @@
-import type { RequestMessage, ResponseMessage } from '../../types.ts';
 import { actionLabel, isRecord, type SemanticsConfig } from '@coach/semantics';
+
+import type { RequestMessage, ResponseMessage } from '../../types.ts';
+
 import { toolPhrases } from './tool-intent.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
