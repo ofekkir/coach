@@ -13,75 +13,87 @@ sessions into a per-agent **user model** (what users want, how they phrase it, w
 unsaid) — a personalization signal population-level RLHF cannot produce. See
 **[docs/agent-model.md](docs/agent-model.md)** for the conceptual model.
 
-See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the full picture: package layout, data flow, upload
-seam, and Vercel deployment.
+## How it works
 
-## Pipeline
+Coach runs a pure, staged **pipeline** that turns trace/log files into a normalized, id-keyed
+**execution graph** — a model that maps 1:1 to a relational DB. That graph feeds two surfaces: a
+React Flow **visualization** (`@coach/app`) and a read-only, queryable **MCP server**
+(`@coach/mcp`) an analyst agent drives itself.
 
-`runPipeline(files)` (@coach/pipeline) runs six named stages, each exposed as a member of
-the returned `PipelineResult`:
-
-```
-UploadedFile[]   (*.jsonl · logs.json + trace*.json)
-        │
-        ▼ 1. classify        every file tagged: otel-trace | otel-log | native | unsupported
-        ▼ 2. route           supported inputs grouped by session id (logs fall back to dir)
-        ▼ 3. canonical       per session → CanonicalNode[]  (each node carries a sessionId FK)
-                               otel:   join traces → enrich with logs → transform (one pass)
-                               native: jsonl → CanonicalNode[]  (OTLP round-trip behind a facade)
-        ▼ 4. aggregate       all sessions → agentGraph = nodes table + agent/sessions entities
-        ▼ 5. execution graph buildExecutionGraph → executionGraph (ExecutionGraph)
-                               id-keyed, stage-layered: nodes/deltas/semantics tables + entities;
-                               edges are containment (tree) and causal (causalEdges)
-        ▼ 5.5 tool results   matchToolResults → tool nodes get is_error/error_kind/result_summary
-                               (matched by tool_use_id; unmatched calls reported, not dropped)
-        ▼ 6. semantic graph  enrichExecutionGraph → ExecutionGraph
-                               pure table pass: writes a semantics[id] row per tool / llm_request
-                               deterministic; labels come from @coach/semantics (no model)
-        │
-        ▼ React Flow graph   (@coach/app renders a pre-computed ExecutionGraph)
-```
-
-The **execution graph** is the deterministic skeleton — a normalized, id-keyed model that maps 1:1
-to a relational DB (`agents`, `sessions`, `nodes`, `node_deltas`, `node_semantics`, `causal_edges`).
-`VizResult.data` is the `ExecutionGraph` directly. The pipeline organizes data losslessly and
-carries no presentation — the app resolves each node id against the graph tables and derives all
-display text. The graph is consumed only by the renderer.
-
-### Upload model
-
-Inputs are classified, then grouped by **session id** — OTEL traces carry `session.id`, native
-`.jsonl` carries `sessionId`, and OTEL logs use their `session_id` (falling back to the traces in
-their directory). A session is assumed wholly OTEL or wholly native. All sessions roll up under a
-single **agent** (multi-agent is out of scope).
-
-The pipeline runs offline (the CLI `pnpm e2e`, or the MCP server). The app no longer runs it in the
-browser: it renders a **pre-computed execution graph**. Load one via the "Load pipeline output"
-button, or boot directly from a URL with `?data=<url>` (fetches the JSON and renders it).
-`?focus=<nodeId>` then reveals, selects, and centers that node — the same effect as the search box.
-
-### Fixtures
-
-`pnpm e2e` accepts a path (relative to cwd) or a fixture name under
-`packages/pipeline/fixtures/`. It dumps each stage member to `out/<name>/`:
-`01-classified.json`, `02-sessions.json`, `03-canonical-by-session.json`,
-`04-agent-graph.json`, `05-execution-graph.json`, and the semantically-enriched
-`06-enriched-graph.json`.
-
-Stage 6 is **deterministic** — every label comes from the bundled `@coach/semantics`
-config (tool intent, path conventions, structural roles, harness markers); no model
-is involved. A model-based labeler that classified the _act_ of terminal assistant
-messages more finely (answer / confirm / suggest …) was removed for now; such turns
-are labeled with the generic `respond` act. The enriched graph is loadable by the
-app's "Load pipeline output" button.
+For the full picture — package layout, pipeline stages, data flow, the MCP query surface, and
+deployment — see **[ARCHITECTURE.md](ARCHITECTURE.md)**. It is the living source of truth; this
+README only covers getting started.
 
 ## Quick start
 
+Requires [pnpm](https://pnpm.io) (do not use npm/yarn) and Node ≥ 20.11.
+
 ```bash
 pnpm install
-pnpm check             # typecheck + lint + format + test + knip (same as CI)
-pnpm --filter @coach/app dev   # load-pipeline-output landing page at http://localhost:5173
+pnpm check                       # typecheck + lint + format + test + knip (same as CI)
 ```
+
+Produce an execution graph from a directory of traces and inspect the per-stage output:
+
+```bash
+pnpm e2e <path-or-fixture>       # writes out/<name>/01-classified.json … 06-enriched-graph.json
+```
+
+`<path-or-fixture>` is a path relative to cwd, or the name of a fixture under
+`packages/pipeline/fixtures/`.
+
+View a graph in the browser:
+
+```bash
+pnpm --filter @coach/app dev     # landing page at http://localhost:5173
+```
+
+Load a `06-enriched-graph.json` (or any pre-computed graph) via the **"Load pipeline output"**
+button, or boot directly from a URL with `?data=<url>`; add `?focus=<nodeId>` to reveal and center
+a node.
+
+## Use it from Claude Code (MCP)
+
+Coach ships an MCP server (`@coach/mcp`) that exposes the analyzed execution graph as a read-only,
+queryable surface — so the agent can drive its own analyses over your sessions. **Claude Code is
+the only supported agent for now.**
+
+**1. Register the server.** Run from anywhere — use the absolute path to this repo so it resolves
+regardless of where Claude Code launches the server:
+
+```bash
+# preload a dataset (a directory of OTEL trace/log JSON, or native .jsonl sessions)
+claude mcp add coach -- node --experimental-strip-types \
+  /ABSOLUTE/PATH/TO/coach/packages/mcp/bin/mcp.ts /ABSOLUTE/PATH/TO/traces
+
+# …or omit the directory and load data at runtime via the load_dataset tool
+claude mcp add coach -- node --experimental-strip-types \
+  /ABSOLUTE/PATH/TO/coach/packages/mcp/bin/mcp.ts
+```
+
+The server speaks MCP over stdio. The optional trailing directory is preloaded so the dataset is
+queryable immediately; without it, ask the agent to call `load_dataset` with a path first. During
+development you can also run it directly with `pnpm mcp [dataset-dir]` from the repo root.
+
+**2. Verify and use it.** In a Claude Code session, run `/mcp` to confirm "coach" is connected,
+then ask in plain language — e.g. _"load the traces in ./out and find the most expensive
+interactions"_. The server exposes:
+
+| Tool              | What it does                                                   |
+| ----------------- | -------------------------------------------------------------- |
+| `load_dataset`    | Run the pipeline over a directory and make its graph queryable |
+| `describe_schema` | Dump the relational schema + example analysis SQL to extend    |
+| `query`           | Run read-only SQL over the execution-graph tables/views        |
+| `resolve`         | Resolve a node id to its full record                           |
+| `subtree`         | Walk the containment tree under a node                         |
+| `causal_path`     | Trace the causal edges leading to/from a node                  |
+| `open_viz`        | Open the React Flow graph in the browser, focused on a node    |
+
+To remove it later: `claude mcp remove coach`.
+
+A standalone DuckDB snapshot for ad-hoc inspection in the `duckdb` CLI is also available via
+`pnpm build-db <traces-dir> [out.db]` (the MCP itself re-derives from source rather than loading
+it).
 
 ## Development
 
@@ -92,6 +104,7 @@ pnpm --filter @coach/app dev   # load-pipeline-output landing page at http://loc
 | `pnpm format`                              | Auto-format with Prettier                             |
 | `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                                  |
 | `pnpm e2e <fixture>`                       | Run pipeline + deterministic enrichment, write `out/` |
+| `pnpm mcp [dataset-dir]`                   | Serve the MCP analyst tools over stdio                |
 
 ## Contributing workflow
 
