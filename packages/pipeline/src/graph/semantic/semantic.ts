@@ -9,15 +9,12 @@ import type {
 import type { ExecutionGraph } from '../types.ts';
 import {
   actionLabel,
-  bashAction,
   classifyIntent,
   coarseAction,
-  type Action,
   type IntentCategory,
   type SemanticsConfig,
 } from '@coach/semantics';
 import {
-  extractBashCommand,
   markerLabel,
   parseToolInput,
   responseText,
@@ -64,16 +61,13 @@ function inferenceFields(
 }
 
 /** The closed `action` bucket for a tool node — a coarsening of the ontology
- *  action the config resolves for this call (`coarseAction`). Escape-hatch shell
- *  tools (Bash) carry no ontology action, so they fall back to the command
- *  classifier (`bashAction`) over the shared `extractBashCommand` (same source as
- *  the promoted nodes.bash_command column). Every tool node yields a non-NULL
- *  action; distinct from the free-form `semantics.what`. */
-function toolAction(node: ToolNode, config: SemanticsConfig): Action {
+ *  action the config resolves for this call. `toolOntologyAction` resolves a single
+ *  ontology action id (tool spec, shell command grammar, or `invoke` for MCP), and
+ *  `coarseAction` rolls it up via the ontology's `coarse` field. Every tool node
+ *  yields a non-NULL bucket; distinct from the free-form `semantics.what`. */
+function toolAction(node: ToolNode, config: SemanticsConfig): string {
   const input = parseToolInput(node.tool_input);
-  const ontologyAction = toolOntologyAction(config, node.name, input);
-  if (ontologyAction != null) return coarseAction(ontologyAction);
-  return bashAction(extractBashCommand(input) ?? undefined);
+  return coarseAction(config, toolOntologyAction(config, node.name, input));
 }
 
 function toolFields(node: ToolNode, config: SemanticsConfig): SemanticFields {
@@ -121,7 +115,7 @@ export function enrichExecutionGraph(
   config: SemanticsConfig,
 ): ExecutionGraph {
   const semantics: Record<string, SemanticFields> = {};
-  const actions: Record<string, Action> = {};
+  const actions: Record<string, string> = {};
   const intents: Record<string, IntentCategory> = {};
   for (const [id, node] of Object.entries(graph.nodes)) {
     if (node.type === 'tool') actions[id] = toolAction(node, config);

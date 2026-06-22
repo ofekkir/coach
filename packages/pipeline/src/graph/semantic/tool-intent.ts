@@ -1,6 +1,7 @@
 import {
   actionLabel,
   objectLabel,
+  shellCommandAction,
   strField,
   type MatchClause,
   type SemanticsConfig,
@@ -8,6 +9,7 @@ import {
   type ToolOverride,
   type ToolSemantics,
 } from '@coach/semantics';
+import { extractBashCommand } from './derive.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Tool & command intent — resolved entirely from config.agent.tools and the
@@ -190,12 +192,13 @@ export function toolPhrases(
   ];
 }
 
-/** The single ontology action id a tool call resolves to (the same resolution
- *  `toolPhrases` uses for its base phrase: `tool.action` after `overrides`). It is
- *  the input to the coarse `action` rollup (`coarseAction` in @coach/semantics).
- *  Returns `undefined` for escape-hatch shell tools — whose command the config does
- *  not classify, so the caller falls back to `bashAction` — and for tool names with
- *  no spec at all. MCP tools (`mcp__*`) resolve to the ontology's `invoke` action. */
+/** The single ontology action id a tool call resolves to — the input to the coarse
+ *  `action` rollup (`coarseAction` in @coach/semantics). Non-shell tools use the
+ *  same resolution `toolPhrases` does (`tool.action` after `overrides`); escape-hatch
+ *  shell tools (Bash) resolve their command through the ontology's command grammar
+ *  (`shellCommandAction`); MCP tools (`mcp__*`) resolve to `invoke`. Returns
+ *  `undefined` only for a tool name with no spec at all (caller's rollup falls back
+ *  to the ontology escape action). */
 export function toolOntologyAction(
   config: SemanticsConfig,
   name: string | undefined,
@@ -203,7 +206,8 @@ export function toolOntologyAction(
 ): string | undefined {
   if (name?.startsWith(MCP_TOOL_PREFIX)) return 'invoke';
   const tool = toolSpecFor(config, name);
-  if (tool == null || tool.escapeHatch) return undefined;
+  if (tool == null) return undefined;
+  if (tool.escapeHatch) return shellCommandAction(config, extractBashCommand(input) ?? undefined);
   return applyOverrides(tool.overrides, input, { action: tool.action }).action;
 }
 

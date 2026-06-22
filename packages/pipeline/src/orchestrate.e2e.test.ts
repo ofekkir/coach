@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ACTIONS, type Action } from '@coach/semantics';
+import { defaultSemanticsConfig } from '@coach/semantics';
 import { runPipeline } from './orchestrate.ts';
 import type { ExecutionGraph } from './graph/types.ts';
 import type { UploadedFile } from './types.ts';
@@ -44,7 +44,7 @@ describe('pipeline e2e', () => {
     const first = runPipeline(files).enrichedGraph;
     const second = runPipeline(files).enrichedGraph;
 
-    const closed: ReadonlySet<string> = new Set<Action>(ACTIONS);
+    const closed: ReadonlySet<string> = new Set(defaultSemanticsConfig.ontology.coarseActions);
     const toolIds = toolNodeIds(first);
     expect(toolIds.length).toBeGreaterThan(0);
     const actions = toolIds.map((id) => first.actions[id]);

@@ -75,21 +75,24 @@ later drop-in with no reshaping. Three concerns are kept strictly separate:
   row exist".
 - **`action` is a closed activity dimension, distinct from the free-form `semantics.what`.** `what`
   is rich, ordered, open-ended human-readable phrasing; `action` is a single value from a small fixed
-  enum (`explore|author|edit|run|test|verify|vcs|setup|mcp|research|delegate|plan|other`, defined in
-  `@coach/semantics`) so the store can `GROUP BY action` for stable, comparable counts. It is **not a
-  second taxonomy**: `action` is a fixed COARSENING of the ontology's own ~30 action ids. The config
-  layer already resolves each tool call to one ontology action (`toolOntologyAction`); `ACTION_GROUP`
-  rolls that up to the coarse bucket (`coarseAction`), so there is one classification source of truth
-  (the ontology mapping), not two. The coarse map is global and agent-invariant on purpose — an agent
-  may remap a tool to a different ontology action, but the bucket map does not move, so counts stay
-  comparable across agents (a test asserts `ACTION_GROUP` covers every ontology action id). The lone
-  exception is shell escape-hatch tools (Bash): the config labels them by name only, so their command
-  grammar (git→vcs, pytest→test, build→setup) lives in `bashAction` — the one rule set with no ontology
-  twin. Derived deterministically (no LLM) in stage 6 for **every** tool node — never NULL — and
-  surfaces as the non-NULL `nodes.action` column. The Bash command and file path are promoted to their
-  own `nodes` columns — `bash_command` (from `tool_input.command`) and `file_path` (from
+  set (the ontology's `coarseActions`: `explore|author|edit|run|test|verify|vcs|setup|mcp|research|
+delegate|plan|other`) so the store can `GROUP BY action` for stable, comparable counts. It is **not a
+  second taxonomy** and it is **not hardcoded**: `action` is a COARSENING of the ontology's own ~30
+  action ids, and the rollup lives in the ontology DATA — every action carries a `coarse` field, and
+  `@coach/semantics`'s `action.ts` is pure resolver logic (`coarseAction`) that just reads it. The config
+  layer resolves each tool call to one ontology action (`toolOntologyAction`); `coarseAction` rolls that
+  up — one classification source of truth, no parallel TS table. The shell escape-hatch tools (Bash) are
+  the one surface with no per-tool spec, so their command grammar (git→vcs, pytest→test, build→setup) is
+  also DATA — the ontology's `commands` block — resolved by `shellCommandAction` into an ontology action,
+  then rolled up the same way (so even Bash flows through the single rollup). `assembleSemanticsConfig`
+  enforces the integrity: every action's `coarse` is a declared `coarseActions` id and every command rule
+  resolves to a real action, so the dimension cannot drift into unaggregatable values. Derived
+  deterministically (no LLM) in stage 6 for **every** tool node — never NULL — and surfaces as the
+  non-NULL `nodes.action` column. The Bash command and file path are promoted to their own `nodes`
+  columns — `bash_command` (from `tool_input.command`) and `file_path` (from
   `tool_input.file_path`/`notebook_path`) — by a single total extractor (`extractBashCommand` /
-  `extractFilePath` in `graph/semantic/derive.ts`) reused by both the materializer and `bashAction`, so
+  `extractFilePath` in `graph/semantic/derive.ts`) reused by both the materializer and the shell
+  classifier, so
   there is one source of truth for the command. Both
   are NULL for tools that don't carry them and on malformed input (the extractor never throws);
   invariant: every `name='Bash'` node has a non-NULL `bash_command`, and every Read node a `file_path`.
@@ -233,7 +236,7 @@ reintroducing it. The interpreter (`graph/semantic`) is agent-agnostic, so a dif
 a config swap, not a code change. See `packages/semantics/README.md` for the resolution order and
 what is deliberately out of scope (composition/inference roll-up). Enrichment writes into the
 `semantics` table (one row per relabeled node), the `actions` table (one closed `action` per tool
-node, the ontology-action rollup `coarseAction`, with `bashAction` for shell tools), and the `intents` table (one closed `intent_category` per
+node, the ontology-action rollup `coarseAction`, with `shellCommandAction` for shell tools), and the `intents` table (one closed `intent_category` per
 interaction node, derived from the prompt by `classifyIntent`), and leaves the `nodes`/`deltas`/edges
 untouched — the old copied twin types (`ActionNode`/`InferenceNode`) are retired.
 
