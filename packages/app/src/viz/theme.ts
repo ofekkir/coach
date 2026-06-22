@@ -67,38 +67,42 @@ export const monoLabel: React.CSSProperties = {
 // Why: the 3px ring + soft drop a node wears when it is selected or the longest step.
 export const ACCENT_SHADOW = `0 0 0 3px ${tokens.accentRing}, 0 4px 14px -6px rgba(160,90,50,0.3)`;
 
-// Why: a small CSS shape replaces the colored badge. `circle-hollow` reads as a
-// thought (inference); `square-filled` as a deed (action); filled marks are levels;
-// the prompt anchor and nested weak-model call wear the accent. The shape→type
-// mapping is GLYPH_BY_TYPE below.
-export type GlyphKind =
-  | 'diamond-filled'
-  | 'circle-filled'
-  | 'circle-ring'
-  | 'dot-halo'
-  | 'circle-hollow'
-  | 'square-filled'
-  | 'diamond-hollow';
+// Why: a small CSS shape replaces the colored badge — the INFERENCE shape reads as a
+// thought, the ACTION shape as a deed; the prompt anchor and nested weak-model call
+// wear the accent. Each kind is named by the role it marks, not by its shape.
+const AGENT_GLYPH = 'diamond-filled';
+const SESSION_GLYPH = 'circle-filled';
+const INTERACTION_GLYPH = 'circle-ring';
+const PROMPT_GLYPH = 'dot-halo';
+const INFERENCE_GLYPH = 'circle-hollow';
+const ACTION_GLYPH = 'square-filled';
+const NESTED_GLYPH = 'diamond-hollow';
 
-const CIRCLE_HOLLOW: GlyphKind = 'circle-hollow';
-const SQUARE_FILLED: GlyphKind = 'square-filled';
+export type GlyphKind =
+  | typeof AGENT_GLYPH
+  | typeof SESSION_GLYPH
+  | typeof INTERACTION_GLYPH
+  | typeof PROMPT_GLYPH
+  | typeof INFERENCE_GLYPH
+  | typeof ACTION_GLYPH
+  | typeof NESTED_GLYPH;
 
 const GLYPH_BY_TYPE: Record<string, GlyphKind> = {
-  agent: 'diamond-filled',
-  session: 'circle-filled',
-  interaction: 'circle-ring',
-  user_prompt: 'dot-halo',
-  llm_request: CIRCLE_HOLLOW,
-  inference: CIRCLE_HOLLOW,
-  tool: SQUARE_FILLED,
-  action: SQUARE_FILLED,
-  'tool.execution': SQUARE_FILLED,
-  hook: SQUARE_FILLED,
+  agent: AGENT_GLYPH,
+  session: SESSION_GLYPH,
+  interaction: INTERACTION_GLYPH,
+  user_prompt: PROMPT_GLYPH,
+  llm_request: INFERENCE_GLYPH,
+  inference: INFERENCE_GLYPH,
+  tool: ACTION_GLYPH,
+  action: ACTION_GLYPH,
+  'tool.execution': ACTION_GLYPH,
+  hook: ACTION_GLYPH,
 };
 
 export function glyphFor(type: string, nested = false): GlyphKind {
-  if (nested) return 'diamond-hollow';
-  return GLYPH_BY_TYPE[type] ?? CIRCLE_HOLLOW;
+  if (nested) return NESTED_GLYPH;
+  return GLYPH_BY_TYPE[type] ?? INFERENCE_GLYPH;
 }
 
 export type Role = 'banner' | 'anchor' | 'step';

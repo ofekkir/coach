@@ -8,50 +8,10 @@ import { createFolderStructure, projectStructurePlugin } from 'eslint-plugin-pro
 import noBarrelFiles from 'eslint-plugin-no-barrel-files';
 import sonarjs from 'eslint-plugin-sonarjs';
 import importX from 'eslint-plugin-import-x';
-
-// Comment policy: a comment must justify its existence as non-obvious WHY, declared
-// with an explicit `Why:` marker. WHAT-comments — ones that restate or label the code
-// — carry information a NAME should carry (extract a constant/function, rename a var),
-// so they are a defect, the same class as dead code. The marker is the deterministic
-// signal: the rule cannot read intent, so it requires the author to assert it. Tooling
-// directives (eslint/ts/prettier/reference), JSDoc `/** */`, and TODO/FIXME/HACK are
-// exempt — they are not narration. The Why: text itself is not graded; the friction of
-// typing the marker is what pushes a WHAT-comment toward a name instead. Only the HEAD
-// of a consecutive `//` run needs the marker — continuation lines inherit it, so a
-// multi-line WHY reads naturally without `Why:` repeated on every line.
-const ALLOWED_LINE_COMMENT =
-  /^\s*(Why:|TODO|FIXME|HACK|eslint-|@ts-|prettier-|global\s|exported\s|c8\s|v8\s|istanbul\s|\/\s*<reference)/;
-const commentPolicyPlugin = {
-  rules: {
-    'why-marker-only': {
-      meta: {
-        type: 'suggestion',
-        docs: { description: 'Comments must be non-obvious WHY, marked `Why:`.' },
-        messages: {
-          needsWhy:
-            'Comment must explain non-obvious WHY and start with `Why:` — or be removed by encoding the intent in a name. WHAT-comments that restate the code are forbidden.',
-        },
-      },
-      create(context) {
-        const sourceCode = context.sourceCode;
-        function reportUnmarkedRuns() {
-          const lineComments = sourceCode.getAllComments().filter((c) => c.type === 'Line');
-          let prevLine = -2;
-          let prevAllowed = false;
-          for (const comment of lineComments) {
-            const startsRun = ALLOWED_LINE_COMMENT.test(comment.value);
-            const continuesRun = prevAllowed && comment.loc.start.line === prevLine + 1;
-            const allowed = startsRun || continuesRun;
-            if (!allowed) context.report({ node: comment, messageId: 'needsWhy' });
-            prevLine = comment.loc.start.line;
-            prevAllowed = allowed;
-          }
-        }
-        return { Program: reportUnmarkedRuns };
-      },
-    },
-  },
-};
+// Why: the two custom rules below (comment policy + named-literal policy) live in a
+// sibling module so this config stays under its own max-lines budget; their rationale
+// is documented there.
+import { commentPolicyPlugin, namedLiteralPlugin } from './eslint-local-rules.js';
 
 // TODO: projectStructureParser integration was kept minimal due to parser-layering
 // complexity with typescript-eslint's projectService. The rule enforces PascalCase
@@ -238,6 +198,13 @@ export default tseslint.config(
     plugins: { 'comment-policy': commentPolicyPlugin },
     rules: { 'comment-policy/why-marker-only': 'error' },
   },
+  // Named-literal policy: enum-like string-literal unions (4+ members) must be named
+  // constants (see plugin). Before the test override so tests can switch it off.
+  {
+    files: ['**/*.{ts,tsx}'],
+    plugins: { 'named-literal': namedLiteralPlugin },
+    rules: { 'named-literal/name-union-members': 'error' },
+  },
   // Config files are plain JS and live outside the TS program; skip type-aware rules.
   {
     files: ['**/*.js'],
@@ -254,6 +221,7 @@ export default tseslint.config(
       '@typescript-eslint/no-magic-numbers': 'off',
       'sonarjs/no-duplicate-string': 'off',
       'comment-policy/why-marker-only': 'off',
+      'named-literal/name-union-members': 'off',
     },
   },
   // Ban barrel files everywhere except each package's public src/index.ts.
