@@ -124,7 +124,8 @@ function typeNodeRecord(
       action: action ?? 'other',
       is_error: node.is_error,
       error_kind: node.error_kind,
-      result_summary: node.result_summary,
+      output_size: node.output_size,
+      error_message: node.error_message,
       repo_path: normalizeRepoPath(filePathFromToolInput(node.tool_input), cwd),
     };
   }

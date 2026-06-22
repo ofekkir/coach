@@ -8,6 +8,7 @@ import type {
 import { enrichTrace } from './enrich/enrich.ts';
 import { nativeSessionToTrace } from './native/native.ts';
 import { transformTrace } from './transform/transform.ts';
+import { attachToolResults } from './result/result.ts';
 
 function joinTraces(traces: readonly TempoTrace[]): TempoTrace {
   return { batches: traces.flatMap((t) => t.batches) };
@@ -53,7 +54,7 @@ function otelFromInputs(inputs: readonly ClassifiedInput[]): CanonicalNode[] {
 // already carries its `sessionId` FK (stamped in transform); the owning Session
 // entity is synthesized later, in aggregate.
 export function toCanonical(session: SessionInputs): CanonicalNode[] {
-  return session.kind === 'native'
-    ? nativeFromInputs(session.inputs)
-    : otelFromInputs(session.inputs);
+  const nodes =
+    session.kind === 'native' ? nativeFromInputs(session.inputs) : otelFromInputs(session.inputs);
+  return attachToolResults(nodes);
 }

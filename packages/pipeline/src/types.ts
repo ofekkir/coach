@@ -225,15 +225,18 @@ export interface ToolNode extends SpannedNode {
    *  block referencing this id). Absent when the trace doesn't carry one. */
   tool_use_id?: string;
   tool_input?: string;
-  /** Stage-5.5 result matching (`graph/result/result.ts`): the tool_result block,
-   *  matched by `tool_use_id` from the consuming inference's request messages.
-   *  `is_error` is the harness's failure flag (absent when no result was matched —
-   *  unmatched calls are reported, never silently dropped). `error_kind` is the
-   *  deterministic classification of an error (NULL when ok). `result_summary` is a
-   *  ≤500-char summary of the result/error text. */
+  /** Tool outcome, attached at canonical construction (`canonical/result/result.ts`)
+   *  from the `tool_result` block matched by `tool_use_id` in the consuming
+   *  inference's `request_messages`. `is_error` is the harness's failure flag
+   *  (absent when no result was matched — those stay NULL, queryable as such).
+   *  `error_kind` is the deterministic classification of a failure (absent when ok).
+   *  `output_size` is the character length of the result content (any outcome).
+   *  `error_message` is a ≤500-char summary of the error text — set only on failures
+   *  (a successful call's content is not stored, only its size). */
   is_error?: boolean;
   error_kind?: ErrorKind;
-  result_summary?: string;
+  output_size?: number;
+  error_message?: string;
 }
 
 export interface ToolExecutionNode extends SpannedNode {

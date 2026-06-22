@@ -122,6 +122,22 @@ Input files (accumulating — user stages N files/folders before submitting)
      otel:   join traces → enrichTrace(logs) → transformTrace   (one unified OTLP pass)
      native: nativeSessionToTrace → transformTrace              (OTLP round-trip, behind facade)
      both:   transformTrace stamps each node's sessionId FK (no session NODE is added)
+     then:   attachToolResults(nodes) (canonical/result/result.ts) completes each
+             `tool` node with its outcome — `is_error`, a deterministic `error_kind`
+             (no LLM — see rules below), `output_size`, and `error_message`
+             (failures only). A tool's result comes back as a `tool_result` block,
+             keyed by tool_use_id, in the consuming inference's `request_messages`;
+             this indexes those blocks across the session's llm_request nodes and
+             annotates the matched tool. `request_messages` is populated by BOTH
+             paths, so one pass is harness-agnostic. Unmatched calls keep is_error
+             NULL (queryable as such). error_kind rules, matched in priority order
+             against the lower-cased text: failed-match edit (`no match` / `string
+             to replace` / `not unique`) → invalid_args (a bad old_string, not a
+             missing file); `no such file` / `enoent` / `command not found` / `does
+             not exist` → not_found; `permission denied` / `eacces` → permission;
+             `timed out` / `etimedout` → timeout; other invalid-argument/parse text
+             → invalid_args; Bash `exit code N>0` / `killed` → nonzero_exit; else
+             → other.
         │
         ▼  Stage 4 — aggregate/aggregate.ts      → agentGraph: AgentGraph
    aggregate()          merge all sessions → one `nodes` table (dedupe by id) plus the
@@ -162,29 +178,6 @@ Input files (accumulating — user stages N files/folders before submitting)
                             (fan-out negative under streamed dispatch). Harness-
                             agnostic: native stamps tool_use_id on its tool spans,
                             OTEL gets it via enrich (from the tool decision log).
-        │
-        ▼  Stage 5.5 — graph/result/result.ts  → ExecutionGraph (+ unmatchedToolIds)
-   matchToolResults(graph)  a PURE TABLE PASS that matches every `tool` node to its
-                            result. A tool call's result is NOT on the tool node — it
-                            arrives as a `tool_result` block, keyed by `tool_use_id`, in
-                            the request messages (stage-5 `requestMessagesDelta`) of the
-                            inference that consumed it. This indexes those blocks by
-                            tool_use_id and annotates each matched tool node with three
-                            promoted columns: `is_error` (the harness failure flag),
-                            `error_kind` (a deterministic class, NO LLM — see below), and
-                            `result_summary` (≤500-char cleanly-truncated result/error
-                            text). Tool calls with NO matching result leave `is_error`
-                            NULL (queryable as tool nodes with NULL is_error), never
-                            silently coerced.
-                            error_kind rules, matched in priority order against the lower-
-                            cased text: a failed-match edit (`no match` / `string to
-                            replace` / `not unique`) → invalid_args (it is a bad
-                            old_string, not a missing file); file/command not found
-                            (`no such file` / `enoent` / `command not found` / `does not
-                            exist`) → not_found; `permission denied` / `eacces` →
-                            permission; `timed out` / `etimedout` → timeout; other
-                            invalid-argument/parse text → invalid_args; a Bash `exit code
-                            N>0` / `killed` → nonzero_exit; anything else → other.
         │
         ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
    enrichExecutionGraph(graph, config)  a PURE TABLE PASS: iterates the `nodes`

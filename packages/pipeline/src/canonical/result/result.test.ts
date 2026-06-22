@@ -2,9 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runPipeline } from '../../orchestrate.ts';
-import type { CanonicalNode, ToolNode, UploadedFile } from '../../types.ts';
-import type { ExecutionGraph } from '../types.ts';
-import { classifyErrorKind, matchToolResults } from './result.ts';
+import type { CanonicalNode, RequestMessage, ToolNode, UploadedFile } from '../../types.ts';
+import { attachToolResults, classifyErrorKind } from './result.ts';
 
 const FIXTURES = join(import.meta.dirname, '../../../fixtures');
 
@@ -37,7 +36,7 @@ describe('classifyErrorKind', () => {
   });
 });
 
-// ── matchToolResults on a hand-built graph ──────────────────────────────────────
+// ── attachToolResults on a hand-built node list ──────────────────────────────────
 
 function toolNode(id: string, name: string, toolUseId: string): ToolNode {
   return {
@@ -54,7 +53,9 @@ function toolNode(id: string, name: string, toolUseId: string): ToolNode {
   };
 }
 
-function inference(id: string): CanonicalNode {
+// The consuming inference carries each tool's result as a tool_result block in its
+// request_messages — the canonical field this pass reads (harness-agnostic).
+function inference(id: string, requestMessages: RequestMessage[]): CanonicalNode {
   return {
     id,
     type: 'llm_request',
@@ -63,95 +64,70 @@ function inference(id: string): CanonicalNode {
     model: 'm',
     tokens_in: 1,
     tokens_out: 1,
+    request_messages: requestMessages,
     start_time_ns: '0',
     end_time_ns: '1',
     duration_ms: 1,
   };
 }
 
-function graphWith(nodes: readonly CanonicalNode[], inferenceId: string): ExecutionGraph {
-  const byId: Record<string, CanonicalNode> = {};
-  for (const n of nodes) byId[n.id] = n;
-  return {
-    kind: 'interaction',
-    data: null,
-    nodes: byId,
-    deltas: {
-      [inferenceId]: {
-        requestMessagesDelta: [
-          {
-            role: 'user',
-            content: [
-              { type: 'tool_result', tool_use_id: 'tu_ok', is_error: false, content: 'all good' },
-              {
-                type: 'tool_result',
-                tool_use_id: 'tu_fail',
-                is_error: true,
-                content: 'Error: String to replace not found in file',
-              },
-            ],
-          },
-        ],
-      },
-    },
-    semantics: {},
-    actions: {},
-    intents: {},
-  };
+function toolResultMessage(blocks: readonly unknown[]): RequestMessage {
+  return { role: 'user', content: blocks };
 }
 
-describe('matchToolResults', () => {
-  it('annotates a success and a failure, and classifies the failure', () => {
+function byId(nodes: readonly CanonicalNode[], id: string): ToolNode {
+  return nodes.find((n) => n.id === id) as ToolNode;
+}
+
+describe('attachToolResults', () => {
+  it('annotates a success and a failure, classifies the failure, and sizes the output', () => {
     const ok = toolNode('n-ok', 'Read', 'tu_ok');
     const fail = toolNode('n-fail', 'Edit', 'tu_fail');
-    const inf = inference('inf');
-    const { graph, unmatchedToolIds } = matchToolResults(graphWith([ok, fail, inf], 'inf'));
+    const inf = inference('inf', [
+      toolResultMessage([
+        { type: 'tool_result', tool_use_id: 'tu_ok', is_error: false, content: 'all good' },
+        {
+          type: 'tool_result',
+          tool_use_id: 'tu_fail',
+          is_error: true,
+          content: 'Error: String to replace not found in file',
+        },
+      ]),
+    ]);
+    const out = attachToolResults([ok, fail, inf]);
 
-    const okOut = graph.nodes['n-ok'] as ToolNode;
-    const failOut = graph.nodes['n-fail'] as ToolNode;
-
+    const okOut = byId(out, 'n-ok');
     expect(okOut.is_error).toBe(false);
     expect(okOut.error_kind).toBeUndefined();
-    expect(okOut.result_summary).toBe('all good');
+    expect(okOut.output_size).toBe('all good'.length);
+    expect(okOut.error_message).toBeUndefined(); // success content is not stored
 
+    const failOut = byId(out, 'n-fail');
     expect(failOut.is_error).toBe(true);
     expect(failOut.error_kind).toBe('invalid_args');
-    expect(failOut.result_summary).toContain('String to replace not found');
-
-    expect(unmatchedToolIds).toEqual([]);
+    expect(failOut.error_message).toContain('String to replace not found');
+    expect(failOut.output_size).toBeGreaterThan(0);
   });
 
-  it('reports a tool call with no matching result instead of dropping it', () => {
+  it('leaves a tool call with no matching result untouched (is_error NULL)', () => {
     const orphan = toolNode('n-orphan', 'Bash', 'tu_missing');
-    const inf = inference('inf');
-    const { graph, unmatchedToolIds } = matchToolResults(graphWith([orphan, inf], 'inf'));
-    const out = graph.nodes['n-orphan'] as ToolNode;
+    const inf = inference('inf', []);
+    const out = byId(attachToolResults([orphan, inf]), 'n-orphan');
     expect(out.is_error).toBeUndefined();
-    expect(unmatchedToolIds).toEqual(['n-orphan']);
+    expect(out.output_size).toBeUndefined();
   });
 
-  it('truncates a long result_summary to ≤500 chars', () => {
+  it('truncates a long error_message to ≤500 chars', () => {
     const long = 'x'.repeat(2000);
-    const graph: ExecutionGraph = {
-      kind: 'interaction',
-      data: null,
-      nodes: { 'n-1': toolNode('n-1', 'Bash', 'tu_long') },
-      deltas: {
-        inf: {
-          requestMessagesDelta: [
-            {
-              role: 'user',
-              content: [{ type: 'tool_result', tool_use_id: 'tu_long', content: long }],
-            },
-          ],
-        },
-      },
-      semantics: {},
-      actions: {},
-      intents: {},
-    };
-    const out = matchToolResults(graph).graph.nodes['n-1'] as ToolNode;
-    expect(out.result_summary?.length).toBeLessThanOrEqual(500);
+    const tool = toolNode('n-1', 'Bash', 'tu_long');
+    const inf = inference('inf', [
+      toolResultMessage([
+        { type: 'tool_result', tool_use_id: 'tu_long', is_error: true, content: long },
+      ]),
+    ]);
+    const out = byId(attachToolResults([tool, inf]), 'n-1');
+    expect(out.error_message?.length).toBeLessThanOrEqual(500);
+    expect(out.output_size).toBe(long.length); // size reflects the full content
   });
 });
 
@@ -163,13 +139,13 @@ describe('tool result/error invariant (failed Edit + success)', () => {
   const { enrichedGraph } = runPipeline(files);
   const tools = Object.values(enrichedGraph.nodes).filter((n): n is ToolNode => n.type === 'tool');
 
-  it('asserts is_error + error_kind + result_summary for the failing Edit', () => {
+  it('asserts is_error + error_kind + error_message for the failing Edit', () => {
     const edit = tools.find((t) => t.name === 'Edit');
     expect(edit).toBeDefined();
     expect(edit?.is_error).toBe(true);
     expect(edit?.error_kind).toBe('invalid_args');
-    expect(edit?.result_summary).toBeTruthy();
-    expect(edit?.result_summary?.length).toBeGreaterThan(0);
+    expect(edit?.error_message).toBeTruthy();
+    expect(edit?.error_message?.length).toBeGreaterThan(0);
   });
 
   it('asserts is_error=false / NULL error_kind for the succeeding tool', () => {

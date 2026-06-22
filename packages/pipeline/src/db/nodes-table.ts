@@ -69,11 +69,13 @@ export const NODES: TableSpec = {
       doc: "tool: closed activity bucket, NON-NULL for every tool node — 'explore'|'author'|'edit'|'run'|'test'|'verify'|'vcs'|'setup'|'mcp'|'research'|'delegate'|'plan'|'other'. Deterministically derived from (name, bash command); GROUP BY it for stable counts. Coarse dimension, distinct from the free-form semantics.what.",
     },
     // prettier-ignore
-    { name: 'is_error', sqlType: 'BOOLEAN', doc: "tool: did the matched tool_result carry is_error=true? Matched by tool_use_id from the consuming inference's request messages. NULL when no result was matched (the call is reported, never dropped)." },
+    { name: 'is_error', sqlType: 'BOOLEAN', doc: "tool: did the matched tool_result carry is_error=true? Matched by tool_use_id from the consuming inference's request messages. NULL when no result was matched (those stay NULL, queryable as such)." },
     // prettier-ignore
     { name: 'error_kind', sqlType: 'VARCHAR', doc: "tool: deterministic error class (no LLM) — 'not_found' | 'invalid_args' | 'permission' | 'timeout' | 'nonzero_exit' | 'other'. NULL when the call succeeded or had no matched result. Count Edit/Write rows WHERE is_error for the misleading-file (failed-edits-per-file) signal." },
     // prettier-ignore
-    { name: 'result_summary', sqlType: 'VARCHAR', doc: 'tool: ≤500-char summary of the tool_result/error text (cleanly truncated). NULL when the result had no text.' },
+    { name: 'output_size', sqlType: 'INTEGER', doc: 'tool: character length of the tool_result content (success or error). NULL when no result was matched. A cheap size signal — the success content itself is not stored.' },
+    // prettier-ignore
+    { name: 'error_message', sqlType: 'VARCHAR', doc: 'tool: ≤500-char summary of the error text, set ONLY on failures (is_error=true). NULL for successes and unmatched calls.' },
     {
       name: 'sequence',
       sqlType: 'INTEGER',
