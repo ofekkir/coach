@@ -8,6 +8,8 @@
     "packages/pipeline": {},
     "packages/semantics": {},
     "packages/mcp": {},
-    "packages/app": {}
+    "packages/app": {
+      "entry": ["src/**/*.stories.tsx"]
+    }
   }
 }

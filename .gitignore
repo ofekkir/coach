@@ -2,6 +2,9 @@ node_modules
 dist
 coverage
 
+# Ladle static catalog output (ladle build)
+packages/app/build
+
 # viz sub-project (workspace package)
 viz/node_modules
 viz/dist
