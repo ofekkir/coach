@@ -1,19 +1,14 @@
 // The server's mutable state: the one dataset currently loaded. `load_dataset`
 // swaps it; every data-bound tool reads through `dataset()` / `store()`, which
 // throw a clear message until something is loaded. Load-once / serve-many — one
-// dataset at a time, replaced on each load. A path is loaded one of two ways:
-//   *.db   — a pre-built coach DB, opened UNTOUCHED (no pipeline); graph recovered
-//            from `_coach_meta`, analysis recomputed (cheap) for the graph tools.
-//   a dir  — trace/native files run through the pipeline, then materialized.
+// dataset at a time, replaced on each load. A load always re-derives from source:
+// the directory's trace/native files run through the pipeline, then materialized.
 
-import { analyzeGraph } from '@coach/pipeline';
+import type { ExecutionGraph } from '@coach/pipeline';
 import type { Store } from './query-core.ts';
 import { loadPipelineResult, type Dataset } from './load.ts';
-import { openPersistedStore } from './duckdb.ts';
 import { createStore } from './store.ts';
 import { dumpPipelineOutputs } from './dump.ts';
-
-const DB_SUFFIX = '.db';
 
 /** What `load_dataset` reports back: where it loaded from and how much it found. */
 export interface DatasetSummary {
@@ -22,8 +17,8 @@ export interface DatasetSummary {
   readonly sessions: number;
   readonly interactions: number;
   readonly nodes: number;
-  /** On a directory load: the stage JSON + `.db` files written to the cwd, so the
-   *  agent can `open_viz` them. Absent on a `.db` load (already a built artifact). */
+  /** The stage JSON + `.db` files written to the cwd, so the agent can `open_viz`
+   *  them. */
   readonly dumped?: readonly string[];
 }
 
@@ -36,37 +31,35 @@ export interface Session {
   close(): void;
 }
 
-function summarize(dir: string, dataset: Dataset, dumped?: readonly string[]): DatasetSummary {
-  const { graph, analysis } = dataset;
+// Counts come straight off the node table — distinct session FKs and the
+// interaction nodes — so the summary needs no separate analysis pass.
+function summarize(dir: string, graph: ExecutionGraph, dumped: readonly string[]): DatasetSummary {
+  const nodes = Object.values(graph.nodes);
   return {
     dir,
     kind: graph.kind,
-    sessions: analysis.sessions.length,
-    interactions: analysis.sessions.reduce((n, s) => n + s.interactions.length, 0),
-    nodes: Object.keys(graph.nodes).length,
-    ...(dumped == null ? {} : { dumped }),
+    sessions: new Set(nodes.map((n) => n.sessionId)).size,
+    interactions: nodes.filter((n) => n.type === 'interaction').length,
+    nodes: nodes.length,
+    dumped,
   };
 }
 
-const NOT_LOADED = 'no dataset loaded — call load_dataset with a directory or a .db path first';
+const NOT_LOADED =
+  'no dataset loaded — call load_dataset with a directory of trace/native files first';
 
 interface Loaded {
   readonly dataset: Dataset;
   readonly store: Store;
-  /** Written stage/db paths — present only on a directory load. */
-  readonly dumped?: readonly string[];
+  readonly dumped: readonly string[];
 }
 
-async function loadFromDb(path: string): Promise<Loaded> {
-  const { store, graph } = await openPersistedStore(path);
-  return { dataset: { graph, analysis: analyzeGraph(graph) }, store };
-}
-
-// A directory load runs the pipeline, dumps the stage outputs + `.db` into the
-// cwd (so they can be served by `open_viz`), and makes the graph queryable.
+// A load re-derives the dataset: run the pipeline over the directory, dump the
+// stage outputs + `.db` into the cwd (so `open_viz` can serve them), and make the
+// graph queryable through a fresh temp DuckDB.
 async function loadFromDir(path: string): Promise<Loaded> {
   const result = loadPipelineResult(path);
-  const dataset: Dataset = { graph: result.enrichedGraph, analysis: result.analysis };
+  const dataset: Dataset = { graph: result.enrichedGraph };
   const dumped = await dumpPipelineOutputs(result, process.cwd());
   return { dataset, store: await createStore(dataset.graph), dumped };
 }
@@ -82,12 +75,10 @@ export function createSession(): Session {
 
   return {
     load: async (path) => {
-      const { dataset, store, dumped } = path.endsWith(DB_SUFFIX)
-        ? await loadFromDb(path)
-        : await loadFromDir(path);
+      const { dataset, store, dumped } = await loadFromDir(path);
       current?.store.close();
       current = { dir: path, dataset, store };
-      return summarize(path, dataset, dumped);
+      return summarize(path, dataset.graph, dumped);
     },
     dataset: () => require().dataset,
     store: () => require().store,

@@ -1,22 +1,23 @@
-// The node-api DuckDB layer. Two ways to get a read-only Connection for the query core:
+// The node-api DuckDB layer. The MCP always re-derives a dataset from its source
+// files, so there is one runtime path:
 //
 //   createDuckDbConnection(graph)  — materialize a graph into a TEMP DB, query, then
 //                                    delete it on close (the in-memory load path).
-//   openPersistedStore(dbPath)     — open a pre-built coach DB FILE untouched (no
-//                                    pipeline, no materialize) and query it.
 //
-// writePersistedDb(graph, dbPath) is the pipeline's shippable artifact: a queryable
-// DuckDB that ALSO carries the enriched graph (in `_coach_meta`) so a loader can
-// recover it for the graph-shaped tools and the visualization. Either way the query
-// handle is READ_ONLY with external access disabled — the engine is the boundary.
-// This is the one node:*-bound piece; the query surface lives in ./query-core.ts.
+// writePersistedDb(graph, dbPath) writes the same materialized tables to a FILE: a
+// standalone, queryable DuckDB SQL snapshot (the `coach-build-db` / dump export).
+// Coach itself never re-loads it — it's for opening in the duckdb CLI without
+// re-running the pipeline — so it carries the query tables only (no embedded graph).
+// The query handle is READ_ONLY with external access disabled — the engine is the
+// boundary. This is the one node:*-bound piece; the query surface lives in
+// ./query-core.ts.
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
 import { materializeSql, type ExecutionGraph } from '@coach/pipeline';
-import { createStore as createCoreStore, type Connection, type Store } from './query-core.ts';
+import { type Connection } from './query-core.ts';
 import type { RawResult } from './result.ts';
 
 // Engine-level read-only sandbox: read-only access, no filesystem/network (COPY,
@@ -29,15 +30,6 @@ const READ_ONLY_CONFIG: Record<string, string> = {
 
 const TMP_PREFIX = 'coach-store-';
 const DB_FILE = 'graph.db';
-const META_TABLE = '_coach_meta';
-
-function metaStatements(graph: ExecutionGraph): string[] {
-  const json = JSON.stringify(graph).replaceAll("'", "''");
-  return [
-    `CREATE TABLE ${META_TABLE} (graph JSON)`,
-    `INSERT INTO ${META_TABLE} VALUES (CAST('${json}' AS JSON))`,
-  ];
-}
 
 async function buildWritable(path: string, statements: readonly string[]): Promise<void> {
   const instance = await DuckDBInstance.create(path);
@@ -55,18 +47,11 @@ async function readAll(conn: DuckDBConnection, sql: string): Promise<RawResult> 
   };
 }
 
-async function readGraph(conn: DuckDBConnection): Promise<ExecutionGraph> {
-  const { rows } = await readAll(conn, `SELECT graph FROM ${META_TABLE}`);
-  const raw = rows[0]?.graph;
-  if (raw == null) throw new Error(`not a coach DB — no ${META_TABLE}.graph`);
-  return (typeof raw === 'string' ? JSON.parse(raw) : raw) as ExecutionGraph;
-}
-
-/** Materializes a stage-6 graph into a self-contained, queryable DuckDB FILE that
- *  also carries the graph (in `_coach_meta`). This is the artifact the pipeline
- *  ships; the MCP loads it untouched with `openPersistedStore`. */
+/** Materializes a stage-6 graph into a standalone, queryable DuckDB FILE — the
+ *  query tables only (no embedded graph). A SQL snapshot for the duckdb CLI; coach
+ *  itself re-derives from source rather than re-loading this. */
 export async function writePersistedDb(graph: ExecutionGraph, dbPath: string): Promise<void> {
-  await buildWritable(dbPath, [...materializeSql(graph), ...metaStatements(graph)]);
+  await buildWritable(dbPath, materializeSql(graph));
 }
 
 /** Builds a TEMP read-only DuckDB from a graph and returns it as a Connection. The
@@ -85,23 +70,4 @@ export async function createDuckDbConnection(graph: ExecutionGraph): Promise<Con
       rmSync(dir, { recursive: true, force: true });
     },
   };
-}
-
-/** Opens a pre-built coach DB FILE untouched (read-only, no pipeline) and returns
- *  the query store plus the graph recovered from `_coach_meta`. The file is the
- *  shipped artifact, so close does NOT delete it. */
-export async function openPersistedStore(
-  dbPath: string,
-): Promise<{ store: Store; graph: ExecutionGraph }> {
-  const instance = await DuckDBInstance.create(dbPath, READ_ONLY_CONFIG);
-  const conn = await instance.connect();
-  const graph = await readGraph(conn);
-  const connection: Connection = {
-    runAndReadAll: (sql) => readAll(conn, sql),
-    close: () => {
-      conn.closeSync();
-      instance.closeSync();
-    },
-  };
-  return { store: createCoreStore(connection), graph };
 }
