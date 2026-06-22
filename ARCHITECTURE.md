@@ -369,8 +369,10 @@ not a reshape.
   snapshot for ad-hoc inspection in the duckdb CLI; coach itself does **not** re-load it (the MCP always
   re-derives from source). `coach-build-db <traces-dir> [out.db]` (root `pnpm build-db`) writes one:
   pipeline in, `.db` out.
-- **Tools (`tools.ts`).** Seven, bound to a session (its current dataset): `load_dataset` (point it at
-  a directory — runs the pipeline and makes the graph queryable, replacing any prior dataset),
+- **Tools (`tools.ts`).** Seven, bound to a session (its current dataset): `load_dataset` (load a
+  repo by **name** — folds the main checkout and **every git worktree** into one dataset by default,
+  see "Repo-name resolution" below — or point it at a single directory; either way it runs the
+  pipeline and makes the graph queryable, replacing any prior dataset),
   `describe_schema` (tables + column docs + the semantic ontology vocabulary + example queries,
   including the rollup/finding queries written as SQL — works with nothing loaded), `query` (read-only single
   SELECT/WITH; enforced by the read-only engine, capped at ≤1000 rows **and** a serialized-byte budget
@@ -390,8 +392,22 @@ outDir)` writes the six `01..06` stage JSON files + a standalone `graph.db` (the
   dependency-free `node:http` server that serves the built `@coach/app` (`packages/app/dist`, resolved
   relative to the package) plus those dumped JSON files, erroring with a build hint if `dist` is missing.
   `coach-viz [data-file] [focus]` (its bin) boots the server and opens the browser.
+- **Repo-name resolution (`resolve-dataset.ts`).** Claude Code stores each working directory's
+  session logs under `~/.claude/projects/<encoded-path>/`, where the absolute path is encoded by
+  replacing `/` and `.` with `-`. A repo's main checkout and each git worktree are **separate**
+  encoded directories sharing a common prefix; the worktree ones append `…-claude-worktrees-<id>…`.
+  `resolveRepoDirs(name)` groups all project dirs by that shared repo-root key (stripping the
+  worktree suffix), matches the requested name (bare name → trailing segment; absolute path → exact
+  encoded form), and returns the whole family — main checkout **plus every worktree by default**
+  (`includeWorktrees: false` keeps only the main checkout). It is the one place that knows the on-disk
+  projects layout; `load.ts` just consumes absolute directories. `loadPipelineResultFromDirs` gathers
+  all of them — each rooted at its own parent so the route stage's per-directory grouping survives —
+  and runs **one** pipeline, so a repo's sessions across all worktrees aggregate into a single forest
+  (the store already normalizes worktree `file_path`s to a repo-relative form, so cross-worktree
+  analysis lines up).
 - **Session + loading (`session.ts`, `load.ts`, `server.ts`, `bin/mcp.ts`).** The server holds one
-  mutable session: the dataset currently loaded. `load_dataset` takes a **directory** of trace/native
+  mutable session: the dataset currently loaded. `load_dataset` takes either a `repo` name (resolved
+  to the main checkout + worktrees above) or a single `path` **directory** of trace/native
   files (read into the same `UploadedFile[]` the browser produces, run through the pipeline,
   materialized into a fresh temp store) — it always re-derives, there is no load-a-prebuilt-`.db` path.
   It rebuilds the store (closing the previous one); data-bound tools read through `session.store()` /
