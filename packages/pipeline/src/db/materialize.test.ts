@@ -37,15 +37,15 @@ function rowsByInteraction(
 }
 
 describe('seq invariant', () => {
-  it('within each interaction, ORDER BY seq == ORDER BY start_time_ns, dense 0..n-1', () => {
+  it('within each interaction, ORDER BY seq == ORDER BY start_time, dense 0..n-1', () => {
     const groups = rowsByInteraction(nodeRows());
     expect(groups.size).toBeGreaterThan(0);
 
     for (const rows of groups.values()) {
       const byStartTime = [...rows].sort((a, b) =>
-        BigInt(a.start_time_ns as string) < BigInt(b.start_time_ns as string)
+        BigInt(a.start_time as string) < BigInt(b.start_time as string)
           ? -1
-          : BigInt(a.start_time_ns as string) > BigInt(b.start_time_ns as string)
+          : BigInt(a.start_time as string) > BigInt(b.start_time as string)
             ? 1
             : (a.id as string) < (b.id as string)
               ? -1
@@ -78,11 +78,12 @@ describe('promoted file_path / bash_command columns', () => {
 });
 
 describe('numeric BIGINT time columns', () => {
-  it('emits start_time/end_time as bare integer literals matching the ns string digits', () => {
+  it('emits start_time/end_time as the verbatim ns digit strings carried in data', () => {
     const rows = nodeRows();
     for (const row of rows) {
-      expect(String(row.start_time)).toBe(String(row.start_time_ns));
-      expect(String(row.end_time)).toBe(String(row.end_time_ns));
+      const node = row.data as CanonicalNode;
+      expect(String(row.start_time)).toBe(node.start_time_ns);
+      expect(String(row.end_time)).toBe(node.end_time_ns);
     }
   });
 
@@ -241,13 +242,19 @@ describe('intent_category', () => {
 
 // ── derived relations are VIEWs, not materialized tables ─────────────────────────
 
-describe('interaction_metrics / transitions are views', () => {
-  it('emits CREATE VIEW (not CREATE TABLE) for both, and inserts no rows for them', () => {
+describe('derived + per-type relations are views', () => {
+  it('emits CREATE VIEW (not CREATE TABLE) for each, and inserts no rows for them', () => {
     const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
     const { enrichedGraph } = runPipeline(files);
     const sql = materializeSql(enrichedGraph);
 
-    for (const name of ['interaction_metrics', 'transitions']) {
+    for (const name of [
+      'interaction_metrics',
+      'transitions',
+      'llm_requests',
+      'tools',
+      'interactions',
+    ]) {
       expect(sql.some((s) => s.startsWith(`CREATE VIEW ${name} AS`))).toBe(true);
       expect(sql.some((s) => s.startsWith(`CREATE TABLE ${name} `))).toBe(false);
       expect(sql.some((s) => s.startsWith(`INSERT INTO ${name} `))).toBe(false);

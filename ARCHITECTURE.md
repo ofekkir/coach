@@ -288,18 +288,20 @@ faithful load,
 not a reshape.
 
 - **Graph → DB SQL — `@coach/pipeline/db` (pure).** `materializeSql` turns the graph into
-  ordered `CREATE`/`INSERT` statements driven entirely by the table specs in `db/schema.ts` (the single
-  source of truth for both the DDL **and** the `describe_schema` tool, so they cannot drift). Tables
-  mirror the model: the three id-keyed node-data layers (`nodes` / `deltas` / `semantics`), the two
-  edge relations (`containment` / `causal_edges`), `threads` (layout lanes), `transitions` (a derived
-  tool→tool adjacency rollup by `seq`, not causal), and the `agents` / `sessions` dimension entities. The `nodes` table promotes common + type-specific columns and keeps
-  the full raw node in a `data` JSON column (the escape hatch for un-promoted fields). Span timing is
-  exposed twice: the VARCHAR `start_time_ns`/`end_time_ns` are retained as the full-precision int64
-  nanosecond values (they overflow DOUBLE/JS `number`), alongside numeric `start_time`/`end_time`
-  **BIGINT** columns (the same digits emitted as bare integer literals — never round-tripped through a
-  JS number) for arithmetic and ordering. A dense `seq` INTEGER ranks every node within its owning
-  interaction by `start_time_ns` ascending (`0..n-1`, no gaps): `ORDER BY seq` == `ORDER BY
-start_time_ns`, a stable per-interaction timeline index. The `sessions` dimension carries `cwd` and
+  ordered `CREATE`/`INSERT` statements driven entirely by the relation specs aggregated in `db/schema.ts`
+  (the single source of truth for both the DDL **and** the `describe_schema` tool, so they cannot drift).
+  Each relation's spec lives in its own file — one per table under `db/tables/` and one per view under
+  `db/views/` — and `schema.ts` only imports them and orders them into `TABLES` (materialized tables
+  first, views last). Tables mirror the model: the three id-keyed node-data layers (`nodes` / `deltas` /
+  `semantics`), the two edge relations (`containment` / `causal_edges`), `threads` (layout lanes), and
+  the `agents` / `sessions` dimension entities. The `nodes` table promotes common + type-specific columns
+  and keeps the full raw node in a `data` JSON column (the escape hatch for un-promoted fields). Span
+  timing is the numeric `start_time`/`end_time` **BIGINT** columns — full-precision int64 nanoseconds
+  (a DOUBLE/JS `number` would lose precision), emitted as bare integer literals and never round-tripped
+  through a JS number; the verbatim ns digit strings still survive inside the `data` JSON for anyone who
+  wants them. A dense `seq` INTEGER ranks every node within its owning interaction by `start_time`
+  ascending (`0..n-1`, no gaps): `ORDER BY seq` == `ORDER BY start_time`, a stable per-interaction
+  timeline index. The `sessions` dimension carries `cwd` and
   `branch` (the working directory + git branch a session ran in; populated for native Claude
   sessions, NULL for OTEL traces, which expose neither). The `nodes` table adds a worktree-normalized
   `repo_path` (`db/repo-path.ts`): the file path a tool touched, derived from `tool_input`, collapsed
@@ -308,25 +310,33 @@ start_time_ns`, a stable per-interaction timeline index. The `sessions` dimensio
   to `<rest>`, else makes the path relative to the session's (worktree-normalized) `cwd`; the result
   never contains `/.claude/worktrees/` and never has a leading `/`. No hard-coded prefix. This lives in
   the pipeline because the graph→DB mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it.
-  Beside those base tables sit two **derived relations**, defined as DuckDB **VIEWs** (`db/views.ts`),
-  not materialized tables. Both are pure aggregates over `nodes`, and in a columnar engine a stored copy
-  of an aggregate buys no query power — it only adds a second thing that can drift. As views they are
-  **computed on read against `nodes`, so they can never disagree with it**, yet still expose a flat,
-  documented surface (`describe_schema` renders a view spec exactly like a table; only the `view` SELECT
+  Beside those base tables sit five **VIEWs** (`db/views/`, one file each), not materialized tables —
+  all computed on read against `nodes`, so they **can never disagree with it**, yet still expose flat,
+  documented surfaces (`describe_schema` renders a view spec exactly like a table; only the `view` SELECT
   body differs, and `materializeSql` emits `CREATE VIEW` instead of `CREATE TABLE` + `INSERT`s). Views
   appear after `nodes` in `TABLES`, so the relation they select from already exists when they are created.
+  Two are **derived rollups** (`interaction_metrics`, `transitions`): pure aggregates over `nodes`, and in
+  a columnar engine a stored copy of an aggregate buys no query power — it only adds a second thing that
+  can drift. Three are **per-type projections** (`llm_requests` / `tools` / `interactions`): a typed,
+  documented slice of `nodes` filtered to one `type` with the other types' NULL columns dropped — the
+  clean "one table per type" surface for an analyst, without splitting the physical table (a columnar
+  engine already stores each column separately, so the split would buy no storage and only fragment the
+  single id space that edges and traversal join on). Their column docs ARE the `nodes` column docs
+  (projected by name via `pickColumns`), so a per-type view can never describe a column differently from
+  the table it projects.
   `interaction_metrics`: one row per interaction, every column a GROUP BY over that interaction's nodes
   (`prompt_len`, `tool_count`/`llm_count`/`error_count`/`distinct_files`, summed `tokens_in`/`tokens_out`/
   `cost_usd`, `duration_ms`, `arg_min`/`arg_max`-over-`seq` `first_action`/`last_action`, and `shape` =
   `'agentic'` iff `tool_count>0` else `'direct'`). `transitions` rolls up tool→tool ADJACENCY: a window
   (`ROW_NUMBER() OVER (PARTITION BY interaction_id ORDER BY seq)`) ranks the TOOL nodes and self-joins
   rank _n_ to _n+1_, emitting one row per adjacent pair (`interaction_id, from_seq, from_action,
-  to_action`, actions from the closed `action` enum) — exactly `tool_count − 1` rows per interaction
+to_action`, actions from the closed `action` enum) — exactly `tool_count − 1` rows per interaction
   (never negative). This is time-order adjacency, NOT causality (causality lives in `causal_edges`);
   `GROUP BY (from_action, to_action)` gives the action-flow histogram (e.g. `explore→edit`,
   `edit→verify`). The view SQL is proven valid + drift-free against a real DuckDB in
   `mcp/src/duckdb.test.ts` (the views exist, `interaction_metrics` agrees with a direct node aggregate,
-  and `transitions` has `tool_count − 1` rows per interaction).
+  `transitions` has `tool_count − 1` rows per interaction, and each per-type view's row count matches its
+  `nodes` slice).
 - **Query core — `@coach/mcp` (pure, backend-neutral).** Beside the engine, the MCP holds the analyst
   `Store` (`query-core.ts`): a UX guard (`guard.ts`) + capped, JSON-safe result shaping (`result.ts`) +
   traversal SQL over a `Connection` port — no `node:*` or DB driver, so the same core could later serve

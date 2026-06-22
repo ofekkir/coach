@@ -1,12 +1,11 @@
-// The `nodes` table spec — the unified, harness-agnostic node table. Extracted
-// from schema.ts (which stays the TABLES aggregator + describe_schema source) so
-// the largest spec has room to grow without tripping the per-file line cap.
+// The `nodes` table spec — the unified, harness-agnostic node table. The largest
+// spec, in its own file so it has room to grow without crowding the aggregator.
 
-import type { TableSpec } from './schema.ts';
+import type { TableSpec } from '../spec.ts';
 
 export const NODES: TableSpec = {
   name: 'nodes',
-  doc: 'One row per CanonicalNode — the unified, harness-agnostic node table. Common columns are promoted; type-specific columns are populated only for the relevant `type` and NULL otherwise; `data` carries the full raw node for anything not promoted.',
+  doc: 'One row per CanonicalNode — the unified, harness-agnostic node table. Common columns are promoted; type-specific columns are populated only for the relevant `type` and NULL otherwise; `data` carries the full raw node for anything not promoted. Per-type VIEWs (`llm_requests` / `tools` / `interactions`) project this table to the columns of one type with the irrelevant NULLs dropped.',
   columns: [
     {
       name: 'id',
@@ -29,18 +28,12 @@ export const NODES: TableSpec = {
       doc: 'FK → sessions.id. Denormalized onto every node so per-session aggregation is a flat filter.',
     },
     { name: 'interaction_id', sqlType: 'VARCHAR', doc: 'FK → owning interaction node id.' },
-    {
-      name: 'start_time_ns',
-      sqlType: 'VARCHAR',
-      doc: 'Span start, ns. VARCHAR because the value overflows DOUBLE precision.',
-    },
-    { name: 'end_time_ns', sqlType: 'VARCHAR', doc: 'Span end, nanoseconds (VARCHAR).' },
     // prettier-ignore
-    { name: 'start_time', sqlType: 'BIGINT', doc: 'Span start, ns — numeric form of start_time_ns (BIGINT holds the full int64). ORDER BY start_time == ORDER BY seq within an interaction.' },
+    { name: 'start_time', sqlType: 'BIGINT', doc: 'Span start, nanoseconds. BIGINT holds the full int64 ns value losslessly (a DOUBLE/JS number would not); the digit string survives verbatim in `data`. ORDER BY start_time == ORDER BY seq within an interaction.' },
     // prettier-ignore
-    { name: 'end_time', sqlType: 'BIGINT', doc: 'Span end, ns — numeric form of end_time_ns (BIGINT).' },
+    { name: 'end_time', sqlType: 'BIGINT', doc: 'Span end, nanoseconds (BIGINT, full-precision int64).' },
     // prettier-ignore
-    { name: 'seq', sqlType: 'INTEGER', doc: 'Dense 0..n-1 rank of this node within its owning interaction (every node sharing interaction_id), by start_time_ns ascending. ORDER BY seq == ORDER BY start_time_ns — a stable per-interaction timeline index.' },
+    { name: 'seq', sqlType: 'INTEGER', doc: 'Dense 0..n-1 rank of this node within its owning interaction (every node sharing interaction_id), by start_time ascending. ORDER BY seq == ORDER BY start_time — a stable per-interaction timeline index.' },
     { name: 'duration_ms', sqlType: 'DOUBLE', doc: 'Span wall-clock in ms.' },
     { name: 'model', sqlType: 'VARCHAR', doc: 'llm_request: model id.' },
     { name: 'source', sqlType: 'VARCHAR', doc: 'llm_request: emitting loop/source.' },
@@ -93,7 +86,7 @@ export const NODES: TableSpec = {
     {
       name: 'data',
       sqlType: 'JSON',
-      doc: "The full raw CanonicalNode. Escape hatch for un-promoted fields, e.g. request_messages / response_messages. Reach in with json_extract / data->>'$.field'.",
+      doc: "The full raw CanonicalNode. Escape hatch for un-promoted fields, e.g. request_messages / response_messages, and the verbatim start_time_ns / end_time_ns digit strings. Reach in with json_extract / data->>'$.field'.",
     },
   ],
 };

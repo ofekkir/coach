@@ -41,13 +41,32 @@ describe('temp-db store built from a graph', () => {
     await expect(store.query('DROP TABLE nodes')).rejects.toThrow();
   });
 
-  it('exposes interaction_metrics + transitions as queryable views', async () => {
+  it('exposes the derived + per-type relations as queryable views', async () => {
     const views = await store.query(
       "SELECT table_name FROM information_schema.tables WHERE table_type = 'VIEW' ORDER BY table_name",
     );
     const names = views.rows.map((r) => r.table_name);
-    expect(names).toContain('interaction_metrics');
-    expect(names).toContain('transitions');
+    for (const name of [
+      'interaction_metrics',
+      'transitions',
+      'llm_requests',
+      'tools',
+      'interactions',
+    ]) {
+      expect(names).toContain(name);
+    }
+  });
+
+  it('the per-type views agree row-for-row with the typed slice of nodes', async () => {
+    const res = await store.query(
+      "SELECT (SELECT COUNT(*) FROM tools) AS tools, (SELECT COUNT(*) FROM nodes WHERE type = 'tool') AS tool_nodes, " +
+        "(SELECT COUNT(*) FROM llm_requests) AS llms, (SELECT COUNT(*) FROM nodes WHERE type = 'llm_request') AS llm_nodes, " +
+        "(SELECT COUNT(*) FROM interactions) AS interactions, (SELECT COUNT(*) FROM nodes WHERE type = 'interaction') AS interaction_nodes",
+    );
+    const row = res.rows[0];
+    expect(Number(row?.tools)).toBe(Number(row?.tool_nodes));
+    expect(Number(row?.llms)).toBe(Number(row?.llm_nodes));
+    expect(Number(row?.interactions)).toBe(Number(row?.interaction_nodes));
   });
 
   it('interaction_metrics.tool_count sums to the total tool-node count (no drift)', async () => {
