@@ -7,6 +7,7 @@ import { fonts, monoLabel, tokens } from '../theme.ts';
 import { Glyph } from '../TraceNode/Glyph.tsx';
 
 import { contextBlock } from './context.tsx';
+import { errorCallout } from './error.tsx';
 import { longTextBlock, longTextOf } from './longtext.tsx';
 
 const DURATION_FONT = 18;
@@ -162,6 +163,7 @@ export function panelBody(content: PanelContent): React.ReactNode {
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px' }}>
       {metricsGrid(card, duration, isLongest)}
+      {card.error != null && errorCallout(card.error)}
       {whatHappened(whatOf(resolved))}
       {contextBlock(resolved)}
       {hiddenSubCall != null && hiddenSubCallCallout(hiddenSubCall)}

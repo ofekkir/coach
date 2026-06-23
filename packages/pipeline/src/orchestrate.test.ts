@@ -3,9 +3,9 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { runPipeline } from './orchestrate.ts';
+import { buildVizResultFromExecutionGraph, runPipeline } from './orchestrate.ts';
 import { PSEUDO_USER_ID } from './types.ts';
-import type { UploadedFile } from './types.ts';
+import type { ToolNode, UploadedFile } from './types.ts';
 
 const FIXTURES = join(import.meta.dirname, '../fixtures');
 
@@ -67,6 +67,23 @@ describe('runPipeline', () => {
 
     expect(classified.find((c) => c.file.name === 'README.md')?.type).toBe('unsupported');
     expect(sessions).toHaveLength(1);
+  });
+
+  it('carries failed-tool error fields onto the app-facing view-model nodes', () => {
+    // The app renders VizResult.data.nodes — assert a failed Edit reaches that
+    // shape with is_error/error_kind/error_message intact, so the card builder can
+    // mark the failure.
+    const files: UploadedFile[] = [
+      { name: 'session.jsonl', content: readFixture('native-claude/failed-edit/session.jsonl') },
+    ];
+    const { enrichedGraph } = runPipeline(files);
+    const viz = buildVizResultFromExecutionGraph(enrichedGraph, 'failed-edit');
+    const failedEdit = Object.values(viz.data.nodes).find(
+      (n): n is ToolNode => n.type === 'tool' && n.is_error === true && n.name === 'Edit',
+    );
+    expect(failedEdit).toBeDefined();
+    expect(failedEdit?.error_kind).toBe('invalid_args');
+    expect(failedEdit?.error_message).toBeTruthy();
   });
 
   it('produces no sessions when nothing renderable is present', () => {

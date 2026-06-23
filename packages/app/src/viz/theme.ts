@@ -40,6 +40,12 @@ export const tokens = {
   accentCallout: '#FCF4EE', // hidden-sub-call callout fill
   accentCalloutBorder: '#EAD3C5',
   positive: '#5B8C6E', // "carries over" check marks only
+  // ── failure: a failed tool call (is_error) — the only red in the system ──
+  danger: '#B23A2E', // failed-step border + error glyph/tag
+  dangerInk: '#8E2C22', // error text on light
+  dangerBg: '#F7E3DF', // error callout fill / glyph backdrop
+  dangerBorder: '#E6B8AF', // error callout border
+  dangerRing: '#F3D6CF', // 3px ring on a failed node card
   // ── inset surfaces, dividers, and one-off skins (warm system) ──
   insetBorder: '#EAE2D4', // border on inset value blocks (metric cards, long-text)
   divider: '#EDE6DA', // details-panel header/footer hairline
