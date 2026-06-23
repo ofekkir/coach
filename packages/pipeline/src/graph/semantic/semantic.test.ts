@@ -79,6 +79,20 @@ describe('enrichExecutionGraph', () => {
     });
   });
 
+  it('promotes structured context onto the semantics row the app renders', () => {
+    const readNode: CanonicalNode = {
+      ...tool1,
+      id: 'read1',
+      name: 'Read',
+      tool_input: JSON.stringify({ file_path: 'packages/app/src/main.tsx' }),
+    };
+    const enriched = enrich([interaction, llm1, readNode]);
+    expect(semanticsOf(enriched, 'read1')).toEqual({
+      what: ['read source code'],
+      context: { package: 'app', file: 'packages/app/src/main.tsx' },
+    });
+  });
+
   it('derives escape-hatch (Bash) `what` from the command grammar, not the tool name', () => {
     const bashNode = (id: string, command: string): CanonicalNode => ({
       ...tool1,

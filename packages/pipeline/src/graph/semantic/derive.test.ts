@@ -1,6 +1,7 @@
 import { defaultSemanticsConfig } from '@coach/semantics';
 import { describe, expect, it } from 'vitest';
 
+import { toolContext } from './context.ts';
 import {
   extractBashCommand,
   extractFilePath,
@@ -58,12 +59,20 @@ describe('toolPhrases (config-driven)', () => {
     ).toEqual(['edit claude code user settings']);
   });
 
-  it('renders the convention object type + structural qualifier for a workspace path', () => {
+  it('renders the convention object type without folding the package into the phrase', () => {
     expect(
       toolPhrases(defaultSemanticsConfig, 'Edit', {
         file_path: 'packages/pipeline/src/graph/semantic/derive.ts',
       }),
-    ).toEqual(['edit source code (package=pipeline)']);
+    ).toEqual(['edit source code']);
+  });
+
+  it('promotes the package + repo-relative file to structured context (not the phrase)', () => {
+    expect(
+      toolContext(defaultSemanticsConfig, 'Edit', {
+        file_path: 'packages/pipeline/src/graph/semantic/derive.ts',
+      }),
+    ).toEqual({ package: 'pipeline', file: 'packages/pipeline/src/graph/semantic/derive.ts' });
   });
 
   it('fetches + notes weak-model processing when WebFetch carries a prompt', () => {

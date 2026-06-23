@@ -16,6 +16,7 @@ import type {
 } from '../../types.ts';
 import type { ExecutionGraph } from '../types.ts';
 
+import { toolContext } from './context.ts';
 import {
   markerLabel,
   parseToolInput,
@@ -75,9 +76,11 @@ function toolAction(node: ToolNode, config: SemanticsConfig): string {
 function toolFields(node: ToolNode, config: SemanticsConfig): SemanticFields {
   const input = parseToolInput(node.tool_input);
   const comment = toolComment(config, node.name, input);
+  const context = toolContext(config, node.name, input);
   return {
     what: toolPhrases(config, node.name, input),
     ...(comment != null ? { comment } : {}),
+    ...(context != null ? { context } : {}),
   };
 }
 
