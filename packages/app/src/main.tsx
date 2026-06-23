@@ -11,11 +11,20 @@ import { App } from './viz/App/App.tsx';
 interface BootParams {
   dataUrl: string | null;
   focusId: string | null;
+  source: string | null;
+  dest: string | null;
+  highlight: string | null;
 }
 
 function readBootParams(): BootParams {
   const params = new URLSearchParams(window.location.search);
-  return { dataUrl: params.get('data'), focusId: params.get('focus') };
+  return {
+    dataUrl: params.get('data'),
+    focusId: params.get('focus'),
+    source: params.get('source'),
+    dest: params.get('dest'),
+    highlight: params.get('highlight'),
+  };
 }
 
 async function fetchPipelineOutput(url: string): Promise<VizResult> {
@@ -38,17 +47,24 @@ function renderApp(node: React.ReactNode): void {
 }
 
 async function boot(): Promise<void> {
-  const { dataUrl, focusId } = readBootParams();
+  const { dataUrl, focusId, source, dest, highlight } = readBootParams();
 
   if (dataUrl == null) {
-    renderApp(<ManualRoot focusId={focusId} />);
+    renderApp(<ManualRoot focusId={focusId} source={source} dest={dest} highlight={highlight} />);
     return;
   }
 
   try {
     const result = await fetchPipelineOutput(dataUrl);
     renderApp(
-      <App data={result.data} title={result.title} initialFocusId={focusId ?? undefined} />,
+      <App
+        data={result.data}
+        title={result.title}
+        initialFocusId={focusId ?? undefined}
+        initialSource={source ?? undefined}
+        initialDest={dest ?? undefined}
+        initialHighlight={highlight ?? undefined}
+      />,
     );
   } catch (err) {
     renderApp(<ErrorScreen message={err instanceof Error ? err.message : 'Unknown error.'} />);

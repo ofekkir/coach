@@ -37,11 +37,27 @@ function missingDataDirHint(dataDir: string): string {
   return `viz: data dir not found at ${dataDir} — load a directory dataset with \`load_dataset\` first so the stage JSON is dumped there.`;
 }
 
-/** Builds the boot URL for a running server: the app reads `data`/`focus` from the
- *  query string (see app `main.tsx`). Pure — tested without a live server. */
-export function buildVizUrl(port: number, dataFile: string, focus?: string): string {
+/** The viewport-targeting params the boot URL can carry: a single `focus` node to
+ *  center, or a `source`/`dest` pair to highlight distinctly and fit both into
+ *  view. All optional and independent (see app `main.tsx`). */
+export interface VizTarget {
+  focus?: string | undefined;
+  source?: string | undefined;
+  dest?: string | undefined;
+}
+
+function setIfPresent(params: URLSearchParams, key: string, value: string | undefined): void {
+  if (value != null && value.length > 0) params.set(key, value);
+}
+
+/** Builds the boot URL for a running server: the app reads `data` plus `focus` /
+ *  `source` / `dest` from the query string (see app `main.tsx`). Pure — tested
+ *  without a live server. */
+export function buildVizUrl(port: number, dataFile: string, target: VizTarget = {}): string {
   const params = new URLSearchParams({ data: dataFile });
-  if (focus != null && focus.length > 0) params.set('focus', focus);
+  setIfPresent(params, 'focus', target.focus);
+  setIfPresent(params, 'source', target.source);
+  setIfPresent(params, 'dest', target.dest);
   return `http://localhost:${String(port)}/?${params.toString()}`;
 }
 
@@ -86,7 +102,7 @@ export interface VizServer {
  *  the app `dist` is missing, or a load hint if the data dir does not exist. */
 export function startVizServer(
   dataFile: string = DEFAULT_DATA_FILE,
-  focus?: string,
+  target: VizTarget = {},
   dataDir: string = outputDir(),
 ): Promise<VizServer> {
   return new Promise((resolvePromise, rejectPromise) => {
@@ -103,7 +119,7 @@ export function startVizServer(
     });
     server.listen(0, () => {
       const { port } = server.address() as AddressInfo;
-      resolvePromise({ url: buildVizUrl(port, dataFile, focus), close: () => server.close() });
+      resolvePromise({ url: buildVizUrl(port, dataFile, target), close: () => server.close() });
     });
   });
 }

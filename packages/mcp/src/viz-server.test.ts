@@ -19,13 +19,32 @@ describe('buildVizUrl', () => {
   });
 
   it('appends the focus node id when given', () => {
-    expect(buildVizUrl(4321, '06-enriched-graph.json', 'node-7')).toBe(
+    expect(buildVizUrl(4321, '06-enriched-graph.json', { focus: 'node-7' })).toBe(
       'http://localhost:4321/?data=06-enriched-graph.json&focus=node-7',
     );
   });
 
   it('omits focus when empty', () => {
-    expect(buildVizUrl(4321, 'x.json', '')).toBe('http://localhost:4321/?data=x.json');
+    expect(buildVizUrl(4321, 'x.json', { focus: '' })).toBe('http://localhost:4321/?data=x.json');
+  });
+
+  it('appends both source and dest when given as a pair', () => {
+    expect(buildVizUrl(4321, 'x.json', { source: 'a', dest: 'b' })).toBe(
+      'http://localhost:4321/?data=x.json&source=a&dest=b',
+    );
+  });
+
+  it('supports source or dest alone', () => {
+    expect(buildVizUrl(4321, 'x.json', { source: 'a' })).toBe(
+      'http://localhost:4321/?data=x.json&source=a',
+    );
+    expect(buildVizUrl(4321, 'x.json', { dest: 'b' })).toBe(
+      'http://localhost:4321/?data=x.json&dest=b',
+    );
+  });
+
+  it('is unchanged with no target', () => {
+    expect(buildVizUrl(4321, 'x.json')).toBe('http://localhost:4321/?data=x.json');
   });
 });
 
@@ -37,7 +56,7 @@ describe('startVizServer', () => {
 
   it('serves dist/index.html and returns a bootable url', async () => {
     if (!DIST_BUILT) return;
-    const server = await startVizServer('06-enriched-graph.json', 'node-1');
+    const server = await startVizServer('06-enriched-graph.json', { focus: 'node-1' });
     try {
       expect(server.url).toMatch(
         /^http:\/\/localhost:\d+\/\?data=06-enriched-graph\.json&focus=node-1$/,

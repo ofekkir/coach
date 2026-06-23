@@ -9,6 +9,8 @@ import type {
 } from '@coach/pipeline';
 import type { Edge } from '@xyflow/react';
 
+import type { HighlightRole } from '../highlight/highlight.ts';
+
 import { placeAgent, sessionWidth } from './place-graph.ts';
 import type { Ctx, RFNode } from './types.ts';
 import { CANVAS_TOP, CENTERING_DIVISOR, NW, HG } from './types.ts';
@@ -43,6 +45,7 @@ export function buildElements(
   graph: ExecutionGraph,
   expanded: Set<string>,
   selected: string | null,
+  highlight: ReadonlyMap<string, HighlightRole> | null = null,
 ): { nodes: RFNode[]; edges: Edge[] } {
   const agent = toAgent(graph);
   const totalSessionsW = agent.sessions.reduce((sum, s, i) => {
@@ -53,6 +56,7 @@ export function buildElements(
     cx: Math.max(NW, totalSessionsW) / CENTERING_DIVISOR + CANVAS_TOP,
     expanded,
     selected,
+    highlight,
     nodes: [],
     edges: [],
   };

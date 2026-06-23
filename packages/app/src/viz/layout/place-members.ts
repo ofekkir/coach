@@ -20,6 +20,13 @@ export function cardOf(ctx: Ctx, id: string, index = 0): NodeCard {
   return buildNodeCard(resolve(ctx.graph, id), index);
 }
 
+// The pair-highlight role for an id, spread onto node data only when present so the
+// `highlightRole?` field stays absent (not `undefined`) under exactOptionalPropertyTypes.
+function highlightFlag(id: string, ctx: Ctx): Pick<TraceRFNodeData, 'highlightRole'> {
+  const role = ctx.highlight?.get(id);
+  return role != null ? { highlightRole: role } : {};
+}
+
 function push(id: string, x: number, y: number, data: TraceRFNodeData, ctx: Ctx): void {
   ctx.nodes.push({
     id,
@@ -59,6 +66,7 @@ export function pushStructural(
       hasRFChildren: hasKids,
       isExpanded: ctx.expanded.has(id),
       selected: id === ctx.selected,
+      ...highlightFlag(id, ctx),
     },
     ctx,
   );
@@ -125,6 +133,7 @@ export function pushExecNode(
       hasRFChildren: false,
       isExpanded: false,
       selected: node.id === ctx.selected,
+      ...highlightFlag(node.id, ctx),
     },
     ctx,
   );
