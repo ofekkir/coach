@@ -1,5 +1,5 @@
 import type { ResolvedNode } from '@coach/pipeline';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { formatMetrics, type NodeCard } from '../format/format.ts';
 import type { HiddenSubCall } from '../layout/types.ts';
@@ -21,6 +21,7 @@ export function DetailsPanel({
   isLongest,
   hiddenSubCall,
   nested,
+  showRawDefault,
   onClose,
 }: {
   card: NodeCard;
@@ -28,9 +29,15 @@ export function DetailsPanel({
   isLongest: boolean;
   hiddenSubCall: HiddenSubCall | undefined;
   nested: boolean;
+  showRawDefault: boolean;
   onClose: () => void;
 }) {
-  const [showRaw, setShowRaw] = useState(false);
+  // Seed from the global default; re-sync when the global toggle flips so an
+  // already-open card follows it, while the footer button still overrides locally.
+  const [showRaw, setShowRaw] = useState(showRawDefault);
+  useEffect(() => {
+    setShowRaw(showRawDefault);
+  }, [showRawDefault]);
   const [expanded, setExpanded] = useState(false);
   const { duration } = formatMetrics(card.metrics);
   const headerAccent = isLongest || isActionType(card.type);

@@ -169,7 +169,7 @@ export function panelBody(content: PanelContent): React.ReactNode {
       {hiddenSubCall != null && hiddenSubCallCallout(hiddenSubCall)}
       {longText != null && longTextBlock(longText, content.expanded, content.onToggleExpanded)}
       {showRaw && (
-        <div style={{ marginTop: 20 }}>
+        <div data-raw-node style={{ marginTop: 20 }}>
           <JsonView value={raw} />
         </div>
       )}
