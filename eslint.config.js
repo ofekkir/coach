@@ -186,9 +186,10 @@ export default tseslint.config(
       'max-lines-per-function': ['error', { max: 80, skipBlankLines: true, skipComments: true }],
     },
   },
-  // Config files are plain JS and live outside the TS program; skip type-aware rules.
+  // Config files are plain JS (incl. .mjs like Ladle's .ladle/config.mjs) and live
+  // outside the TS program; skip type-aware rules so projectService doesn't reject them.
   {
-    files: ['**/*.js'],
+    files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },
   // Test files use nested describe/it/expect which is idiomatic Vitest — not a real smell.
