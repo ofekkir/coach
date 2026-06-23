@@ -15,6 +15,13 @@ export interface QueryResult {
   readonly rowCount: number;
   /** True if rows were dropped (row/byte cap) or any cell was clipped. */
   readonly truncated: boolean;
+  /** Rows actually returned (`rows.length`); equals `rowCount` when nothing was dropped. */
+  readonly returnedRows: number;
+  /** Rows removed by the row/byte cap (`rowCount - returnedRows`); 0 when only cells were clipped. */
+  readonly droppedRows: number;
+  /** Plain-language warning, present and non-empty IFF something was reduced — names how
+   *  many rows were dropped, which cap fired, whether cells were clipped, and how to recover. */
+  readonly notice?: string;
 }
 
 export interface ResultLimits {
@@ -54,8 +61,37 @@ function clipRow(
   return { row: out, clipped };
 }
 
+/** Whether the row/byte cap fired, and which one — so the notice can name the cause.
+ *  `row` means we kept exactly `maxRows` and more existed; `byte` means we stopped on the
+ *  serialized-byte budget before reaching `maxRows`. */
+type DropCause = 'none' | 'row' | 'byte';
+
+function dropCause(returnedRows: number, totalRows: number, maxRows: number): DropCause {
+  if (returnedRows >= totalRows) return 'none';
+  if (returnedRows >= maxRows) return 'row';
+  return 'byte';
+}
+
+function buildNotice(
+  droppedRows: number,
+  totalRows: number,
+  cause: DropCause,
+  clippedAny: boolean,
+): string | undefined {
+  const remediation =
+    'narrow your SELECT (fewer/shorter columns) or page with LIMIT/OFFSET to retrieve the rest';
+  if (cause === 'byte')
+    return `${String(droppedRows)} of ${String(totalRows)} rows were dropped because the result hit the serialized-byte budget${clippedAny ? ' (some cells were also clipped)' : ''}. To get the rest, ${remediation}.`;
+  if (cause === 'row')
+    return `${String(droppedRows)} of ${String(totalRows)} rows were dropped because the result hit the row cap${clippedAny ? ' (some cells were also clipped)' : ''}. To get the rest, ${remediation}.`;
+  if (clippedAny)
+    return `0 rows were dropped, but some cells were clipped to fit the per-cell length limit. The full cell values are not shown; ${remediation}.`;
+  return undefined;
+}
+
 /** Caps rows by count and serialized bytes (always keeping ≥1 row) and clips long
- *  cells. `rowCount` is the true pre-cap total; `truncated` flags any reduction. */
+ *  cells. `rowCount` is the true pre-cap total; `truncated` flags any reduction; `notice`
+ *  spells out — in plain language — what was cut, why, and how to recover. */
 export function shapeResult(raw: RawResult, limits: ResultLimits = DEFAULT_LIMITS): QueryResult {
   const kept: Record<string, unknown>[] = [];
   let bytes = 0;
@@ -69,10 +105,18 @@ export function shapeResult(raw: RawResult, limits: ResultLimits = DEFAULT_LIMIT
     bytes += rowBytes;
     clippedAny ||= clipped;
   }
+  const rowCount = raw.rows.length;
+  const returnedRows = kept.length;
+  const droppedRows = rowCount - returnedRows;
+  const cause = dropCause(returnedRows, rowCount, limits.maxRows);
+  const notice = buildNotice(droppedRows, rowCount, cause, clippedAny);
   return {
     columns: raw.columns,
     rows: kept,
-    rowCount: raw.rows.length,
-    truncated: kept.length < raw.rows.length || clippedAny,
+    rowCount,
+    returnedRows,
+    droppedRows,
+    truncated: droppedRows > 0 || clippedAny,
+    ...(notice != null && { notice }),
   };
 }

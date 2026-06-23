@@ -92,7 +92,7 @@ function queryTool(session: Session): Tool {
   return {
     name: 'query',
     description:
-      'Run a read-only SQL query (a single SELECT or WITH statement) over the loaded execution-graph tables. Results are capped (≤1000 rows and a serialized-byte budget; `truncated` flags when rows were dropped or long cells clipped). See describe_schema for the table/column reference.',
+      'Run a read-only SQL query (a single SELECT or WITH statement) over the loaded execution-graph tables. Results are capped (≤1000 rows and a serialized-byte budget). When anything is reduced, `truncated` is true, `droppedRows` reports how many rows were cut (`returnedRows` is what you got of `rowCount` total), and `notice` explains in plain language which cap fired and how to recover — read it. See describe_schema for the table/column reference.',
     inputShape: { sql: z.string().describe('A single SELECT/WITH statement.') },
     handle: (args) => session.store().query(stringArg(args, 'sql')),
   };
