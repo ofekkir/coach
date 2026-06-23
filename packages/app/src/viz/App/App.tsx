@@ -78,6 +78,7 @@ interface AppProps {
 export function App({ data, title, initialFocusId }: AppProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => initialExpanded());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showRawDefault, setShowRawDefault] = useState(false);
   const [focus, setFocus] = useState<FocusRequest | null>(null);
   const focusNonce = useRef(0);
 
@@ -128,6 +129,10 @@ export function App({ data, title, initialFocusId }: AppProps) {
         stats={stats}
         onExpandAll={onExpandAll}
         onCollapseAll={onCollapseAll}
+        showRaw={showRawDefault}
+        onToggleShowRaw={() => {
+          setShowRawDefault((v) => !v);
+        }}
         onFocus={onFocusId}
       />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -149,6 +154,7 @@ export function App({ data, title, initialFocusId }: AppProps) {
             isLongest={selected.isLongest}
             hiddenSubCall={selected.hiddenSubCall}
             nested={selected.nested}
+            showRawDefault={showRawDefault}
             onClose={() => {
               setSelectedId(null);
             }}
