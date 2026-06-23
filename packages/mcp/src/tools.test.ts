@@ -5,8 +5,10 @@ import { fileURLToPath } from 'node:url';
 import type { ResolvedNode } from '@coach/pipeline';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import type { QueryResult } from './result.ts';
-import { createSession, type Session } from './session.ts';
+import { createStore, type Store } from './query-core.ts';
+import type { QueryResult, RawResult } from './result.ts';
+import type { Session } from './session.ts';
+import { createSession } from './session.ts';
 import { createTools, type Tool } from './tools.ts';
 
 const FIXTURE = fileURLToPath(
@@ -102,5 +104,50 @@ describe('createTools', () => {
     const id = ids.rows[0]?.id;
     const resolved = (await tool('resolve').handle({ id })) as ResolvedNode;
     expect(resolved.node.id).toBe(id);
+  });
+});
+
+// Stand-in session whose store applies tiny limits over a fixed result, so a
+// truncated query is deterministic and fast — no heavy fixture / DuckDB needed.
+function fakeSession(store: Store): Session {
+  const unused = (): never => {
+    throw new Error('not used in this test');
+  };
+  return {
+    load: () => Promise.reject(new Error('not used in this test')),
+    dataset: unused,
+    store: () => store,
+    close: () => undefined,
+  };
+}
+
+describe('query tool serialization round-trip', () => {
+  const JSON_INDENT = 2;
+
+  it('keeps notice and droppedRows when the result is serialized back to the caller', async () => {
+    const big = 'a'.repeat(500);
+    const raw: RawResult = {
+      columns: ['x'],
+      rows: Array.from({ length: 100 }, () => ({ x: big })),
+    };
+    const store = createStore(
+      { runAndReadAll: () => Promise.resolve(raw), close: () => undefined },
+      { maxRows: 1000, maxBytes: 1000, maxCellChars: 10_000 },
+    );
+    const query = createTools(fakeSession(store)).find((t) => t.name === 'query');
+    if (query == null) throw new Error('no query tool');
+
+    const result = (await query.handle({ sql: 'SELECT x FROM t' })) as QueryResult;
+    expect(result.droppedRows).toBeGreaterThan(0);
+    expect(result.notice).toBeDefined();
+
+    // Mirror server.ts textResult: the payload the caller actually receives.
+    const serialized = JSON.parse(JSON.stringify(result, null, JSON_INDENT)) as QueryResult;
+    expect(serialized.droppedRows).toBe(result.droppedRows);
+    expect(serialized.returnedRows).toBe(result.returnedRows);
+    expect(serialized.truncated).toBe(true);
+    expect(serialized.notice).toBe(result.notice);
+    expect(serialized.notice).toContain('serialized-byte budget');
+    expect(serialized.notice).toContain(`${String(serialized.droppedRows)} of 100 rows`);
   });
 });
