@@ -8,6 +8,7 @@ import type { ExecutionGraph } from '@coach/pipeline';
 
 import { dumpPipelineOutputs } from './dump.ts';
 import { loadPipelineResult, type Dataset } from './load.ts';
+import { outputDir } from './output-dir.ts';
 import type { Store } from './query-core.ts';
 import { createStore } from './store.ts';
 
@@ -18,8 +19,8 @@ export interface DatasetSummary {
   readonly sessions: number;
   readonly interactions: number;
   readonly nodes: number;
-  /** The stage JSON + `.db` files written to the cwd, so the agent can `open_viz`
-   *  them. */
+  /** The stage JSON + `.db` files written to the gitignored `out/` dir, so the
+   *  agent can `open_viz` them. */
   readonly dumped?: readonly string[];
 }
 
@@ -56,12 +57,13 @@ interface Loaded {
 }
 
 // A load re-derives the dataset: run the pipeline over the directory, dump the
-// stage outputs + `.db` into the cwd (so `open_viz` can serve them), and make the
-// graph queryable through a fresh temp DuckDB.
+// stage outputs + `.db` into the gitignored `out/` dir (so `open_viz` can serve
+// them without polluting the run dir), and make the graph queryable through a
+// fresh temp DuckDB.
 async function loadFromDir(path: string): Promise<Loaded> {
   const result = loadPipelineResult(path);
   const dataset: Dataset = { graph: result.enrichedGraph };
-  const dumped = await dumpPipelineOutputs(result, process.cwd());
+  const dumped = await dumpPipelineOutputs(result, outputDir());
   return { dataset, store: await createStore(dataset.graph), dumped };
 }
 

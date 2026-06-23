@@ -140,7 +140,7 @@ function openVizTool(): Tool {
   return {
     name: 'open_viz',
     description:
-      'Open the interactive graph visualization. Starts a local web server over the built app and the stage JSON dumped into the cwd by the last directory `load_dataset`, and returns a URL. Pass a dumped JSON file name (default `06-enriched-graph.json`) and an optional `focus` node id to center on. Requires the app to be built (`pnpm --filter @coach/app build`).',
+      'Open the interactive graph visualization. Starts a local web server over the built app and the stage JSON dumped into the `out/` dir by the last directory `load_dataset`, and returns a URL. Pass a dumped JSON file name (default `06-enriched-graph.json`) and an optional `focus` node id to center on. Requires the app to be built (`pnpm --filter @coach/app build`).',
     inputShape: {
       file: z
         .string()

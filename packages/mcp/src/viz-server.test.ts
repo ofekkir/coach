@@ -1,8 +1,11 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { outputDir } from './output-dir.ts';
 import { buildVizUrl, startVizServer } from './viz-server.ts';
 
 const APP_DIST_INDEX = fileURLToPath(new URL('../../app/dist/index.html', import.meta.url));
@@ -45,5 +48,30 @@ describe('startVizServer', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+// The default data dir is the shared `out/` — the same source of truth the
+// session dumps to — so dump-here and read-there cannot drift. Run from a temp
+// cwd so the assertion is independent of the repo working tree.
+describe('startVizServer default data dir', () => {
+  let cwdBefore: string;
+  let tmpCwd: string;
+
+  beforeAll(() => {
+    cwdBefore = process.cwd();
+    tmpCwd = mkdtempSync(join(tmpdir(), 'coach-viz-outdir-test-'));
+    process.chdir(tmpCwd);
+  });
+
+  afterAll(() => {
+    process.chdir(cwdBefore);
+    rmSync(tmpCwd, { recursive: true, force: true });
+  });
+
+  it('errors with a load hint when the default out/ dir does not exist', async () => {
+    if (!DIST_BUILT) return;
+    await expect(startVizServer()).rejects.toThrow(outputDir());
+    await expect(startVizServer()).rejects.toThrow(/load_dataset/);
   });
 });
