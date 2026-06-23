@@ -4,6 +4,7 @@ import { BG_NW, COMPACT_NW, NW } from '../layout/types.ts';
 import type { TraceRFNodeData } from '../layout/types.ts';
 import { ACCENT_SHADOW, ellipsis, fonts, glyphFor, isWeakModel, tokens } from '../theme.ts';
 
+import { ErrorBadge, withDanger } from './error.tsx';
 import { Glyph } from './Glyph.tsx';
 import { NodeBody, type StepPalette } from './NodeBody.tsx';
 
@@ -95,6 +96,9 @@ function stepCardStyle(
   return { ...base, background: tokens.surface, border: `1px solid ${tokens.cardBorder}` };
 }
 
+// Gap (px) between the error badge and the duration when both share the header.
+const ERROR_DURATION_GAP = 6;
+
 function modelLabel(card: NodeCard): string | undefined {
   if (card.model == null) return undefined;
   return isWeakModel(card.model) ? `${card.model} · weak model` : card.model;
@@ -113,6 +117,7 @@ function stepHeader(
   chevron: string | null,
   duration: string | null,
 ): React.ReactNode {
+  const hasError = card.error != null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
       <Glyph kind={glyphFor(card.type, nested)} accent={accent} />
@@ -132,10 +137,11 @@ function stepHeader(
           {chevron}
         </span>
       )}
+      {hasError && <ErrorBadge pushRight={duration == null} />}
       {duration != null && (
         <span
           style={{
-            marginLeft: 'auto',
+            marginLeft: hasError ? ERROR_DURATION_GAP : 'auto',
             fontFamily: fonts.mono,
             fontSize: 11,
             fontWeight: accent ? WEIGHT_BOLD : WEIGHT_NORMAL,
@@ -178,9 +184,12 @@ export function renderStep(data: TraceRFNodeData, selected: boolean): React.Reac
   const palette = PALETTES[state];
   const { duration } = formatMetrics(card.metrics);
   const chevron = chevronFor(hasRFChildren, isExpanded);
+  const hasError = card.error != null;
+  const baseStyle = stepCardStyle(state, lane, compact);
+  const cardStyle = hasError ? withDanger(baseStyle) : baseStyle;
 
   return (
-    <div style={stepCardStyle(state, lane, compact)}>
+    <div style={cardStyle} data-error={hasError ? 'true' : undefined}>
       {stepHeader(card, palette, accent, nested, chevron, duration)}
       <NodeBody
         title={card.title}

@@ -263,7 +263,9 @@ dropped) and surfaced as a count. The graph is consumed only by the renderer —
 (`layout/place-members.ts :: cardOf` / `nodeOf`, backed by `graph.nodes` + the `semantics` overlay,
 threaded via `Ctx.graph`). `viz/format/format.ts :: buildNodeCard` takes a **`ResolvedNode`** (the
 canonical row + its optional semantic fields) and returns a typed `NodeCard` — a curated, at-a-glance
-summary (display type, title, structural key/values, numeric metrics). Entities render as container
+summary (display type, title, structural key/values, numeric metrics) — plus, for a **failed** tool
+call, its outcome on `NodeCard.error` (`error_kind` + `error_message`, derived in `format/error.ts ::
+errorOf`; absent on success/unmatched calls). Entities render as container
 cards from `buildAgentCard` / `buildSessionCard` (the degraded-graph synthesizer in `layout/queries.ts`
 produces synthetic `Agent`/`Session` **entities**), never from the node table. The card reads only
 fields the canonical model guarantees; it never interprets harness-shaped content (response content
@@ -282,7 +284,10 @@ synthesized in the layout from `InteractionNode.prompt` (`buildPromptCard`), the
 cards are synthesized from entities; selecting it resolves to no node row, and its full text rides on
 the card for the details panel. The lone clay accent is spent only on focus — selection, the prompt
 anchor, and the **longest step** (its share-of-run bar + the edge into it), derived app-side in the
-layout pass (`layout/place-graph.ts`). The main thread rides a spine;
+layout pass (`layout/place-graph.ts`). The one exception is **failure**: a failed tool call
+(`card.error != null`) earns the system's only red — a danger border + an ✕/`ERROR` glyph on the node
+(`TraceNode/error.tsx`, never color alone) and a `FAILED` callout with the kind + message in the
+details panel (`DetailsPanel/error.tsx`). The main thread rides a spine;
 off-spine threads (`source !== 'repl_main_thread'`) move to a dimmed background lane, a tool's raw
 sub-spans (`tool.execution` / `tool.blocked_on_user`) are collapsed (only its one nested weak-model
 inference surfaces, indented), and the top bar (`viz/TopBar`) shows the breadcrumb + run aggregates.
