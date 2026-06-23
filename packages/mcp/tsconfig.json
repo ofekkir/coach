@@ -4,5 +4,5 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["src", "bin", "vitest.config.ts"]
+  "include": ["src", "bin", "vitest.config.ts", "tsup.config.ts"]
 }

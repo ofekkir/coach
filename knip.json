@@ -7,7 +7,9 @@
     "packages/logger": {},
     "packages/pipeline": {},
     "packages/semantics": {},
-    "packages/mcp": {},
+    "packages/mcp": {
+      "entry": ["bin/viz.ts"]
+    },
     "packages/app": {
       "entry": ["src/**/*.stories.tsx"]
     }

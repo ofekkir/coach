@@ -95,6 +95,52 @@ A standalone DuckDB snapshot for ad-hoc inspection in the `duckdb` CLI is also a
 `pnpm build-db <traces-dir> [out.db]` (the MCP itself re-derives from source rather than loading
 it).
 
+## Install coach in your own agent
+
+The instructions above run coach from a clone of this repo. To use coach in **your own agent**
+without cloning, install the published `@coach/mcp` package — it bundles the pipeline + semantics
+into a self-contained server bin (`coach-mcp`) and ships the `analyze-traces` skill so your agent
+knows how to drive it. The native DuckDB module and the MCP SDK install as normal npm deps.
+
+```bash
+# install the distributable server (once published to npm)
+npm install -g @coach/mcp
+# …or, from a tarball you built locally:
+#   pnpm --filter @coach/mcp build && (cd packages/mcp && npm pack)
+#   npm install -g ./coach-mcp-<version>.tgz
+```
+
+**1. Install the skill + get the registration line.** `coach-mcp init` copies the bundled
+`analyze-traces` skill into your skills dir and prints the exact `claude mcp add` command:
+
+```bash
+coach-mcp init                 # installs to ~/.claude/skills/analyze-traces/SKILL.md
+coach-mcp init --project       # installs to ./.claude/skills/ instead
+coach-mcp init --print-only    # just print the registration line, write nothing
+```
+
+It never overwrites an existing skill without `--force`. The command prints:
+
+```text
+claude mcp add coach -- coach-mcp
+```
+
+**2. Register the server with your agent.** Run that line (append an absolute traces directory to
+preload it, e.g. `claude mcp add coach -- coach-mcp /ABS/PATH/TO/traces`). With no directory, the
+server defaults to discovering your own Claude Code logs at `~/.claude/projects`, and the agent can
+also call `load_dataset` with any path at runtime.
+
+**3. Verify.** In a Claude Code session run `/mcp` to confirm "coach" is connected, then ask
+_"analyze my agent traces and find the most expensive interactions"_ — the `analyze-traces` skill
+triggers and drives the tools.
+
+> `open_viz` requires the built `@coach/app`, which is not shipped in the server package — querying
+> and graph traversal work standalone; the browser visualization is available from a repo clone.
+
+A cross-repo install of the packaged server is exercised end to end by
+`node --experimental-strip-types scripts/smoke-mcp-install.ts` (pack → install into a temp dir →
+`init` → MCP `tools/list` handshake).
+
 ## Development
 
 | Command                                    | What it does                                          |

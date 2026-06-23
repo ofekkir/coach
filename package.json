@@ -16,6 +16,7 @@
     "format:check": "prettier --check .",
     "test": "pnpm -r test",
     "test:watch": "pnpm --filter @coach/pipeline test:watch",
+    "build": "pnpm --filter @coach/mcp build",
     "e2e": "node --experimental-strip-types scripts/e2e.ts",
     "mcp": "node --experimental-strip-types packages/mcp/bin/mcp.ts",
     "build-db": "node --experimental-strip-types packages/mcp/bin/build-db.ts",
