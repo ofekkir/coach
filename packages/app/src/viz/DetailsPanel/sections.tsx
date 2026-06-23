@@ -6,6 +6,7 @@ import type { HiddenSubCall } from '../layout/types.ts';
 import { fonts, monoLabel, tokens } from '../theme.ts';
 import { Glyph } from '../TraceNode/Glyph.tsx';
 
+import { contextBlock } from './context.tsx';
 import { longTextBlock, longTextOf } from './longtext.tsx';
 
 const DURATION_FONT = 18;
@@ -162,6 +163,7 @@ export function panelBody(content: PanelContent): React.ReactNode {
     <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px' }}>
       {metricsGrid(card, duration, isLongest)}
       {whatHappened(whatOf(resolved))}
+      {contextBlock(resolved)}
       {hiddenSubCall != null && hiddenSubCallCallout(hiddenSubCall)}
       {longText != null && longTextBlock(longText, content.expanded, content.onToggleExpanded)}
       {showRaw && (

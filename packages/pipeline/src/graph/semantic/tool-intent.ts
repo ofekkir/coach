@@ -50,29 +50,15 @@ function groundedType(config: SemanticsConfig, path: string): string | undefined
   return objectLabel(config, rule.object);
 }
 
-/** A structural qualifier (e.g. `package=pipeline`) deduced from generic layout
- *  conventions — the monorepo workspace a path lives in. Undefined when none match. */
-function structureQualifier(config: SemanticsConfig, path: string): string | undefined {
-  const rules = config.ontology.conventions?.structure?.rules ?? [];
-  for (const rule of rules) {
-    const captured = new RegExp(rule.match, 'i').exec(path)?.[1];
-    if (captured != null && captured !== '') return `${rule.qualifier}=${captured}`;
-  }
-  return undefined;
-}
-
 /** Convention-based rendering: well-known agent paths keep their semantic name;
- *  otherwise render the convention object type plus any structural qualifier
- *  (`source code (package=pipeline)`). Unknown type → just the basename (the full
- *  path is preserved on the canonical node for detail display). */
+ *  otherwise the convention object type (`source code`). The package and full path
+ *  are NOT folded into the phrase — they live on `context`. Unknown → basename. */
 function renderPathObject(config: SemanticsConfig, rawPath: string): string {
   const path = stripWorktreeSegment(rawPath);
   const known = wellKnownLabel(config, path);
   if (known != null) return known;
   const type = groundedType(config, path);
-  if (type == null) return basename(path);
-  const qualifier = structureQualifier(config, path);
-  return qualifier != null ? `${type} (${qualifier})` : type;
+  return type ?? basename(path);
 }
 
 function hostOf(url: string): string {
@@ -172,7 +158,10 @@ const MCP_TOOL_PREFIX = 'mcp__';
 
 /** The agent's configured tool spec for a tool name, falling back to the
  *  `_unknownTool` catch-all. Undefined only when neither is configured. */
-function toolSpecFor(config: SemanticsConfig, name: string | undefined): ToolSemantics | undefined {
+export function toolSpecFor(
+  config: SemanticsConfig,
+  name: string | undefined,
+): ToolSemantics | undefined {
   return (name != null ? config.agent.tools[name] : undefined) ?? config.agent.tools._unknownTool;
 }
 
@@ -181,8 +170,7 @@ function toolSpecFor(config: SemanticsConfig, name: string | undefined): ToolSem
  *  `toolOntologyAction` feeds the coarse rollup. `git commit …` → "version control",
  *  `pnpm test …` → "run tests", `grep …` → "search". A command the grammar can't
  *  classify falls to the generic `run` action; qualify it with the invoked program
- *  (`python3 build.py` → "run python3") so the phrase still names what ran rather
- *  than the bare tool/action. */
+ *  (`python3 build.py` → "run python3") so the phrase still names what ran. */
 function escapeHatchPhrase(config: SemanticsConfig, input: Record<string, unknown>): string {
   const command = extractBashCommand(input) ?? undefined;
   const action = shellCommandAction(config, command);
