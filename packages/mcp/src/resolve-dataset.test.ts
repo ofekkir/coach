@@ -10,10 +10,10 @@ import { resolveRepoDirs, type ResolvedRepo } from './resolve-dataset.ts';
 // repo, and a repo whose name is a suffix of another — enough to exercise the
 // worktree fold, the include flag, and the not-found / ambiguity paths.
 const PROJECT_DIRS = [
-  '-Users-ofek-projects-coach',
-  '-Users-ofek-projects-coach--claude-worktrees-add-search',
-  '-Users-ofek-projects-coach--claude-worktrees-fix-delta',
-  '-Users-ofek-projects-other',
+  '-Users-dev-projects-coach',
+  '-Users-dev-projects-coach--claude-worktrees-add-search',
+  '-Users-dev-projects-coach--claude-worktrees-fix-delta',
+  '-Users-dev-projects-other',
 ];
 
 describe('resolveRepoDirs', () => {
@@ -35,20 +35,20 @@ describe('resolveRepoDirs', () => {
   it('folds in every worktree by default when resolving by name', () => {
     const resolved: ResolvedRepo = resolveRepoDirs('coach');
     expect(resolved.dirs.map((d) => basename(d))).toEqual([
-      '-Users-ofek-projects-coach',
-      '-Users-ofek-projects-coach--claude-worktrees-add-search',
-      '-Users-ofek-projects-coach--claude-worktrees-fix-delta',
+      '-Users-dev-projects-coach',
+      '-Users-dev-projects-coach--claude-worktrees-add-search',
+      '-Users-dev-projects-coach--claude-worktrees-fix-delta',
     ]);
   });
 
   it('returns only the main checkout when worktrees are excluded', () => {
     const resolved = resolveRepoDirs('coach', { includeWorktrees: false });
-    expect(resolved.dirs.map((d) => basename(d))).toEqual(['-Users-ofek-projects-coach']);
+    expect(resolved.dirs.map((d) => basename(d))).toEqual(['-Users-dev-projects-coach']);
   });
 
   it('resolves by absolute repo path', () => {
-    const resolved = resolveRepoDirs('/Users/ofek/projects/coach');
-    expect(resolved.repoKey).toBe('-Users-ofek-projects-coach');
+    const resolved = resolveRepoDirs('/Users/dev/projects/coach');
+    expect(resolved.repoKey).toBe('-Users-dev-projects-coach');
     expect(resolved.dirs).toHaveLength(3);
   });
 

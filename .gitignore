@@ -23,6 +23,8 @@ out.timeline
 
 # Claude Code worktrees (git worktrees created per session — not source files)
 .claude/worktrees/
+# Stray legacy worktree dir (accidentally committed once in #14)
+.claire/
 
 # MCP server config — contains secrets (service account tokens)
 .mcp.json

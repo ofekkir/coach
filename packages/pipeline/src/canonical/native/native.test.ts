@@ -39,6 +39,18 @@ const REFACTOR_JSONL = readFileSync(
   'utf8',
 );
 
+// The interaction prompts are asserted against the fixture's own human turns rather
+// than hardcoded literals, so test source stays free of fixture-specific content.
+function humanPrompts(jsonl: string): string[] {
+  return jsonl
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as { type?: string; message?: { content?: unknown } })
+    .filter((row) => row.type === 'user' && typeof row.message?.content === 'string')
+    .map((row) => row.message?.content as string)
+    .filter((text) => !text.startsWith('<'));
+}
+
 function toolResultText(b: unknown): string | null {
   if (typeof b !== 'object' || b === null) return null;
   const block = b as { type?: unknown; content?: unknown };
@@ -57,7 +69,7 @@ describe('nativeSessionToTrace', () => {
 
     const interactions = nodes.filter((n) => n.type === 'interaction');
     expect(interactions).toHaveLength(1);
-    expect(interactions[0]?.prompt).toBe('fetch ynet.co.il');
+    expect(interactions[0]?.prompt).toBe(humanPrompts(FIXTURE_JSONL)[0]);
     expect(interactions[0]?.session_id).toBe(SESSION_ID);
 
     const tools = nodes.filter((n): n is ToolNode => n.type === 'tool');
@@ -159,9 +171,7 @@ describe('nativeSessionToTrace — multi-turn fixture', () => {
     const nodes = transformTrace(nativeSessionToTrace(MULTI_TURN_JSONL));
     const interactions = nodes.filter((n) => n.type === 'interaction');
     expect(interactions).toHaveLength(3);
-    expect(interactions[0]?.prompt).toBe('fetch ynet.co.il');
-    expect(interactions[1]?.prompt).toBe('translated to hebrew the second one');
-    expect(interactions[2]?.prompt).toBe('translate to english and convert it to a joke');
+    expect(interactions.map((n) => n.prompt)).toEqual(humanPrompts(MULTI_TURN_JSONL));
   });
 
   it('each interaction carries the correct sequence index', () => {
