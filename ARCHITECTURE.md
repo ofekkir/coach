@@ -263,7 +263,9 @@ dropped) and surfaced as a count. The graph is consumed only by the renderer —
 (`layout/place-members.ts :: cardOf` / `nodeOf`, backed by `graph.nodes` + the `semantics` overlay,
 threaded via `Ctx.graph`). `viz/format/format.ts :: buildNodeCard` takes a **`ResolvedNode`** (the
 canonical row + its optional semantic fields) and returns a typed `NodeCard` — a curated, at-a-glance
-summary (display type, title, structural key/values, numeric metrics). Entities render as container
+summary (display type, title, structural key/values, numeric metrics) — plus, for a **failed** tool
+call, its outcome on `NodeCard.error` (`error_kind` + `error_message`, derived in `format/error.ts ::
+errorOf`; absent on success/unmatched calls). Entities render as container
 cards from `buildAgentCard` / `buildSessionCard` (the degraded-graph synthesizer in `layout/queries.ts`
 produces synthetic `Agent`/`Session` **entities**), never from the node table. The card reads only
 fields the canonical model guarantees; it never interprets harness-shaped content (response content
@@ -282,7 +284,17 @@ synthesized in the layout from `InteractionNode.prompt` (`buildPromptCard`), the
 cards are synthesized from entities; selecting it resolves to no node row, and its full text rides on
 the card for the details panel. The lone clay accent is spent only on focus — selection, the prompt
 anchor, and the **longest step** (its share-of-run bar + the edge into it), derived app-side in the
-layout pass (`layout/place-graph.ts`). The main thread rides a spine;
+layout pass (`layout/place-graph.ts`). The one exception is **failure**: a failed tool call
+(`card.error != null`) earns the system's only red — a danger border + an ✕/`ERROR` glyph on the node
+(`TraceNode/error.tsx`, never color alone) and a `FAILED` callout with the kind + message in the
+details panel (`DetailsPanel/error.tsx`). A second, orthogonal overlay highlights a **handed-over
+pair** — a `?source`/`?dest` boot set (e.g. a failed call + the call that recovered it): each wears a
+distinct non-clay accent (teal `source`, violet `dest`) plus a `SRC`/`DST` role badge so the pair is
+colorblind-legible and never collides with selection or failure (`TraceNode/highlight.tsx`,
+`FlowInner/HighlightLegend.tsx`). The role is resolved in `highlight/highlight.ts :: parseHighlight`,
+threaded into the layout via `Ctx.highlight` (a node-id→role map passed to `buildElements`), and the
+viewport fits the **whole highlighted set at once** (`FlowInner/useViewportFit.ts`) vs. focus's
+single-node center. The main thread rides a spine;
 off-spine threads (`source !== 'repl_main_thread'`) move to a dimmed background lane, a tool's raw
 sub-spans (`tool.execution` / `tool.blocked_on_user`) are collapsed (only its one nested weak-model
 inference surfaces, indented), and the top bar (`viz/TopBar`) shows the breadcrumb + run aggregates.
@@ -380,7 +392,8 @@ not a reshape.
   three layers, reusing the pipeline's `resolve`), `subtree` and `causal_path` (traversal primitives
   over the containment tree / causal DAG, so the agent never hand-writes recursive CTEs), and
   `open_viz` (start a local static server over the built app + the stage JSON dumped into the cwd by
-  the last directory load, and hand back a boot URL — `?data=<file>&focus=<nodeId>`).
+  the last directory load, and hand back a boot URL — `?data=<file>` plus either `&focus=<nodeId>`
+  to center one node or `&source=<id>&dest=<id>` to highlight a related pair and fit both into view).
   There is **no** `get_analysis` tool and no curated-analysis stage: every rollup one would compute is a
   one-line query over these tables (`interaction_metrics`, the promoted `is_error`/`file_path`/`action`
   columns), so the findings ship as `describe_schema` example queries the agent composes — not a frozen
@@ -391,7 +404,8 @@ outDir)` writes the six `01..06` stage JSON files + a standalone `graph.db` (the
   both call it (the load dumps into the cwd and reports the paths in its summary). `startVizServer` is a
   dependency-free `node:http` server that serves the built `@coach/app` (`packages/app/dist`, resolved
   relative to the package) plus those dumped JSON files, erroring with a build hint if `dist` is missing.
-  `coach-viz [data-file] [focus]` (its bin) boots the server and opens the browser.
+  `coach-viz [data-file] [focus] [--source <id>] [--dest <id>]` (its bin) boots the server and opens
+  the browser.
 - **Repo-name resolution (`resolve-dataset.ts`).** Claude Code stores each working directory's
   session logs under `~/.claude/projects/<encoded-path>/`, where the absolute path is encoded by
   replacing `/` and `.` with `-`. A repo's main checkout and each git worktree are **separate**
@@ -433,7 +447,11 @@ Boot params (src/main.tsx parses window.location.search)
   ?focus=<id>  → passed to <App initialFocusId>; after first render a one-shot
                    effect calls App's onFocusId(id) — the same reveal/select/center
                    path the FocusInput search box uses (revealPath in layout/queries)
-  (neither)    → <ManualRoot>: the upload page below
+  ?source=<id> → passed to <App initialSource/initialDest/initialHighlight>; a
+  &dest=<id>     one-shot effect (App/viewport-targets.ts) reveals both, applies the
+                   SRC/DST highlight roles, and fits the viewport to the whole pair
+                   (vs. focus's single-node center). source/dest are independent.
+  (none)       → <ManualRoot>: the upload page below
 
 Manual intake: pre-computed pipeline output
   UploadPage.tsx  (PipelineOutputLoader)

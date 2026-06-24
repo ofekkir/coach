@@ -204,6 +204,8 @@ export interface LlmRequestNode extends SpannedNode {
   stop_reason?: string;
   tokens_in: number;
   tokens_out: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
   cost_usd?: number;
 }
 
@@ -289,7 +291,21 @@ export interface MessageDeltas {
  *  `description`) — free text, a display signal only, never part of the closed
  *  `what` vocabulary. Sparse: only relabeled (`tool`/`llm_request`) nodes get a row.
  *  The presence of a row IS the "is this enriched?" flag — there is no node type. */
+/** Structured, machine-readable context for a relabeled node — the data the `what`
+ *  phrase used to flatten into a parenthetical (`(package=pipeline)`) or fold into a
+ *  basename. Promoted out of the phrase so a consumer can read the package/file/url
+ *  as data. All fields optional; the whole object is absent when nothing applies.
+ *  `package`: the workspace deduced from the path (e.g. `pipeline`). `file`: the
+ *  repo-relative file path (worktree-normalized, same basis as `repo_path`). `url`:
+ *  the target URL for web/fetch tools. */
+export interface SemanticContext {
+  readonly package?: string;
+  readonly file?: string;
+  readonly url?: string;
+}
+
 export interface SemanticFields {
   readonly what: readonly string[];
   readonly comment?: string;
+  readonly context?: SemanticContext;
 }

@@ -18,7 +18,7 @@ import {
 
 const SID = 'session-s-1';
 const span = { start_time_ns: '0', end_time_ns: '1', duration_ms: 12 };
-const tokens = { tokens_in: 40, tokens_out: 12 };
+const tokens = { tokens_in: 40, tokens_out: 12, cache_read_tokens: 0, cache_write_tokens: 0 };
 
 function resolved(node: ResolvedNode['node'], semantics?: ResolvedNode['semantics']): ResolvedNode {
   return { node, ...(semantics != null ? { semantics } : {}) };
@@ -99,6 +99,36 @@ describe('buildNodeCard', () => {
     expect(card.title).toBe('fetch ynet.co.il');
     expect(card.subtitle).toBe('summarize headlines');
     expect(card.tag).toBe('ACTION · WEBFETCH');
+  });
+
+  it('threads a failed tool call outcome onto card.error (kind + message)', () => {
+    const tool: ToolNode = {
+      id: 'ed',
+      type: 'tool',
+      sessionId: SID,
+      name: 'Edit',
+      is_error: true,
+      error_kind: 'invalid_args',
+      error_message: 'String to replace not found in file',
+      ...span,
+    };
+    const card = buildNodeCard(resolved(tool, { what: ['edits config'] }));
+    expect(card.error).toEqual({
+      kind: 'invalid_args',
+      message: 'String to replace not found in file',
+    });
+  });
+
+  it('leaves card.error absent for a successful tool call', () => {
+    const tool: ToolNode = {
+      id: 'rd',
+      type: 'tool',
+      sessionId: SID,
+      name: 'Read',
+      is_error: false,
+      ...span,
+    };
+    expect(buildNodeCard(resolved(tool, { what: ['reads file'] })).error).toBeUndefined();
   });
 
   it('tags an inference by its off-spine source, leaving the main thread bare', () => {

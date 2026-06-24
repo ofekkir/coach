@@ -44,6 +44,8 @@ function fixture(opts: { withToolUseIds: boolean }): CanonicalNode[] {
     model: '',
     tokens_in: 0,
     tokens_out: 0,
+    cache_read_tokens: 0,
+    cache_write_tokens: 0,
     request_messages: [{ role: 'user', content: 'hello' }],
     response_messages: [
       { type: 'tool_use', id: 'tu_a', name: 'Read' },
@@ -78,6 +80,8 @@ function fixture(opts: { withToolUseIds: boolean }): CanonicalNode[] {
     model: '',
     tokens_in: 0,
     tokens_out: 0,
+    cache_read_tokens: 0,
+    cache_write_tokens: 0,
     request_messages: [
       { role: 'user', content: 'hello' },
       {
@@ -167,6 +171,8 @@ describe('buildCausalEdges', () => {
       model: '',
       tokens_in: 0,
       tokens_out: 0,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
       response_messages: [{ type: 'tool_use', id: 'tu_x', name: 'Read' }],
       ...span(100, 200),
     };
@@ -188,6 +194,8 @@ describe('buildCausalEdges', () => {
       model: '',
       tokens_in: 0,
       tokens_out: 0,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
       // The background loop's request echoes the main thread's tool_result history.
       request_messages: [{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu_x' }] }],
       ...span(9000, 9100),
@@ -209,6 +217,8 @@ describe('buildCausalEdges', () => {
       model: '',
       tokens_in: 0,
       tokens_out: 0,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
       response_messages: [{ type: 'tool_use', id: 'tu_x', name: 'Read' }],
       ...span(100, 200),
     };

@@ -2,6 +2,7 @@ import type { ExecutionGraph } from '@coach/pipeline';
 import type { Edge, Node } from '@xyflow/react';
 
 import type { NodeCard } from '../format/format.ts';
+import type { HighlightRole } from '../highlight/highlight.ts';
 
 export const NW = 240;
 /** Narrower card width for the dimmed background lane. */
@@ -72,6 +73,10 @@ export interface TraceRFNodeData extends Record<string, unknown> {
   hasRFChildren: boolean;
   isExpanded: boolean;
   selected: boolean;
+  /** Source/dest (or plain) pair-highlight role, when this node is part of a
+   *  handed-over `?source`/`?dest`/`?highlight` set — drives a distinct, badged
+   *  highlight treatment layered over the card's state styling. */
+  highlightRole?: HighlightRole;
 }
 
 export type TraceRFNode = Node<TraceRFNodeData, 'trace'>;
@@ -95,6 +100,9 @@ export interface Ctx {
   cx: number;
   expanded: Set<string>;
   selected: string | null;
+  /** Node id → pair-highlight role for the current view, or null when no
+   *  `?source`/`?dest`/`?highlight` set is active. */
+  highlight: ReadonlyMap<string, HighlightRole> | null;
   nodes: RFNode[];
   edges: Edge[];
   /** The longest step in the interaction currently being placed — it (and the

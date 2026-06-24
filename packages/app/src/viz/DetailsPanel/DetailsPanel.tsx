@@ -21,6 +21,8 @@ export function DetailsPanel({
   isLongest,
   hiddenSubCall,
   nested,
+  showRaw,
+  onToggleShowRaw,
   onClose,
 }: {
   card: NodeCard;
@@ -28,9 +30,10 @@ export function DetailsPanel({
   isLongest: boolean;
   hiddenSubCall: HiddenSubCall | undefined;
   nested: boolean;
+  showRaw: boolean;
+  onToggleShowRaw: () => void;
   onClose: () => void;
 }) {
-  const [showRaw, setShowRaw] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const { duration } = formatMetrics(card.metrics);
   const headerAccent = isLongest || isActionType(card.type);
@@ -63,9 +66,7 @@ export function DetailsPanel({
           setExpanded((v) => !v);
         },
       })}
-      {panelFooter(resolved?.node.id, showRaw, () => {
-        setShowRaw((v) => !v);
-      })}
+      {panelFooter(resolved?.node.id, showRaw, onToggleShowRaw)}
     </div>
   );
 }

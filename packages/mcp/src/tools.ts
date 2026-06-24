@@ -123,7 +123,7 @@ function queryTool(session: Session): Tool {
   return {
     name: 'query',
     description:
-      'Run a read-only SQL query (a single SELECT or WITH statement) over the loaded execution-graph tables. Results are capped (≤1000 rows and a serialized-byte budget; `truncated` flags when rows were dropped or long cells clipped). See describe_schema for the table/column reference.',
+      'Run a read-only SQL query (a single SELECT or WITH statement) over the loaded execution-graph tables. Results are capped (≤1000 rows and a serialized-byte budget). When anything is reduced, `truncated` is true, `droppedRows` reports how many rows were cut (`returnedRows` is what you got of `rowCount` total), and `notice` explains in plain language which cap fired and how to recover — read it. See describe_schema for the table/column reference.',
     inputShape: { sql: z.string().describe('A single SELECT/WITH statement.') },
     handle: (args) => session.store().query(stringArg(args, 'sql')),
   };
@@ -171,18 +171,29 @@ function openVizTool(): Tool {
   return {
     name: 'open_viz',
     description:
-      'Open the interactive graph visualization. Starts a local web server over the built app and the stage JSON dumped into the cwd by the last directory `load_dataset`, and returns a URL. Pass a dumped JSON file name (default `06-enriched-graph.json`) and an optional `focus` node id to center on. Requires the app to be built (`pnpm --filter @coach/app build`).',
+      'Open the interactive graph visualization. Starts a local web server over the built app and the stage JSON dumped into the `out/` dir by the last directory `load_dataset`, and returns a URL. Pass a dumped JSON file name (default `06-enriched-graph.json`). Use `focus` to center on a single node, OR `source` + `dest` to highlight a related PAIR distinctly (e.g. a failed call as `source` and the call that recovered it as `dest`) and fit both into view at once — either of source/dest alone is also valid. Requires the app to be built (`pnpm --filter @coach/app build`).',
     inputShape: {
       file: z
         .string()
         .optional()
         .describe('Dumped JSON file name to visualize. Default 06-enriched-graph.json.'),
       focus: z.string().optional().describe('Node id to center the graph on.'),
+      source: z
+        .string()
+        .optional()
+        .describe('Node id to highlight as the SOURCE of a pair (fit alongside dest).'),
+      dest: z
+        .string()
+        .optional()
+        .describe('Node id to highlight as the DEST of a pair (fit alongside source).'),
     },
     handle: async (args) => {
       const file = optionalString(args, 'file') ?? DEFAULT_VIZ_FILE;
-      const focus = optionalString(args, 'focus');
-      const { url } = await startVizServer(file, focus);
+      const { url } = await startVizServer(file, {
+        focus: optionalString(args, 'focus'),
+        source: optionalString(args, 'source'),
+        dest: optionalString(args, 'dest'),
+      });
       return { url };
     },
   };

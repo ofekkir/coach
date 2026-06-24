@@ -9,6 +9,8 @@ import type {
   ToolNode,
 } from '@coach/pipeline';
 
+import { type CardError, errorOf } from './error.ts';
+
 // ════════════════════════════════════════════════════════════════════════════
 // Presentation lives in the APP, not the pipeline. The pipeline emits a
 // normalized node table (CanonicalNode by id) plus a sparse `semantics` overlay;
@@ -53,6 +55,10 @@ export interface NodeCard {
   readonly fields: readonly CardField[];
   readonly metrics: CardMetrics;
   readonly prompt?: string;
+  /** Set only on a FAILED tool node (its tool_result carried `is_error=true`), so
+   *  `error != null` is the single "this step failed" predicate the node affordance
+   *  and details card both key on. Absent on success/unmatched calls. */
+  readonly error?: CardError;
 }
 
 // Truncation limits (chars) for title lines, and decimal precision for metrics.
@@ -74,18 +80,6 @@ function formatDuration(ms: number): string {
   if (ms < MS_PER_SECOND) return `${String(Math.round(ms))}ms`;
   if (ms < MS_PER_MINUTE) return `${(ms / MS_PER_SECOND).toFixed(1)}s`;
   return `${(ms / MS_PER_MINUTE).toFixed(1)}min`;
-}
-
-const TOPBAR_COST_DECIMALS = 3;
-
-/** Top-bar run duration, e.g. `18.4s`. */
-export function formatRunDuration(ms: number): string {
-  return formatDuration(ms);
-}
-
-/** Top-bar run cost, e.g. `$0.045`. */
-export function formatRunCost(usd: number): string {
-  return `$${usd.toFixed(TOPBAR_COST_DECIMALS)}`;
 }
 
 /** Formats a signed millisecond gap from a `CausalEdge` into "+12ms" / "-3ms".
@@ -237,7 +231,7 @@ function metricsOf(node: CanonicalNode): CardMetrics {
   };
 }
 
-function finishCard(shape: CardShape, metrics: CardMetrics): NodeCard {
+function finishCard(shape: CardShape, metrics: CardMetrics, error?: CardError): NodeCard {
   return {
     type: shape.type,
     tag: shape.tag,
@@ -246,13 +240,18 @@ function finishCard(shape: CardShape, metrics: CardMetrics): NodeCard {
     ...(shape.model != null && shape.model !== '' ? { model: shape.model } : {}),
     fields: shape.fields ?? [],
     metrics,
+    ...(error != null ? { error } : {}),
   };
 }
 
 /** The curated card for a resolved node (canonical row + optional semantic
  *  overlay). `index` supplies positional fallbacks for interaction titles. */
 export function buildNodeCard(resolved: ResolvedNode, index = 0): NodeCard {
-  return finishCard(shapeOf(resolved.node, resolved.semantics, index), metricsOf(resolved.node));
+  return finishCard(
+    shapeOf(resolved.node, resolved.semantics, index),
+    metricsOf(resolved.node),
+    errorOf(resolved.node),
+  );
 }
 
 /** The spine-head anchor card, derived from `InteractionNode.prompt` — there is no

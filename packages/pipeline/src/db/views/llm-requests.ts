@@ -23,6 +23,8 @@ const COLUMNS = [
   'stop_reason',
   'tokens_in',
   'tokens_out',
+  'cache_read_tokens',
+  'cache_write_tokens',
   'cost_usd',
 ] as const;
 

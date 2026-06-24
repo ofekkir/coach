@@ -6,6 +6,7 @@
 export { loadDataset, loadPipelineResult } from './load.ts';
 export type { Dataset } from './load.ts';
 export { dumpPipelineOutputs } from './dump.ts';
+export { outputDir } from './output-dir.ts';
 export { startVizServer, buildVizUrl } from './viz-server.ts';
 export type { VizServer } from './viz-server.ts';
 export { createSession } from './session.ts';

@@ -1,4 +1,3 @@
-import { formatRunCost, formatRunDuration } from '../format/format.ts';
 import { fonts, tokens } from '../theme.ts';
 
 import { FocusInput } from './FocusInput.tsx';
@@ -28,26 +27,6 @@ function breadcrumb(segments: readonly string[]): React.ReactNode {
   );
 }
 
-function stat(value: string, label: string): React.ReactNode {
-  return (
-    <div style={{ textAlign: 'right' }}>
-      <div style={{ fontFamily: fonts.mono, fontSize: 14, color: tokens.ink, fontWeight: 500 }}>
-        {value}
-      </div>
-      <div
-        style={{
-          fontFamily: fonts.mono,
-          fontSize: 9.5,
-          color: tokens.faint,
-          letterSpacing: '0.05em',
-        }}
-      >
-        {label}
-      </div>
-    </div>
-  );
-}
-
 const textBtn: React.CSSProperties = {
   background: 'none',
   border: 'none',
@@ -61,13 +40,11 @@ const textBtn: React.CSSProperties = {
 export function TopBar({
   title,
   stats,
-  onExpandAll,
   onCollapseAll,
   onFocus,
 }: {
   title: string;
   stats: RunStats;
-  onExpandAll: () => void;
   onCollapseAll: () => void;
   onFocus: (id: string) => boolean;
 }) {
@@ -105,16 +82,10 @@ export function TopBar({
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 18 }}>
         <FocusInput onFocus={onFocus} />
         <div style={{ display: 'flex', gap: 4 }}>
-          <button style={textBtn} onClick={onExpandAll}>
-            expand all
-          </button>
           <button style={textBtn} onClick={onCollapseAll}>
             collapse all
           </button>
         </div>
-        {stat(formatRunDuration(stats.durationMs), 'DURATION')}
-        {stat(formatRunCost(stats.costUsd), 'COST')}
-        {stat(String(stats.steps), 'STEPS')}
       </div>
     </div>
   );

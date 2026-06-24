@@ -1,10 +1,13 @@
 import type { NodeCard } from '../format/format.ts';
 import { formatMetrics } from '../format/format.ts';
+import type { HighlightRole } from '../highlight/highlight.ts';
 import { BG_NW, COMPACT_NW, NW } from '../layout/types.ts';
 import type { TraceRFNodeData } from '../layout/types.ts';
 import { ACCENT_SHADOW, ellipsis, fonts, glyphFor, isWeakModel, tokens } from '../theme.ts';
 
+import { ErrorBadge, withDanger } from './error.tsx';
 import { Glyph } from './Glyph.tsx';
+import { HighlightBadge, withHighlight } from './highlight.tsx';
 import { NodeBody, type StepPalette } from './NodeBody.tsx';
 
 const WEIGHT_BOLD = 600;
@@ -95,6 +98,9 @@ function stepCardStyle(
   return { ...base, background: tokens.surface, border: `1px solid ${tokens.cardBorder}` };
 }
 
+// Gap (px) between the error badge and the duration when both share the header.
+const ERROR_DURATION_GAP = 6;
+
 function modelLabel(card: NodeCard): string | undefined {
   if (card.model == null) return undefined;
   return isWeakModel(card.model) ? `${card.model} · weak model` : card.model;
@@ -105,6 +111,9 @@ function chevronFor(hasRFChildren: boolean, isExpanded: boolean): string | null 
   return isExpanded ? '▾' : '▸';
 }
 
+// Gap (px) between the duration and a trailing pair-highlight badge.
+const DURATION_BADGE_GAP = 6;
+
 function stepHeader(
   card: NodeCard,
   palette: FullPalette,
@@ -112,7 +121,11 @@ function stepHeader(
   nested: boolean,
   chevron: string | null,
   duration: string | null,
+  highlightRole: HighlightRole | undefined,
 ): React.ReactNode {
+  const hasError = card.error != null;
+  // The badge owns the right edge only when nothing else already pushed there.
+  const badgePushesRight = !hasError && duration == null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
       <Glyph kind={glyphFor(card.type, nested)} accent={accent} />
@@ -132,10 +145,11 @@ function stepHeader(
           {chevron}
         </span>
       )}
+      {hasError && <ErrorBadge pushRight={duration == null} />}
       {duration != null && (
         <span
           style={{
-            marginLeft: 'auto',
+            marginLeft: hasError ? ERROR_DURATION_GAP : 'auto',
             fontFamily: fonts.mono,
             fontSize: 11,
             fontWeight: accent ? WEIGHT_BOLD : WEIGHT_NORMAL,
@@ -144,6 +158,13 @@ function stepHeader(
           }}
         >
           {duration}
+        </span>
+      )}
+      {highlightRole != null && (
+        <span
+          style={{ marginLeft: badgePushesRight ? 'auto' : DURATION_BADGE_GAP, display: 'flex' }}
+        >
+          <HighlightBadge role={highlightRole} />
         </span>
       )}
     </div>
@@ -178,10 +199,18 @@ export function renderStep(data: TraceRFNodeData, selected: boolean): React.Reac
   const palette = PALETTES[state];
   const { duration } = formatMetrics(card.metrics);
   const chevron = chevronFor(hasRFChildren, isExpanded);
+  const hasError = card.error != null;
+  const { highlightRole } = data;
+  const baseStyle = stepCardStyle(state, lane, compact);
+  const erroredStyle = hasError ? withDanger(baseStyle) : baseStyle;
+  // Pair highlight wins the outline over the error ring so a handed-over pair stays
+  // legible as a pair; the error badge in the header still marks the failure.
+  const cardStyle =
+    highlightRole != null ? withHighlight(erroredStyle, highlightRole) : erroredStyle;
 
   return (
-    <div style={stepCardStyle(state, lane, compact)}>
-      {stepHeader(card, palette, accent, nested, chevron, duration)}
+    <div style={cardStyle} data-error={hasError ? 'true' : undefined} data-role={highlightRole}>
+      {stepHeader(card, palette, accent, nested, chevron, duration, highlightRole)}
       <NodeBody
         title={card.title}
         subtitle={compact ? undefined : card.subtitle}
