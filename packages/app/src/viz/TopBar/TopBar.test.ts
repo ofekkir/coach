@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { RunStats } from './stats.ts';
 import { TopBar } from './TopBar.tsx';
 
-const stats: RunStats = { durationMs: 1000, costUsd: 0, steps: 3, breadcrumb: ['run'] };
+const stats: RunStats = { breadcrumb: ['run'] };
 
 function render(showRaw: boolean): string {
   return renderToStaticMarkup(

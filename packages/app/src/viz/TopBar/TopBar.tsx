@@ -1,4 +1,3 @@
-import { formatRunCost, formatRunDuration } from '../format/format.ts';
 import { fonts, tokens } from '../theme.ts';
 
 import { FocusInput } from './FocusInput.tsx';
@@ -24,26 +23,6 @@ function breadcrumb(segments: readonly string[]): React.ReactNode {
           </span>
         </span>
       ))}
-    </div>
-  );
-}
-
-function stat(value: string, label: string): React.ReactNode {
-  return (
-    <div style={{ textAlign: 'right' }}>
-      <div style={{ fontFamily: fonts.mono, fontSize: 14, color: tokens.ink, fontWeight: 500 }}>
-        {value}
-      </div>
-      <div
-        style={{
-          fontFamily: fonts.mono,
-          fontSize: 9.5,
-          color: tokens.faint,
-          letterSpacing: '0.05em',
-        }}
-      >
-        {label}
-      </div>
     </div>
   );
 }
@@ -124,9 +103,6 @@ export function TopBar({
             {showRaw ? 'raw node ▾' : 'raw node ▸'}
           </button>
         </div>
-        {stat(formatRunDuration(stats.durationMs), 'DURATION')}
-        {stat(formatRunCost(stats.costUsd), 'COST')}
-        {stat(String(stats.steps), 'STEPS')}
       </div>
     </div>
   );

@@ -82,18 +82,6 @@ function formatDuration(ms: number): string {
   return `${(ms / MS_PER_MINUTE).toFixed(1)}min`;
 }
 
-const TOPBAR_COST_DECIMALS = 3;
-
-/** Top-bar run duration, e.g. `18.4s`. */
-export function formatRunDuration(ms: number): string {
-  return formatDuration(ms);
-}
-
-/** Top-bar run cost, e.g. `$0.045`. */
-export function formatRunCost(usd: number): string {
-  return `$${usd.toFixed(TOPBAR_COST_DECIMALS)}`;
-}
-
 /** Formats a signed millisecond gap from a `CausalEdge` into "+12ms" / "-3ms".
  *  Returns null when there is no meaningful gap to show. */
 export function formatGap(gapMs: number | undefined): string | null {
