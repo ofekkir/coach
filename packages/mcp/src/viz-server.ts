@@ -1,13 +1,16 @@
 // A tiny dependency-free static server for the visualization. It serves the built
-// `@coach/app` (packages/app/dist) plus the stage JSON files dumped into the cwd by
-// a directory `load_dataset`, then hands back a URL that boots the app pointed at a
-// chosen data file (and optional focus node). No framework: just `node:http`.
+// `@coach/app` (packages/app/dist) plus the stage JSON files dumped into the
+// gitignored `out/` dir by a directory `load_dataset`, then hands back a URL that
+// boots the app pointed at a chosen data file (and optional focus node). No
+// framework: just `node:http`.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { outputDir } from './output-dir.ts';
 
 const DEFAULT_DATA_FILE = '06-enriched-graph.json';
 
@@ -29,6 +32,10 @@ const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404;
 
 const MISSING_DIST_HINT = `viz: built app not found at ${APP_DIST} — run \`pnpm --filter @coach/app build\` first.`;
+
+function missingDataDirHint(dataDir: string): string {
+  return `viz: data dir not found at ${dataDir} — load a directory dataset with \`load_dataset\` first so the stage JSON is dumped there.`;
+}
 
 /** Builds the boot URL for a running server: the app reads `data`/`focus` from the
  *  query string (see app `main.tsx`). Pure — tested without a live server. */
@@ -74,16 +81,21 @@ export interface VizServer {
 }
 
 /** Starts the static server on an ephemeral port serving the built app + the
- *  dumped JSON from `dataDir` (defaults to the cwd), then resolves the boot URL.
- *  Throws a build hint if the app `dist` is missing. */
+ *  dumped JSON from `dataDir` (defaults to the shared `out/` dir a directory
+ *  `load_dataset` dumps to), then resolves the boot URL. Throws a build hint if
+ *  the app `dist` is missing, or a load hint if the data dir does not exist. */
 export function startVizServer(
   dataFile: string = DEFAULT_DATA_FILE,
   focus?: string,
-  dataDir: string = process.cwd(),
+  dataDir: string = outputDir(),
 ): Promise<VizServer> {
   return new Promise((resolvePromise, rejectPromise) => {
     if (!existsSync(join(APP_DIST, INDEX_HTML))) {
       rejectPromise(new Error(MISSING_DIST_HINT));
+      return;
+    }
+    if (!existsSync(dataDir)) {
+      rejectPromise(new Error(missingDataDirHint(dataDir)));
       return;
     }
     const server = createServer((req, res) => {
