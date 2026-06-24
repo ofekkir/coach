@@ -40,6 +40,11 @@ function optionalString(args: Record<string, unknown>, key: string): string | un
   return typeof value === 'string' ? value : undefined;
 }
 
+function optionalBoolean(args: Record<string, unknown>, key: string): boolean | undefined {
+  const value = args[key];
+  return typeof value === 'boolean' ? value : undefined;
+}
+
 const ID_SHAPE = { id: z.string().describe('A node id.') };
 
 // ── describe_schema ──────────────────────────────────────────────────────────
@@ -66,15 +71,41 @@ function schemaDescription(): unknown {
 
 // ── Tool registry ────────────────────────────────────────────────────────────
 
+function loadDataset(session: Session, args: Record<string, unknown>): Promise<unknown> {
+  const repo = optionalString(args, 'repo');
+  const path = optionalString(args, 'path');
+  if (repo != null && path != null) throw new Error("pass either 'repo' or 'path', not both");
+  if (repo != null) return session.loadRepo(repo, { includeWorktrees: includeWorktrees(args) });
+  if (path != null) return session.load(path);
+  throw new Error("provide 'repo' (a repo name, loads all worktrees) or 'path' (a directory)");
+}
+
+function includeWorktrees(args: Record<string, unknown>): boolean {
+  return optionalBoolean(args, 'includeWorktrees') ?? true;
+}
+
 function loadDatasetTool(session: Session): Tool {
   return {
     name: 'load_dataset',
     description:
-      'Load a dataset and make it queryable, replacing any previously loaded one. Pass a directory of OTEL Tempo traces / native session .jsonl logs; it is run through the full pipeline and materialized. Returns a summary (counts). Call this before querying unless a dataset was preloaded at startup.',
+      "Load a dataset and make it queryable, replacing any previously loaded one. Pass `repo` (a repo name like 'coach', or an absolute repo path) to load that repo's Claude Code logs across the main checkout AND every git worktree by default — the harness-agnostic way to get a complete picture of a repo. Or pass `path` for an exact directory of OTEL Tempo traces / native session .jsonl logs. Either way it runs through the full pipeline and is materialized. Returns a summary (the directories loaded + counts). Call this before querying unless a dataset was preloaded at startup.",
     inputShape: {
-      path: z.string().describe('Absolute path to a directory of trace/native files.'),
+      repo: z
+        .string()
+        .optional()
+        .describe(
+          "Repo name (e.g. 'coach') or absolute repo path. Loads its logs across the main checkout and all git worktrees.",
+        ),
+      path: z
+        .string()
+        .optional()
+        .describe('Absolute path to a single directory of trace/native files.'),
+      includeWorktrees: z
+        .boolean()
+        .optional()
+        .describe('When loading by `repo`, fold in git-worktree logs. Default true.'),
     },
-    handle: (args) => session.load(stringArg(args, 'path')),
+    handle: (args) => loadDataset(session, args),
   };
 }
 

@@ -115,6 +115,7 @@ function fakeSession(store: Store): Session {
   };
   return {
     load: () => Promise.reject(new Error('not used in this test')),
+    loadRepo: () => Promise.reject(new Error('not used in this test')),
     dataset: unused,
     store: () => store,
     close: () => undefined,

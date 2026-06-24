@@ -19,10 +19,10 @@ function render(): string {
 }
 
 describe('TopBar', () => {
-  it('renders the expand/collapse controls but no raw-node toggle (it lives in the card)', () => {
+  it('renders the collapse-all control but neither the expand-all control nor the raw-node toggle (both removed from the TopBar)', () => {
     const markup = render();
-    expect(markup).toContain('expand all');
     expect(markup).toContain('collapse all');
+    expect(markup).not.toContain('expand all');
     expect(markup).not.toContain('raw node');
   });
 });

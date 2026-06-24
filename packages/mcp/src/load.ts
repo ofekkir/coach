@@ -4,7 +4,7 @@
 // filesystem; everything downstream is graph-only.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 
 import {
   runPipeline,
@@ -38,6 +38,20 @@ function gatherFiles(dir: string, rootDir: string): UploadedFile[] {
  *  stage's output — the directory load uses this to also dump the stage files. */
 export function loadPipelineResult(dir: string): PipelineResult {
   return runPipeline(gatherFiles(dir, dir));
+}
+
+// Each directory is rooted at its own parent so file `path`s keep the source
+// directory's name as a prefix — this preserves the per-directory grouping the
+// route stage relies on (OTEL logs attach to traces by directory) while keeping
+// files from different worktrees distinct and traceable in one combined run.
+function gatherFromDirs(dirs: readonly string[]): UploadedFile[] {
+  return dirs.flatMap((dir) => gatherFiles(dir, dirname(dir)));
+}
+
+/** Loads every file under all `dirs` and runs one pipeline over the union — used
+ *  to fold a repo's main checkout and its worktrees into a single dataset. */
+export function loadPipelineResultFromDirs(dirs: readonly string[]): PipelineResult {
+  return runPipeline(gatherFromDirs(dirs));
 }
 
 /** Loads every file under `dir` and runs the full pipeline over them. */
