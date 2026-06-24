@@ -31,5 +31,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check (typecheck + lint + format + test + knip + structure + pii)
+      - name: Check (typecheck + lint + format + test + knip + structure)
         run: pnpm check
+
+      # PII / origin guard. Patterns live in the private PII_DENYLIST repo secret,
+      # never in the open tree. Lists only matching file paths (never the matched
+      # text) so a hit can't echo the secret into public logs. Skips when the
+      # secret is absent (e.g. fork PRs). The fixtures dir is exempt until it is
+      # regenerated synthetically — see RELEASE-CHECKLIST.md (WS2).
+      - name: PII / origin guard
+        env:
+          PII_DENYLIST: ${{ secrets.PII_DENYLIST }}
+        run: |
+          if [ -z "$PII_DENYLIST" ]; then
+            echo "PII_DENYLIST not set; skipping (expected on fork PRs)."
+            exit 0
+          fi
+          if git grep -lEi "$PII_DENYLIST" -- ':!packages/pipeline/fixtures' ':!pnpm-lock.yaml'; then
+            echo "::error::PII/origin leak detected in the file(s) listed above."
+            exit 1
+          fi
+          echo "PII guard passed."

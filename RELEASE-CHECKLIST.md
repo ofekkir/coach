@@ -17,7 +17,9 @@ demo dataset and the demo video both anchor on that moment.
 - [x] Decouple fixture-coupled assertions from PII/origin literals
       (`native.test.ts`, `materialize.test.ts`) so test source is clean even while the fixtures
       are not yet regenerated.
-- [x] Add a CI PII/origin guard (`pnpm check:pii`, wired into `pnpm check`).
+- [x] Add a **CI-only** PII/origin guard driven by the private `PII_DENYLIST` repo
+      secret — no patterns committed to the open tree. Lists only matching file
+      paths, never the matched text, so a hit can't echo the secret into public logs.
 
 ## WS2 — Synthetic fixtures _(HARD BLOCKER)_
 
@@ -35,8 +37,8 @@ must be regenerated.
 - [ ] Export both OTEL (`otel/*`) and native (`native-claude/*`) variants to keep parity with the
       current three fixtures.
 - [ ] Re-couple the decoupled test assertions to the new fixtures' content if desired.
-- [ ] **Remove the `packages/pipeline/fixtures/` exclusion in `scripts/check-pii.ts`** and confirm
-      `pnpm check:pii` passes over the fixtures too.
+- [ ] **Remove the `packages/pipeline/fixtures/` path-exclusion in the CI PII-guard step**
+      (`.github/workflows/ci.yml`) and confirm the guard passes over the fixtures too.
 
 ## WS3 — Wow-moment demo (agent self-critique via MCP)
 
@@ -72,6 +74,6 @@ must be regenerated.
 
 - [ ] Decide on git **history**: scrub or squash to a single initial commit so historical PII
       (email, home paths, captured transcripts in old commits) does not ship.
-- [ ] `pnpm check` green, including `check:pii` with the fixtures exclusion removed.
+- [ ] `pnpm check` green; CI PII guard green with the fixtures exclusion removed.
 - [ ] Fresh-clone smoke test: clone → `pnpm install` → `pnpm check` → `pnpm e2e <fixture>` → MCP
       demo path works end to end.
