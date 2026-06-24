@@ -45,9 +45,9 @@ export const NODES: TableSpec = {
     },
     { name: 'tokens_out', sqlType: 'DOUBLE', doc: 'llm_request: output tokens.' },
     // prettier-ignore
-    { name: 'cache_read_tokens', sqlType: 'DOUBLE', doc: 'llm_request: Anthropic prompt-cache READ input tokens (cache_read_input_tokens), billed ~0.1×. 0 when absent.' },
+    { name: 'cache_read_tokens', sqlType: 'DOUBLE', doc: 'llm_request: prompt-cache read tokens — context served from a cached prefix (typically billed at a large discount). 0 when absent or unsupported by the provider.' },
     // prettier-ignore
-    { name: 'cache_creation_tokens', sqlType: 'DOUBLE', doc: 'llm_request: Anthropic prompt-cache WRITE input tokens (cache_creation_input_tokens), billed ~1.25×. 0 when absent.' },
+    { name: 'cache_write_tokens', sqlType: 'DOUBLE', doc: 'llm_request: prompt-cache write tokens — context written into the cache this turn (typically billed at a small premium; not all providers report this). 0 when absent.' },
     { name: 'cost_usd', sqlType: 'DOUBLE', doc: 'llm_request: cost in USD, when present.' },
     { name: 'name', sqlType: 'VARCHAR', doc: 'tool/hook: the tool or hook name.' },
     {

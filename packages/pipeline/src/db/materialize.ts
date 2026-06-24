@@ -113,7 +113,7 @@ function typeNodeRecord(
       tokens_in: node.tokens_in,
       tokens_out: node.tokens_out,
       cache_read_tokens: node.cache_read_tokens,
-      cache_creation_tokens: node.cache_creation_tokens,
+      cache_write_tokens: node.cache_write_tokens,
       cost_usd: node.cost_usd,
     };
   if (node.type === 'tool') {

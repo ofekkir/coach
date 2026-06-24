@@ -38,7 +38,7 @@ const llm1: CanonicalNode = {
   tokens_in: 100,
   tokens_out: 20,
   cache_read_tokens: 0,
-  cache_creation_tokens: 0,
+  cache_write_tokens: 0,
   start_time_ns: '100000000',
   end_time_ns: '200000000',
   duration_ms: 100,
@@ -149,7 +149,7 @@ describe('enrichExecutionGraph', () => {
       tokens_in: 100,
       tokens_out: 20,
       cache_read_tokens: 0,
-      cache_creation_tokens: 0,
+      cache_write_tokens: 0,
       model: 'claude-haiku',
     });
   });
@@ -181,7 +181,7 @@ describe('enrichExecutionGraph', () => {
       tokens_in: 100,
       tokens_out: 20,
       cache_read_tokens: 0,
-      cache_creation_tokens: 0,
+      cache_write_tokens: 0,
       start_time_ns: '100000000',
       end_time_ns: '200000000',
       duration_ms: 100,

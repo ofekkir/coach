@@ -87,11 +87,11 @@ describe('nativeSessionToTrace', () => {
 
     for (const n of llmNodes) {
       expect(n.cache_read_tokens).toBeGreaterThanOrEqual(0);
-      expect(n.cache_creation_tokens).toBeGreaterThanOrEqual(0);
+      expect(n.cache_write_tokens).toBeGreaterThanOrEqual(0);
     }
     // The fetch-website session is heavily cached: at least one request creates and
     // at least one reads from the prompt cache.
-    expect(llmNodes.some((n) => n.cache_creation_tokens > 0)).toBe(true);
+    expect(llmNodes.some((n) => n.cache_write_tokens > 0)).toBe(true);
     expect(llmNodes.some((n) => n.cache_read_tokens > 0)).toBe(true);
   });
 
@@ -124,7 +124,7 @@ describe('nativeSessionToTrace', () => {
     const nodes = transformTrace(nativeSessionToTrace(jsonl));
     const llm = nodes.find((n) => n.type === 'llm_request');
     expect(llm?.cache_read_tokens).toBe(0);
-    expect(llm?.cache_creation_tokens).toBe(0);
+    expect(llm?.cache_write_tokens).toBe(0);
   });
 
   it('aggregate produces a Session entity with the correct session id', () => {

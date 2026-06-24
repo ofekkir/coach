@@ -24,7 +24,7 @@ const COLUMNS = [
   'tokens_in',
   'tokens_out',
   'cache_read_tokens',
-  'cache_creation_tokens',
+  'cache_write_tokens',
   'cost_usd',
 ] as const;
 

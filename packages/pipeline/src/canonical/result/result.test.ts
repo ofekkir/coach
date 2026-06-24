@@ -68,7 +68,7 @@ function inference(id: string, requestMessages: RequestMessage[]): CanonicalNode
     tokens_in: 1,
     tokens_out: 1,
     cache_read_tokens: 0,
-    cache_creation_tokens: 0,
+    cache_write_tokens: 0,
     request_messages: requestMessages,
     start_time_ns: '0',
     end_time_ns: '1',

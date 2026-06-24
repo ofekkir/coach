@@ -50,7 +50,7 @@ const llm1: CanonicalNode = {
   tokens_in: 0,
   tokens_out: 0,
   cache_read_tokens: 0,
-  cache_creation_tokens: 0,
+  cache_write_tokens: 0,
   ...span(100, 200),
 };
 
@@ -64,7 +64,7 @@ const llm2: CanonicalNode = {
   tokens_in: 0,
   tokens_out: 0,
   cache_read_tokens: 0,
-  cache_creation_tokens: 0,
+  cache_write_tokens: 0,
   ...span(310, 400),
 };
 
@@ -270,7 +270,7 @@ function llm(over: Partial<CanonicalNode> & { id: string }): CanonicalNode {
     tokens_in: 0,
     tokens_out: 0,
     cache_read_tokens: 0,
-    cache_creation_tokens: 0,
+    cache_write_tokens: 0,
     ...span(100, 200),
     ...over,
   } as CanonicalNode;

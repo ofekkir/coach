@@ -24,7 +24,7 @@ interface MessageTokenFields {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
-  cacheCreationTokens: number;
+  cacheWriteTokens: number;
 }
 
 function usageNum(usage: NativeUsage, key: keyof NonNullable<NativeUsage>): number {
@@ -38,7 +38,7 @@ function extractFirstMessageFields(msg: NativeEntry['message']): MessageTokenFie
     inputTokens: usageNum(usage, 'input_tokens'),
     outputTokens: usageNum(usage, 'output_tokens'),
     cacheReadTokens: usageNum(usage, 'cache_read_input_tokens'),
-    cacheCreationTokens: usageNum(usage, 'cache_creation_input_tokens'),
+    cacheWriteTokens: usageNum(usage, 'cache_creation_input_tokens'),
   };
 }
 
@@ -138,8 +138,8 @@ function buildLlmSpan(
       strAttr('model', meta.model),
       intAttr('input_tokens', meta.inputTokens),
       intAttr('output_tokens', meta.outputTokens),
-      intAttr('cache_read_input_tokens', meta.cacheReadTokens),
-      intAttr('cache_creation_input_tokens', meta.cacheCreationTokens),
+      intAttr('cache_read_tokens', meta.cacheReadTokens),
+      intAttr('cache_creation_tokens', meta.cacheWriteTokens),
       strAttr('stop_reason', meta.stopReason),
       strAttr('request_id', requestId),
       strAttr('raw_request_body', rawRequestBody),

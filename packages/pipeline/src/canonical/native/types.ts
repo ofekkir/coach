@@ -42,7 +42,7 @@ export interface LlmSpanMeta {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
-  cacheCreationTokens: number;
+  cacheWriteTokens: number;
   spanStart: string;
   spanEnd: string;
 }
