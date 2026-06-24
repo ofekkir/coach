@@ -9,8 +9,8 @@
 
 ## Why this model exists
 
-Coach reflects findings back to the agent (and, for now, the engineer). A finding is only
-useful if it points at the **right unit of behavior**: "your plan was wrong" is a different
+Coach aims to reflect findings back to the agent (and, for now, surfaces them to the engineer). A
+finding is only useful if it points at the **right unit of behavior**: "your plan was wrong" is a different
 claim about a different thing than "this tool call failed" or "this whole sub-goal took four
 retries." To make those claims precisely, we need a model of agent execution with named
 levels — and we need to be clear about which levels are _given to us_ versus which ones
@@ -250,10 +250,11 @@ inferred, and what genuinely needs a clarifying question — for example:
 The user model is the artifact **RLHF structurally cannot produce**. RLHF bakes a
 _population-averaged_ policy into _shared weights_, frozen at training time and identical for every
 user; the only per-user channel a deployed model has is its **context**. Coach computes a per-user
-_correction_ to that population prior and feeds it into exactly that channel — it does not compete
-with fine-tuning, it supplies the one input fine-tuning leaves open. The loop closes at the
-**agent** node: the semantic layer is a function from a session forest to an agent-level user
-model, which is both an output (to the engineer/agent) and an input (to future runs).
+_correction_ to that population prior and feeds it into exactly that channel — it would not compete
+with fine-tuning, it would supply the one input fine-tuning leaves open. The loop is meant to close
+at the **agent** node: the semantic layer is conceived as a function from a session forest to an
+agent-level user model, which would be both an output (to the engineer/agent) and an input (to
+future runs). None of this is built yet.
 
 ### The consequence: aggregation forces canonicalization
 
