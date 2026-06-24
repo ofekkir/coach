@@ -287,7 +287,14 @@ anchor, and the **longest step** (its share-of-run bar + the edge into it), deri
 layout pass (`layout/place-graph.ts`). The one exception is **failure**: a failed tool call
 (`card.error != null`) earns the system's only red — a danger border + an ✕/`ERROR` glyph on the node
 (`TraceNode/error.tsx`, never color alone) and a `FAILED` callout with the kind + message in the
-details panel (`DetailsPanel/error.tsx`). The main thread rides a spine;
+details panel (`DetailsPanel/error.tsx`). A second, orthogonal overlay highlights a **handed-over
+pair** — a `?source`/`?dest` boot set (e.g. a failed call + the call that recovered it): each wears a
+distinct non-clay accent (teal `source`, violet `dest`) plus a `SRC`/`DST` role badge so the pair is
+colorblind-legible and never collides with selection or failure (`TraceNode/highlight.tsx`,
+`FlowInner/HighlightLegend.tsx`). The role is resolved in `highlight/highlight.ts :: parseHighlight`,
+threaded into the layout via `Ctx.highlight` (a node-id→role map passed to `buildElements`), and the
+viewport fits the **whole highlighted set at once** (`FlowInner/useViewportFit.ts`) vs. focus's
+single-node center. The main thread rides a spine;
 off-spine threads (`source !== 'repl_main_thread'`) move to a dimmed background lane, a tool's raw
 sub-spans (`tool.execution` / `tool.blocked_on_user`) are collapsed (only its one nested weak-model
 inference surfaces, indented), and the top bar (`viz/TopBar`) shows the breadcrumb + run aggregates.
@@ -383,7 +390,8 @@ not a reshape.
   three layers, reusing the pipeline's `resolve`), `subtree` and `causal_path` (traversal primitives
   over the containment tree / causal DAG, so the agent never hand-writes recursive CTEs), and
   `open_viz` (start a local static server over the built app + the stage JSON dumped into the cwd by
-  the last directory load, and hand back a boot URL — `?data=<file>&focus=<nodeId>`).
+  the last directory load, and hand back a boot URL — `?data=<file>` plus either `&focus=<nodeId>`
+  to center one node or `&source=<id>&dest=<id>` to highlight a related pair and fit both into view).
   There is **no** `get_analysis` tool and no curated-analysis stage: every rollup one would compute is a
   one-line query over these tables (`interaction_metrics`, the promoted `is_error`/`file_path`/`action`
   columns), so the findings ship as `describe_schema` example queries the agent composes — not a frozen
@@ -394,7 +402,8 @@ outDir)` writes the six `01..06` stage JSON files + a standalone `graph.db` (the
   both call it (the load dumps into the cwd and reports the paths in its summary). `startVizServer` is a
   dependency-free `node:http` server that serves the built `@coach/app` (`packages/app/dist`, resolved
   relative to the package) plus those dumped JSON files, erroring with a build hint if `dist` is missing.
-  `coach-viz [data-file] [focus]` (its bin) boots the server and opens the browser.
+  `coach-viz [data-file] [focus] [--source <id>] [--dest <id>]` (its bin) boots the server and opens
+  the browser.
 - **Session + loading (`session.ts`, `load.ts`, `server.ts`, `bin/mcp.ts`).** The server holds one
   mutable session: the dataset currently loaded. `load_dataset` takes a **directory** of trace/native
   files (read into the same `UploadedFile[]` the browser produces, run through the pipeline,
@@ -422,7 +431,11 @@ Boot params (src/main.tsx parses window.location.search)
   ?focus=<id>  → passed to <App initialFocusId>; after first render a one-shot
                    effect calls App's onFocusId(id) — the same reveal/select/center
                    path the FocusInput search box uses (revealPath in layout/queries)
-  (neither)    → <ManualRoot>: the upload page below
+  ?source=<id> → passed to <App initialSource/initialDest/initialHighlight>; a
+  &dest=<id>     one-shot effect (App/viewport-targets.ts) reveals both, applies the
+                   SRC/DST highlight roles, and fits the viewport to the whole pair
+                   (vs. focus's single-node center). source/dest are independent.
+  (none)       → <ManualRoot>: the upload page below
 
 Manual intake: pre-computed pipeline output
   UploadPage.tsx  (PipelineOutputLoader)
