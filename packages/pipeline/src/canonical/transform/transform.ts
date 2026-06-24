@@ -111,6 +111,8 @@ function buildLlmRequestNode(
     model: require(span.model, span.id, 'model'),
     tokens_in: require(span.inputTokens, span.id, 'input_tokens'),
     tokens_out: require(span.outputTokens, span.id, 'output_tokens'),
+    cache_read_tokens: span.cacheReadTokens,
+    cache_creation_tokens: span.cacheCreationTokens,
   };
   if (span.querySource != null) node.source = span.querySource;
   if (span.rawRequestBody != null) applyRequestBody(node, span.rawRequestBody, repair);

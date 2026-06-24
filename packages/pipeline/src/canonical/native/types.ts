@@ -17,6 +17,8 @@ interface NativeMessage {
   readonly usage?: {
     readonly input_tokens?: number;
     readonly output_tokens?: number;
+    readonly cache_read_input_tokens?: number;
+    readonly cache_creation_input_tokens?: number;
   };
 }
 
@@ -39,6 +41,8 @@ export interface LlmSpanMeta {
   stopReason: string;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
   spanStart: string;
   spanEnd: string;
 }

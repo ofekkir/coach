@@ -204,6 +204,8 @@ export interface LlmRequestNode extends SpannedNode {
   stop_reason?: string;
   tokens_in: number;
   tokens_out: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
   cost_usd?: number;
 }
 

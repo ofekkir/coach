@@ -17,22 +17,35 @@ function extractLlmGroupBounds(group: NativeEntry[]): {
   };
 }
 
-function extractFirstMessageFields(msg: NativeEntry['message']): {
+type NativeUsage = NonNullable<NativeEntry['message']>['usage'];
+
+interface MessageTokenFields {
   model: string;
   inputTokens: number;
   outputTokens: number;
-} {
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}
+
+function usageNum(usage: NativeUsage, key: keyof NonNullable<NativeUsage>): number {
+  return usage?.[key] ?? 0;
+}
+
+function extractFirstMessageFields(msg: NativeEntry['message']): MessageTokenFields {
+  const usage = msg?.usage;
   return {
     model: msg?.model ?? '',
-    inputTokens: msg?.usage?.input_tokens ?? 0,
-    outputTokens: msg?.usage?.output_tokens ?? 0,
+    inputTokens: usageNum(usage, 'input_tokens'),
+    outputTokens: usageNum(usage, 'output_tokens'),
+    cacheReadTokens: usageNum(usage, 'cache_read_input_tokens'),
+    cacheCreationTokens: usageNum(usage, 'cache_creation_input_tokens'),
   };
 }
 
 function extractTokenUsage(
   first: NativeEntry,
   last: NativeEntry,
-): { model: string; stopReason: string; inputTokens: number; outputTokens: number } {
+): MessageTokenFields & { stopReason: string } {
   const fromFirst = extractFirstMessageFields(first.message);
   return { ...fromFirst, stopReason: last.message?.stop_reason ?? '' };
 }
@@ -125,6 +138,8 @@ function buildLlmSpan(
       strAttr('model', meta.model),
       intAttr('input_tokens', meta.inputTokens),
       intAttr('output_tokens', meta.outputTokens),
+      intAttr('cache_read_input_tokens', meta.cacheReadTokens),
+      intAttr('cache_creation_input_tokens', meta.cacheCreationTokens),
       strAttr('stop_reason', meta.stopReason),
       strAttr('request_id', requestId),
       strAttr('raw_request_body', rawRequestBody),

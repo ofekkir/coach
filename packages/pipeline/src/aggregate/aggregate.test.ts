@@ -26,6 +26,8 @@ function chain(): CanonicalNode[] {
       model: 'm',
       tokens_in: 0,
       tokens_out: 0,
+      cache_read_tokens: 0,
+      cache_creation_tokens: 0,
       ...base,
     },
   ];

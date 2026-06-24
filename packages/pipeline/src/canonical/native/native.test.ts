@@ -81,6 +81,52 @@ describe('nativeSessionToTrace', () => {
     expect(endTurnNodes).toHaveLength(1);
   });
 
+  it('extracts prompt-cache token fields from native usage', () => {
+    const nodes = transformTrace(nativeSessionToTrace(FIXTURE_JSONL));
+    const llmNodes = nodes.filter((n) => n.type === 'llm_request');
+
+    for (const n of llmNodes) {
+      expect(n.cache_read_tokens).toBeGreaterThanOrEqual(0);
+      expect(n.cache_creation_tokens).toBeGreaterThanOrEqual(0);
+    }
+    // The fetch-website session is heavily cached: at least one request creates and
+    // at least one reads from the prompt cache.
+    expect(llmNodes.some((n) => n.cache_creation_tokens > 0)).toBe(true);
+    expect(llmNodes.some((n) => n.cache_read_tokens > 0)).toBe(true);
+  });
+
+  it('defaults cache token fields to 0 when native usage omits them', () => {
+    const userEntry = {
+      type: 'user',
+      uuid: 'u1',
+      parentUuid: null,
+      sessionId: 's-test',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      message: { role: 'user', content: 'hi there' },
+    };
+    const assistantEntry = {
+      type: 'assistant',
+      uuid: 'a1',
+      parentUuid: 'u1',
+      sessionId: 's-test',
+      timestamp: '2024-01-01T00:00:01.000Z',
+      requestId: 'req-1',
+      message: {
+        id: 'm1',
+        role: 'assistant',
+        model: 'claude-sonnet-4-6',
+        content: [{ type: 'text', text: 'hi' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 10, output_tokens: 5 },
+      },
+    };
+    const jsonl = [userEntry, assistantEntry].map((e) => JSON.stringify(e)).join('\n');
+    const nodes = transformTrace(nativeSessionToTrace(jsonl));
+    const llm = nodes.find((n) => n.type === 'llm_request');
+    expect(llm?.cache_read_tokens).toBe(0);
+    expect(llm?.cache_creation_tokens).toBe(0);
+  });
+
   it('aggregate produces a Session entity with the correct session id', () => {
     const nodes = transformTrace(nativeSessionToTrace(FIXTURE_JSONL));
     const { sessions } = aggregate([nodes]);

@@ -23,6 +23,21 @@ function findInteraction(nodes: CanonicalNode[], id: string): InteractionNode | 
   return node?.type === 'interaction' ? node : undefined;
 }
 
+const CACHE_ATTR_KEYS = ['cache_read_input_tokens', 'cache_creation_input_tokens'];
+
+function stripCacheAttributes(trace: TempoTrace): TempoTrace {
+  return {
+    batches: trace.batches.map((batch) => ({
+      scopeSpans: batch.scopeSpans.map((ss) => ({
+        spans: ss.spans.map((span) => ({
+          ...span,
+          attributes: span.attributes.filter((a) => !CACHE_ATTR_KEYS.includes(a.key)),
+        })),
+      })),
+    })),
+  };
+}
+
 const TRACE_HEX = '00000000000000000000000000000001';
 const PARENT_HEX = '0000000000000001';
 const CHILD_HEX = '0000000000000002';
@@ -59,6 +74,8 @@ const minimalTrace: TempoTrace = {
                 { key: 'model', value: { stringValue: 'claude-sonnet-4-6' } },
                 { key: 'input_tokens', value: { intValue: '100' } },
                 { key: 'output_tokens', value: { intValue: '50' } },
+                { key: 'cache_read_input_tokens', value: { intValue: '900' } },
+                { key: 'cache_creation_input_tokens', value: { intValue: '40' } },
                 { key: 'query_source', value: { stringValue: 'repl_main_thread' } },
                 {
                   key: 'raw_request_body',
@@ -125,6 +142,20 @@ describe('transformTrace', () => {
     expect(child?.tokens_in).toBe(100);
     expect(child?.tokens_out).toBe(50);
     expect(child?.cost_usd).toBeCloseTo(0.001234);
+  });
+
+  it('extracts prompt-cache token attributes onto the llm_request node', () => {
+    const nodes = transformTrace(minimalTrace);
+    const child = findLlm(nodes, `s${CHILD_HEX}`);
+    expect(child?.cache_read_tokens).toBe(900);
+    expect(child?.cache_creation_tokens).toBe(40);
+  });
+
+  it('defaults cache token fields to 0 when the attributes are absent', () => {
+    const noCacheTrace = stripCacheAttributes(minimalTrace);
+    const child = findLlm(transformTrace(noCacheTrace), `s${CHILD_HEX}`);
+    expect(child?.cache_read_tokens).toBe(0);
+    expect(child?.cache_creation_tokens).toBe(0);
   });
 
   it('smoke test: enrich then transform real fixture produces nodes', () => {

@@ -16,6 +16,8 @@ SELECT
   COUNT(*) FILTER (WHERE n.type = 'llm_request') AS llm_count,
   SUM(n.tokens_in) FILTER (WHERE n.type = 'llm_request') AS tokens_in,
   SUM(n.tokens_out) FILTER (WHERE n.type = 'llm_request') AS tokens_out,
+  SUM(n.cache_read_tokens) FILTER (WHERE n.type = 'llm_request') AS cache_read_tokens,
+  SUM(n.cache_creation_tokens) FILTER (WHERE n.type = 'llm_request') AS cache_creation_tokens,
   SUM(n.cost_usd) FILTER (WHERE n.type = 'llm_request') AS cost_usd,
   i.duration_ms,
   CASE WHEN COUNT(*) FILTER (WHERE n.type = 'tool') > 0 THEN 'agentic' ELSE 'direct' END AS shape,
@@ -67,6 +69,10 @@ export const INTERACTION_METRICS: TableSpec = {
       sqlType: 'DOUBLE',
       doc: "SUM of tokens_out over the interaction's llm_request nodes.",
     },
+    // prettier-ignore
+    { name: 'cache_read_tokens', sqlType: 'DOUBLE', doc: "SUM of cache_read_tokens (prompt-cache reads, billed ~0.1×) over the interaction's llm_request nodes." },
+    // prettier-ignore
+    { name: 'cache_creation_tokens', sqlType: 'DOUBLE', doc: "SUM of cache_creation_tokens (prompt-cache writes, billed ~1.25×) over the interaction's llm_request nodes." },
     // prettier-ignore
     { name: 'cost_usd', sqlType: 'DOUBLE', doc: "SUM of the traced cost_usd over the interaction's llm_request nodes; NULL when no node carries a traced cost (cost is never estimated)." },
     {

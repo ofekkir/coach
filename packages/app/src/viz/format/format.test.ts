@@ -18,7 +18,7 @@ import {
 
 const SID = 'session-s-1';
 const span = { start_time_ns: '0', end_time_ns: '1', duration_ms: 12 };
-const tokens = { tokens_in: 40, tokens_out: 12 };
+const tokens = { tokens_in: 40, tokens_out: 12, cache_read_tokens: 0, cache_creation_tokens: 0 };
 
 function resolved(node: ResolvedNode['node'], semantics?: ResolvedNode['semantics']): ResolvedNode {
   return { node, ...(semantics != null ? { semantics } : {}) };

@@ -15,6 +15,8 @@ export interface ParsedSpan {
   readonly userPrompt: string | null;
   readonly inputTokens: number | null;
   readonly outputTokens: number | null;
+  readonly cacheReadTokens: number;
+  readonly cacheCreationTokens: number;
   readonly sessionId: string | null;
   readonly userId: string | null;
   readonly querySource: string | null;
@@ -66,6 +68,8 @@ export function parseSpans(trace: TempoTrace): ParsedSpan[] {
         userPrompt: getStringAttr(span.attributes, 'user_prompt'),
         inputTokens: getIntAttr(span.attributes, 'input_tokens'),
         outputTokens: getIntAttr(span.attributes, 'output_tokens'),
+        cacheReadTokens: getIntAttr(span.attributes, 'cache_read_input_tokens') ?? 0,
+        cacheCreationTokens: getIntAttr(span.attributes, 'cache_creation_input_tokens') ?? 0,
         sessionId: getStringAttr(span.attributes, 'session.id'),
         userId: getStringAttr(span.attributes, 'user.id'),
         querySource: getStringAttr(span.attributes, 'query_source'),
