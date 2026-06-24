@@ -101,12 +101,7 @@ export function App({
         fontFamily: fonts.sans,
       }}
     >
-      <TopBar
-        title={title}
-        stats={stats}
-        onCollapseAll={onCollapseAll}
-        onFocus={onFocusId}
-      />
+      <TopBar title={title} stats={stats} onCollapseAll={onCollapseAll} onFocus={onFocusId} />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <FlowInner
