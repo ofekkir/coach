@@ -17,9 +17,10 @@ demo dataset and the demo video both anchor on that moment.
 - [x] Decouple fixture-coupled assertions from PII/origin literals
       (`native.test.ts`, `materialize.test.ts`) so test source is clean even while the fixtures
       are not yet regenerated.
-- [x] Add a **CI-only** PII/origin guard driven by the private `PII_DENYLIST` repo
-      secret — no patterns committed to the open tree. Lists only matching file
-      paths, never the matched text, so a hit can't echo the secret into public logs.
+- [ ] _(No automated CI guard.)_ A scripted PII guard was considered and removed — the
+      patterns themselves are author-identifying, so they don't belong in an open repo or
+      its public CI logs. PII/origin protection rests on this checklist's manual review
+      until the fixtures are regenerated (WS2) and history is scrubbed (WS6).
 
 ## WS2 — Synthetic fixtures _(HARD BLOCKER)_
 
@@ -37,8 +38,8 @@ must be regenerated.
 - [ ] Export both OTEL (`otel/*`) and native (`native-claude/*`) variants to keep parity with the
       current three fixtures.
 - [ ] Re-couple the decoupled test assertions to the new fixtures' content if desired.
-- [ ] **Remove the `packages/pipeline/fixtures/` path-exclusion in the CI PII-guard step**
-      (`.github/workflows/ci.yml`) and confirm the guard passes over the fixtures too.
+- [ ] Confirm the regenerated fixtures carry no author PII / origin content (manual grep,
+      since there is no automated CI guard).
 
 ## WS3 — Wow-moment demo (agent self-critique via MCP)
 
@@ -74,6 +75,6 @@ must be regenerated.
 
 - [ ] Decide on git **history**: scrub or squash to a single initial commit so historical PII
       (email, home paths, captured transcripts in old commits) does not ship.
-- [ ] `pnpm check` green; CI PII guard green with the fixtures exclusion removed.
+- [ ] `pnpm check` green; manual PII/origin grep over the whole tree (incl. fixtures) clean.
 - [ ] Fresh-clone smoke test: clone → `pnpm install` → `pnpm check` → `pnpm e2e <fixture>` → MCP
       demo path works end to end.
