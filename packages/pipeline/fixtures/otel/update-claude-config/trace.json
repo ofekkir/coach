@@ -77,7 +77,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -167,7 +167,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -381,7 +381,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -595,7 +595,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -809,7 +809,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -845,7 +845,7 @@
                 {
                   "key": "file_path",
                   "value": {
-                    "stringValue": "/Users/ofek/.claude/settings.json"
+                    "stringValue": "/Users/dev/.claude/settings.json"
                   }
                 },
                 {
@@ -863,13 +863,13 @@
                     {
                       "key": "file_path",
                       "value": {
-                        "stringValue": "/Users/ofek/.claude/settings.json"
+                        "stringValue": "/Users/dev/.claude/settings.json"
                       }
                     },
                     {
                       "key": "content",
                       "value": {
-                        "stringValue": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(npm install:*)\",\n      \"Bash(npm ls:*)\",\n      \"Bash(npm view:*)\",\n      \"Bash(npm remove:*)\",\n      \"Bash(npx tsc:*)\",\n      \"Bash(git init:*)\",\n      \"Bash(git commit:*)\",\n      \"Bash(git push:*)\",\n      \"Bash(git add:*)\",\n      \"Bash(npm test:*)\",\n      \"Bash(npx eslint:*)\",\n      \"Bash(node -e *)\",\n      \"Bash(gh api:*)\",\n      \"Bash(npx prettier:*)\",\n      \"Bash(git checkout:*)\",\n      \"Bash(which pandoc:*)\",\n      \"Bash(npm uninstall:*)\",\n      \"Bash(/Users/ofek/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/scripts/start-server.sh --project-dir /Users/ofek/projects/yb4)\",\n      \"Bash(/Users/ofek/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/skills/brainstorming/scripts/start-server.sh --project-dir /Users/ofek/projects/yb4)\"\n    ],\n    \"defaultMode\": \"plan\"\n  },\n  \"hooks\": {\n    \"Notification\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"osascript -e 'display notification \\\"Claude Code needs your attention\\\" with title \\\"Claude Code\\\"'\"\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"/Users/ofek/.claude/hooks/rtk-rewrite.sh\"\n          }\n        ]\n      }\n    ]\n  },\n  \"statusLine\": {\n    \"type\": \"command\",\n    \"command\": \"bash /Users/ofek/.claude/statusline-command.sh\"\n  },\n  \"enabledPlugins\": {\n    \"superpowers@claude-plugins-official\": false,\n    \"typescript-lsp@claude-plugins-official\": false,\n    \"minimalist-entrepreneur@minimalist-entrepreneur\": false,\n    \"adgen@yb4\": false,\n    \"frontend-design@claude-plugins-official\": false,\n    \"claude-seo@agricidaniel-seo\": false,\n    \"vercel@claude-plugins-official\": false,\n    \"agentmemory@agentmemory\": false,\n    \"langsmith-tracing@langsmith-claude-code-plugins\": true\n  },\n  \"extraKnownMarketplaces\": {\n    \"minimalist-entrepreneur\": {\n      \"source\": {\n        \"source\": \"github"
+                        "stringValue": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(npm install:*)\",\n      \"Bash(npm ls:*)\",\n      \"Bash(npm view:*)\",\n      \"Bash(npm remove:*)\",\n      \"Bash(npx tsc:*)\",\n      \"Bash(git init:*)\",\n      \"Bash(git commit:*)\",\n      \"Bash(git push:*)\",\n      \"Bash(git add:*)\",\n      \"Bash(npm test:*)\",\n      \"Bash(npx eslint:*)\",\n      \"Bash(node -e *)\",\n      \"Bash(gh api:*)\",\n      \"Bash(npx prettier:*)\",\n      \"Bash(git checkout:*)\",\n      \"Bash(which pandoc:*)\",\n      \"Bash(npm uninstall:*)\",\n      \"Bash(/Users/dev/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/scripts/start-server.sh --project-dir /Users/dev/projects/sample-app)\",\n      \"Bash(/Users/dev/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/skills/brainstorming/scripts/start-server.sh --project-dir /Users/dev/projects/sample-app)\"\n    ],\n    \"defaultMode\": \"plan\"\n  },\n  \"hooks\": {\n    \"Notification\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"osascript -e 'display notification \\\"Claude Code needs your attention\\\" with title \\\"Claude Code\\\"'\"\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"/Users/dev/.claude/hooks/rtk-rewrite.sh\"\n          }\n        ]\n      }\n    ]\n  },\n  \"statusLine\": {\n    \"type\": \"command\",\n    \"command\": \"bash /Users/dev/.claude/statusline-command.sh\"\n  },\n  \"enabledPlugins\": {\n    \"superpowers@claude-plugins-official\": false,\n    \"typescript-lsp@claude-plugins-official\": false,\n    \"example-marketplace@example-marketplace\": false,\n    \"sample-plugin@sample-app\": false,\n    \"frontend-design@claude-plugins-official\": false,\n    \"claude-seo@example-seo\": false,\n    \"vercel@claude-plugins-official\": false,\n    \"agentmemory@agentmemory\": false,\n    \"langsmith-tracing@langsmith-claude-code-plugins\": true\n  },\n  \"extraKnownMarketplaces\": {\n    \"example-marketplace\": {\n      \"source\": {\n        \"source\": \"github"
                       }
                     }
                   ]
@@ -913,7 +913,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -997,7 +997,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -1075,7 +1075,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -1289,7 +1289,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -1325,7 +1325,7 @@
                 {
                   "key": "file_path",
                   "value": {
-                    "stringValue": "/Users/ofek/.claude/settings.json"
+                    "stringValue": "/Users/dev/.claude/settings.json"
                   }
                 },
                 {
@@ -1343,7 +1343,7 @@
                     {
                       "key": "file_path",
                       "value": {
-                        "stringValue": "/Users/ofek/.claude/settings.json"
+                        "stringValue": "/Users/dev/.claude/settings.json"
                       }
                     },
                     {
@@ -1393,7 +1393,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -1477,7 +1477,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -1555,7 +1555,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -1815,7 +1815,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -2029,7 +2029,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -2113,7 +2113,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -2191,7 +2191,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -2321,7 +2321,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {
@@ -2581,7 +2581,7 @@
                 {
                   "key": "user.email",
                   "value": {
-                    "stringValue": "ofekkir@gmail.com"
+                    "stringValue": "dev@example.com"
                   }
                 },
                 {

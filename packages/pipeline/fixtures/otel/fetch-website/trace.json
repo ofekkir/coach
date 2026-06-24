@@ -3,16 +3,44 @@
     {
       "resource": {
         "attributes": [
-          { "key": "host.arch", "value": { "stringValue": "arm64" } },
-          { "key": "os.type", "value": { "stringValue": "darwin" } },
-          { "key": "os.version", "value": { "stringValue": "25.4.0" } },
-          { "key": "service.version", "value": { "stringValue": "2.1.158" } },
-          { "key": "service.name", "value": { "stringValue": "claude-code" } }
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "darwin"
+            }
+          },
+          {
+            "key": "os.version",
+            "value": {
+              "stringValue": "25.4.0"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "2.1.158"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "claude-code"
+            }
+          }
         ]
       },
       "scopeSpans": [
         {
-          "scope": { "name": "com.anthropic.claude_code.tracing", "version": "1.0.0" },
+          "scope": {
+            "name": "com.anthropic.claude_code.tracing",
+            "version": "1.0.0"
+          },
           "spans": [
             {
               "attributes": [
@@ -24,28 +52,76 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "interaction" } },
-                { "key": "user_prompt", "value": { "stringValue": "fetch ynet.co.il" } },
-                { "key": "user_prompt_length", "value": { "intValue": "16" } },
-                { "key": "interaction.sequence", "value": { "intValue": "1" } },
-                { "key": "interaction.duration_ms", "value": { "intValue": "18392" } }
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "user_prompt",
+                  "value": {
+                    "stringValue": "fetch example.com"
+                  }
+                },
+                {
+                  "key": "user_prompt_length",
+                  "value": {
+                    "intValue": "16"
+                  }
+                },
+                {
+                  "key": "interaction.sequence",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "interaction.duration_ms",
+                  "value": {
+                    "intValue": "18392"
+                  }
+                }
               ],
               "endTimeUnixNano": "1780132942809815917",
               "kind": "SPAN_KIND_INTERNAL",
@@ -65,60 +141,182 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "llm_request" } },
-                { "key": "model", "value": { "stringValue": "claude-sonnet-4-6" } },
-                { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
-                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-sonnet-4-6" } },
-                { "key": "llm_request.context", "value": { "stringValue": "interaction" } },
-                { "key": "speed", "value": { "stringValue": "normal" } },
-                { "key": "duration_ms", "value": { "intValue": "3301" } },
-                { "key": "input_tokens", "value": { "intValue": "3" } },
-                { "key": "output_tokens", "value": { "intValue": "100" } },
-                { "key": "cache_read_tokens", "value": { "intValue": "18372" } },
-                { "key": "cache_creation_tokens", "value": { "intValue": "9995" } },
-                { "key": "success", "value": { "boolValue": true } },
-                { "key": "attempt", "value": { "intValue": "1" } },
-                { "key": "request_id", "value": { "stringValue": "req_011CbYWSa9jFWZQee1ccNntm" } },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "3301"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "3"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "100"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "18372"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "9995"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbYWSa9jFWZQee1ccNntm"
+                  }
+                },
                 {
                   "key": "gen_ai.response.id",
-                  "value": { "stringValue": "req_011CbYWSa9jFWZQee1ccNntm" }
+                  "value": {
+                    "stringValue": "req_011CbYWSa9jFWZQee1ccNntm"
+                  }
                 },
                 {
                   "key": "client_request_id",
-                  "value": { "stringValue": "76a25be2-0aa6-460f-8261-ed40f782704e" }
+                  "value": {
+                    "stringValue": "76a25be2-0aa6-460f-8261-ed40f782704e"
+                  }
                 },
-                { "key": "ttft_ms", "value": { "intValue": "1820" } },
-                { "key": "stop_reason", "value": { "stringValue": "tool_use" } },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "1820"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "tool_use"
+                  }
+                },
                 {
                   "key": "gen_ai.response.finish_reasons",
-                  "value": { "arrayValue": { "values": [{ "stringValue": "tool_use" }] } }
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "tool_use"
+                        }
+                      ]
+                    }
+                  }
                 }
               ],
               "endTimeUnixNano": "1780132927734444875",
               "events": [
                 {
                   "attributes": [
-                    { "key": "attempt", "value": { "intValue": "1" } },
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
                     {
                       "key": "client_request_id",
-                      "value": { "stringValue": "76a25be2-0aa6-460f-8261-ed40f782704e" }
+                      "value": {
+                        "stringValue": "76a25be2-0aa6-460f-8261-ed40f782704e"
+                      }
                     }
                   ],
                   "name": "gen_ai.request.attempt",
@@ -128,7 +326,14 @@
               "kind": "SPAN_KIND_INTERNAL",
               "links": [
                 {
-                  "attributes": [{ "key": "link.type", "value": { "stringValue": "parent_of" } }],
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ],
                   "spanId": "3l7lQP+qR64=",
                   "traceId": "6nu0fgeIRHz/soaVrSKdMA=="
                 }
@@ -150,26 +355,64 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "tool" } },
-                { "key": "tool_name", "value": { "stringValue": "ToolSearch" } },
-                { "key": "duration_ms", "value": { "intValue": "2" } }
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool"
+                  }
+                },
+                {
+                  "key": "tool_name",
+                  "value": {
+                    "stringValue": "ToolSearch"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "2"
+                  }
+                }
               ],
               "endTimeUnixNano": "1780132927440058709",
               "kind": "SPAN_KIND_INTERNAL",
@@ -190,27 +433,70 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "tool.blocked_on_user" } },
-                { "key": "duration_ms", "value": { "intValue": "1" } },
-                { "key": "decision", "value": { "stringValue": "accept" } },
-                { "key": "source", "value": { "stringValue": "config" } }
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.blocked_on_user"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "decision",
+                  "value": {
+                    "stringValue": "accept"
+                  }
+                },
+                {
+                  "key": "source",
+                  "value": {
+                    "stringValue": "config"
+                  }
+                }
               ],
               "endTimeUnixNano": "1780132927439893000",
               "kind": "SPAN_KIND_INTERNAL",
@@ -231,26 +517,64 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "tool.execution" } },
-                { "key": "duration_ms", "value": { "intValue": "1" } },
-                { "key": "success", "value": { "boolValue": true } }
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.execution"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                }
               ],
               "endTimeUnixNano": "1780132927440983833",
               "kind": "SPAN_KIND_INTERNAL",
@@ -271,26 +595,64 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "tool" } },
-                { "key": "tool_name", "value": { "stringValue": "WebFetch" } },
-                { "key": "duration_ms", "value": { "intValue": "6239" } }
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool"
+                  }
+                },
+                {
+                  "key": "tool_name",
+                  "value": {
+                    "stringValue": "WebFetch"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "6239"
+                  }
+                }
               ],
               "endTimeUnixNano": "1780132936924415583",
               "kind": "SPAN_KIND_INTERNAL",
@@ -311,26 +673,64 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "tool.execution" } },
-                { "key": "duration_ms", "value": { "intValue": "6238" } },
-                { "key": "success", "value": { "boolValue": true } }
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.execution"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "6238"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                }
               ],
               "endTimeUnixNano": "1780132936924658334",
               "kind": "SPAN_KIND_INTERNAL",
@@ -351,63 +751,182 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "llm_request" } },
-                { "key": "model", "value": { "stringValue": "claude-haiku-4-5-20251001" } },
-                { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
                 {
                   "key": "gen_ai.request.model",
-                  "value": { "stringValue": "claude-haiku-4-5-20251001" }
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
                 },
-                { "key": "llm_request.context", "value": { "stringValue": "tool" } },
-                { "key": "speed", "value": { "stringValue": "normal" } },
-                { "key": "duration_ms", "value": { "intValue": "5819" } },
-                { "key": "input_tokens", "value": { "intValue": "41652" } },
-                { "key": "output_tokens", "value": { "intValue": "287" } },
-                { "key": "cache_read_tokens", "value": { "intValue": "0" } },
-                { "key": "cache_creation_tokens", "value": { "intValue": "0" } },
-                { "key": "success", "value": { "boolValue": true } },
-                { "key": "attempt", "value": { "intValue": "1" } },
-                { "key": "request_id", "value": { "stringValue": "req_011CbYWT4giNe9QYZ7dtjYio" } },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "tool"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "5819"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "41652"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "287"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbYWT4giNe9QYZ7dtjYio"
+                  }
+                },
                 {
                   "key": "gen_ai.response.id",
-                  "value": { "stringValue": "req_011CbYWT4giNe9QYZ7dtjYio" }
+                  "value": {
+                    "stringValue": "req_011CbYWT4giNe9QYZ7dtjYio"
+                  }
                 },
                 {
                   "key": "client_request_id",
-                  "value": { "stringValue": "829600f6-e064-4869-97b5-13571e3e4309" }
+                  "value": {
+                    "stringValue": "829600f6-e064-4869-97b5-13571e3e4309"
+                  }
                 },
-                { "key": "ttft_ms", "value": { "intValue": "2031" } },
-                { "key": "stop_reason", "value": { "stringValue": "end_turn" } },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "2031"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "end_turn"
+                  }
+                },
                 {
                   "key": "gen_ai.response.finish_reasons",
-                  "value": { "arrayValue": { "values": [{ "stringValue": "end_turn" }] } }
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "end_turn"
+                        }
+                      ]
+                    }
+                  }
                 }
               ],
               "endTimeUnixNano": "1780132936923929208",
               "events": [
                 {
                   "attributes": [
-                    { "key": "attempt", "value": { "intValue": "1" } },
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
                     {
                       "key": "client_request_id",
-                      "value": { "stringValue": "829600f6-e064-4869-97b5-13571e3e4309" }
+                      "value": {
+                        "stringValue": "829600f6-e064-4869-97b5-13571e3e4309"
+                      }
                     }
                   ],
                   "name": "gen_ai.request.attempt",
@@ -417,7 +936,14 @@
               "kind": "SPAN_KIND_INTERNAL",
               "links": [
                 {
-                  "attributes": [{ "key": "link.type", "value": { "stringValue": "parent_of" } }],
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ],
                   "spanId": "WeUUgMaygV0=",
                   "traceId": "bKxeZHPip8syyAh2ff6kow=="
                 }
@@ -439,60 +965,182 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "llm_request" } },
-                { "key": "model", "value": { "stringValue": "claude-sonnet-4-6" } },
-                { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
-                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-sonnet-4-6" } },
-                { "key": "llm_request.context", "value": { "stringValue": "interaction" } },
-                { "key": "speed", "value": { "stringValue": "normal" } },
-                { "key": "duration_ms", "value": { "intValue": "5868" } },
-                { "key": "input_tokens", "value": { "intValue": "1" } },
-                { "key": "output_tokens", "value": { "intValue": "215" } },
-                { "key": "cache_read_tokens", "value": { "intValue": "28988" } },
-                { "key": "cache_creation_tokens", "value": { "intValue": "419" } },
-                { "key": "success", "value": { "boolValue": true } },
-                { "key": "attempt", "value": { "intValue": "1" } },
-                { "key": "request_id", "value": { "stringValue": "req_011CbYWTVbuj9zSCS1Uf4Xtn" } },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "5868"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "215"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "28988"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "419"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbYWTVbuj9zSCS1Uf4Xtn"
+                  }
+                },
                 {
                   "key": "gen_ai.response.id",
-                  "value": { "stringValue": "req_011CbYWTVbuj9zSCS1Uf4Xtn" }
+                  "value": {
+                    "stringValue": "req_011CbYWTVbuj9zSCS1Uf4Xtn"
+                  }
                 },
                 {
                   "key": "client_request_id",
-                  "value": { "stringValue": "fda11c9a-02d4-4fc2-a43a-965141fa46cc" }
+                  "value": {
+                    "stringValue": "fda11c9a-02d4-4fc2-a43a-965141fa46cc"
+                  }
                 },
-                { "key": "ttft_ms", "value": { "intValue": "2877" } },
-                { "key": "stop_reason", "value": { "stringValue": "end_turn" } },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "2877"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "end_turn"
+                  }
+                },
                 {
                   "key": "gen_ai.response.finish_reasons",
-                  "value": { "arrayValue": { "values": [{ "stringValue": "end_turn" }] } }
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "end_turn"
+                        }
+                      ]
+                    }
+                  }
                 }
               ],
               "endTimeUnixNano": "1780132942805504542",
               "events": [
                 {
                   "attributes": [
-                    { "key": "attempt", "value": { "intValue": "1" } },
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
                     {
                       "key": "client_request_id",
-                      "value": { "stringValue": "fda11c9a-02d4-4fc2-a43a-965141fa46cc" }
+                      "value": {
+                        "stringValue": "fda11c9a-02d4-4fc2-a43a-965141fa46cc"
+                      }
                     }
                   ],
                   "name": "gen_ai.request.attempt",
@@ -502,7 +1150,14 @@
               "kind": "SPAN_KIND_INTERNAL",
               "links": [
                 {
-                  "attributes": [{ "key": "link.type", "value": { "stringValue": "parent_of" } }],
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ],
                   "spanId": "5oQ2qOA1ovs=",
                   "traceId": "1j8KxHY2LmNE+HON82gfhA=="
                 }
@@ -521,16 +1176,44 @@
     {
       "resource": {
         "attributes": [
-          { "key": "host.arch", "value": { "stringValue": "arm64" } },
-          { "key": "os.type", "value": { "stringValue": "darwin" } },
-          { "key": "os.version", "value": { "stringValue": "25.4.0" } },
-          { "key": "service.version", "value": { "stringValue": "2.1.158" } },
-          { "key": "service.name", "value": { "stringValue": "claude-code" } }
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "darwin"
+            }
+          },
+          {
+            "key": "os.version",
+            "value": {
+              "stringValue": "25.4.0"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "2.1.158"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "claude-code"
+            }
+          }
         ]
       },
       "scopeSpans": [
         {
-          "scope": { "name": "com.anthropic.claude_code.tracing", "version": "1.0.0" },
+          "scope": {
+            "name": "com.anthropic.claude_code.tracing",
+            "version": "1.0.0"
+          },
           "spans": [
             {
               "attributes": [
@@ -542,63 +1225,182 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "llm_request" } },
-                { "key": "model", "value": { "stringValue": "claude-haiku-4-5-20251001" } },
-                { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
                 {
                   "key": "gen_ai.request.model",
-                  "value": { "stringValue": "claude-haiku-4-5-20251001" }
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
                 },
-                { "key": "llm_request.context", "value": { "stringValue": "interaction" } },
-                { "key": "speed", "value": { "stringValue": "normal" } },
-                { "key": "duration_ms", "value": { "intValue": "1238" } },
-                { "key": "input_tokens", "value": { "intValue": "441" } },
-                { "key": "output_tokens", "value": { "intValue": "17" } },
-                { "key": "cache_read_tokens", "value": { "intValue": "0" } },
-                { "key": "cache_creation_tokens", "value": { "intValue": "0" } },
-                { "key": "success", "value": { "boolValue": true } },
-                { "key": "attempt", "value": { "intValue": "1" } },
-                { "key": "request_id", "value": { "stringValue": "req_011CbYWSaBDmwNr1JugqMKgi" } },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "1238"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "441"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "17"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbYWSaBDmwNr1JugqMKgi"
+                  }
+                },
                 {
                   "key": "gen_ai.response.id",
-                  "value": { "stringValue": "req_011CbYWSaBDmwNr1JugqMKgi" }
+                  "value": {
+                    "stringValue": "req_011CbYWSaBDmwNr1JugqMKgi"
+                  }
                 },
                 {
                   "key": "client_request_id",
-                  "value": { "stringValue": "8650fa2b-3bc5-4e9e-b6b8-ee09c80a499a" }
+                  "value": {
+                    "stringValue": "8650fa2b-3bc5-4e9e-b6b8-ee09c80a499a"
+                  }
                 },
-                { "key": "ttft_ms", "value": { "intValue": "1197" } },
-                { "key": "stop_reason", "value": { "stringValue": "end_turn" } },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "1197"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "end_turn"
+                  }
+                },
                 {
                   "key": "gen_ai.response.finish_reasons",
-                  "value": { "arrayValue": { "values": [{ "stringValue": "end_turn" }] } }
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "end_turn"
+                        }
+                      ]
+                    }
+                  }
                 }
               ],
               "endTimeUnixNano": "1780132925665663667",
               "events": [
                 {
                   "attributes": [
-                    { "key": "attempt", "value": { "intValue": "1" } },
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
                     {
                       "key": "client_request_id",
-                      "value": { "stringValue": "8650fa2b-3bc5-4e9e-b6b8-ee09c80a499a" }
+                      "value": {
+                        "stringValue": "8650fa2b-3bc5-4e9e-b6b8-ee09c80a499a"
+                      }
                     }
                   ],
                   "name": "gen_ai.request.attempt",
@@ -608,7 +1410,14 @@
               "kind": "SPAN_KIND_INTERNAL",
               "links": [
                 {
-                  "attributes": [{ "key": "link.type", "value": { "stringValue": "parent_of" } }],
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ],
                   "spanId": "fAhW/9C2Ou4=",
                   "traceId": "+ailxn+2sq6BnH3WkNjDJA=="
                 }
@@ -630,63 +1439,182 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "llm_request" } },
-                { "key": "model", "value": { "stringValue": "claude-haiku-4-5-20251001" } },
-                { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
                 {
                   "key": "gen_ai.request.model",
-                  "value": { "stringValue": "claude-haiku-4-5-20251001" }
+                  "value": {
+                    "stringValue": "claude-haiku-4-5-20251001"
+                  }
                 },
-                { "key": "llm_request.context", "value": { "stringValue": "interaction" } },
-                { "key": "speed", "value": { "stringValue": "normal" } },
-                { "key": "duration_ms", "value": { "intValue": "1370" } },
-                { "key": "input_tokens", "value": { "intValue": "441" } },
-                { "key": "output_tokens", "value": { "intValue": "17" } },
-                { "key": "cache_read_tokens", "value": { "intValue": "0" } },
-                { "key": "cache_creation_tokens", "value": { "intValue": "0" } },
-                { "key": "success", "value": { "boolValue": true } },
-                { "key": "attempt", "value": { "intValue": "1" } },
-                { "key": "request_id", "value": { "stringValue": "req_011CbYWSa7zdp17aG5WJBVri" } },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "1370"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "441"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "17"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbYWSa7zdp17aG5WJBVri"
+                  }
+                },
                 {
                   "key": "gen_ai.response.id",
-                  "value": { "stringValue": "req_011CbYWSa7zdp17aG5WJBVri" }
+                  "value": {
+                    "stringValue": "req_011CbYWSa7zdp17aG5WJBVri"
+                  }
                 },
                 {
                   "key": "client_request_id",
-                  "value": { "stringValue": "b37ac791-dabf-4e8d-b368-4fa87105b33a" }
+                  "value": {
+                    "stringValue": "b37ac791-dabf-4e8d-b368-4fa87105b33a"
+                  }
                 },
-                { "key": "ttft_ms", "value": { "intValue": "1327" } },
-                { "key": "stop_reason", "value": { "stringValue": "end_turn" } },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "1327"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "end_turn"
+                  }
+                },
                 {
                   "key": "gen_ai.response.finish_reasons",
-                  "value": { "arrayValue": { "values": [{ "stringValue": "end_turn" }] } }
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "end_turn"
+                        }
+                      ]
+                    }
+                  }
                 }
               ],
               "endTimeUnixNano": "1780132925815672584",
               "events": [
                 {
                   "attributes": [
-                    { "key": "attempt", "value": { "intValue": "1" } },
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
                     {
                       "key": "client_request_id",
-                      "value": { "stringValue": "b37ac791-dabf-4e8d-b368-4fa87105b33a" }
+                      "value": {
+                        "stringValue": "b37ac791-dabf-4e8d-b368-4fa87105b33a"
+                      }
                     }
                   ],
                   "name": "gen_ai.request.attempt",
@@ -696,7 +1624,14 @@
               "kind": "SPAN_KIND_INTERNAL",
               "links": [
                 {
-                  "attributes": [{ "key": "link.type", "value": { "stringValue": "parent_of" } }],
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ],
                   "spanId": "Ehm+9d//++Y=",
                   "traceId": "kW10PN/gsjgniEowgGE55w=="
                 }
@@ -715,16 +1650,44 @@
     {
       "resource": {
         "attributes": [
-          { "key": "host.arch", "value": { "stringValue": "arm64" } },
-          { "key": "os.type", "value": { "stringValue": "darwin" } },
-          { "key": "os.version", "value": { "stringValue": "25.4.0" } },
-          { "key": "service.version", "value": { "stringValue": "2.1.158" } },
-          { "key": "service.name", "value": { "stringValue": "claude-code" } }
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "darwin"
+            }
+          },
+          {
+            "key": "os.version",
+            "value": {
+              "stringValue": "25.4.0"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "2.1.158"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "claude-code"
+            }
+          }
         ]
       },
       "scopeSpans": [
         {
-          "scope": { "name": "com.anthropic.claude_code.tracing", "version": "1.0.0" },
+          "scope": {
+            "name": "com.anthropic.claude_code.tracing",
+            "version": "1.0.0"
+          },
           "spans": [
             {
               "attributes": [
@@ -736,60 +1699,182 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "llm_request" } },
-                { "key": "model", "value": { "stringValue": "claude-sonnet-4-6" } },
-                { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
-                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-sonnet-4-6" } },
-                { "key": "llm_request.context", "value": { "stringValue": "interaction" } },
-                { "key": "speed", "value": { "stringValue": "normal" } },
-                { "key": "duration_ms", "value": { "intValue": "3033" } },
-                { "key": "input_tokens", "value": { "intValue": "3" } },
-                { "key": "output_tokens", "value": { "intValue": "123" } },
-                { "key": "cache_read_tokens", "value": { "intValue": "28367" } },
-                { "key": "cache_creation_tokens", "value": { "intValue": "621" } },
-                { "key": "success", "value": { "boolValue": true } },
-                { "key": "attempt", "value": { "intValue": "1" } },
-                { "key": "request_id", "value": { "stringValue": "req_011CbYWSpK2T9nVGVcYADriN" } },
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "llm_request"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-6"
+                  }
+                },
+                {
+                  "key": "llm_request.context",
+                  "value": {
+                    "stringValue": "interaction"
+                  }
+                },
+                {
+                  "key": "speed",
+                  "value": {
+                    "stringValue": "normal"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "3033"
+                  }
+                },
+                {
+                  "key": "input_tokens",
+                  "value": {
+                    "intValue": "3"
+                  }
+                },
+                {
+                  "key": "output_tokens",
+                  "value": {
+                    "intValue": "123"
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": "28367"
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": "621"
+                  }
+                },
+                {
+                  "key": "success",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "request_id",
+                  "value": {
+                    "stringValue": "req_011CbYWSpK2T9nVGVcYADriN"
+                  }
+                },
                 {
                   "key": "gen_ai.response.id",
-                  "value": { "stringValue": "req_011CbYWSpK2T9nVGVcYADriN" }
+                  "value": {
+                    "stringValue": "req_011CbYWSpK2T9nVGVcYADriN"
+                  }
                 },
                 {
                   "key": "client_request_id",
-                  "value": { "stringValue": "43c9539f-eb26-4de2-b131-583a596f6418" }
+                  "value": {
+                    "stringValue": "43c9539f-eb26-4de2-b131-583a596f6418"
+                  }
                 },
-                { "key": "ttft_ms", "value": { "intValue": "1819" } },
-                { "key": "stop_reason", "value": { "stringValue": "tool_use" } },
+                {
+                  "key": "ttft_ms",
+                  "value": {
+                    "intValue": "1819"
+                  }
+                },
+                {
+                  "key": "stop_reason",
+                  "value": {
+                    "stringValue": "tool_use"
+                  }
+                },
                 {
                   "key": "gen_ai.response.finish_reasons",
-                  "value": { "arrayValue": { "values": [{ "stringValue": "tool_use" }] } }
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "tool_use"
+                        }
+                      ]
+                    }
+                  }
                 }
               ],
               "endTimeUnixNano": "1780132930768773750",
               "events": [
                 {
                   "attributes": [
-                    { "key": "attempt", "value": { "intValue": "1" } },
+                    {
+                      "key": "attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    },
                     {
                       "key": "client_request_id",
-                      "value": { "stringValue": "43c9539f-eb26-4de2-b131-583a596f6418" }
+                      "value": {
+                        "stringValue": "43c9539f-eb26-4de2-b131-583a596f6418"
+                      }
                     }
                   ],
                   "name": "gen_ai.request.attempt",
@@ -799,7 +1884,14 @@
               "kind": "SPAN_KIND_INTERNAL",
               "links": [
                 {
-                  "attributes": [{ "key": "link.type", "value": { "stringValue": "parent_of" } }],
+                  "attributes": [
+                    {
+                      "key": "link.type",
+                      "value": {
+                        "stringValue": "parent_of"
+                      }
+                    }
+                  ],
                   "spanId": "oXwBNlswJZI=",
                   "traceId": "+UNAACcqW7ALh3m0ek9Uaw=="
                 }
@@ -821,27 +1913,70 @@
                 },
                 {
                   "key": "session.id",
-                  "value": { "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099" }
+                  "value": {
+                    "stringValue": "0c248f2d-332e-4341-bbdb-ffb379e10099"
+                  }
                 },
-                { "key": "app.version", "value": { "stringValue": "2.1.158" } },
+                {
+                  "key": "app.version",
+                  "value": {
+                    "stringValue": "2.1.158"
+                  }
+                },
                 {
                   "key": "organization.id",
-                  "value": { "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e" }
+                  "value": {
+                    "stringValue": "f86c1be9-9469-4c18-806e-edad1f2c2f5e"
+                  }
                 },
-                { "key": "user.email", "value": { "stringValue": "ofekkir@gmail.com" } },
+                {
+                  "key": "user.email",
+                  "value": {
+                    "stringValue": "dev@example.com"
+                  }
+                },
                 {
                   "key": "user.account_uuid",
-                  "value": { "stringValue": "d0339033-d051-478e-8257-8402c2f0f144" }
+                  "value": {
+                    "stringValue": "d0339033-d051-478e-8257-8402c2f0f144"
+                  }
                 },
                 {
                   "key": "user.account_id",
-                  "value": { "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M" }
+                  "value": {
+                    "stringValue": "user_01SiA6FT2ECdYXGUzc3XoM9M"
+                  }
                 },
-                { "key": "terminal.type", "value": { "stringValue": "iTerm.app" } },
-                { "key": "span.type", "value": { "stringValue": "tool.blocked_on_user" } },
-                { "key": "duration_ms", "value": { "intValue": "1" } },
-                { "key": "decision", "value": { "stringValue": "accept" } },
-                { "key": "source", "value": { "stringValue": "config" } }
+                {
+                  "key": "terminal.type",
+                  "value": {
+                    "stringValue": "iTerm.app"
+                  }
+                },
+                {
+                  "key": "span.type",
+                  "value": {
+                    "stringValue": "tool.blocked_on_user"
+                  }
+                },
+                {
+                  "key": "duration_ms",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "decision",
+                  "value": {
+                    "stringValue": "accept"
+                  }
+                },
+                {
+                  "key": "source",
+                  "value": {
+                    "stringValue": "config"
+                  }
+                }
               ],
               "endTimeUnixNano": "1780132930686366375",
               "kind": "SPAN_KIND_INTERNAL",

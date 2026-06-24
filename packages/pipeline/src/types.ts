@@ -285,7 +285,7 @@ export interface MessageDeltas {
 
 /** Stage 6 — the semantic label for a relabeled node. `what` is an ordered list of
  *  atomic action phrases (a node often does several things in sequence — e.g.
- *  ["fetch ynet.co.il", "summarize headlines"]); a single-action node carries a
+ *  ["fetch example.com", "summarize headlines"]); a single-action node carries a
  *  one-element array. `comment` is an OPTIONAL agent-authored annotation harvested
  *  verbatim from a per-agent-configured input field (e.g. Claude Code's Bash
  *  `description`) — free text, a display signal only, never part of the closed

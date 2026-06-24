@@ -19,6 +19,16 @@ function readFixture(relPath: string): string {
 const NATIVE_JSONL = readFixture('native-claude/fetch-website/session.jsonl');
 const REFACTOR_JSONL = readFixture('native-claude/refactor-code/session.jsonl');
 
+// Read the cwd straight from the fixture so the assertion stays free of any
+// machine-specific path literal.
+function fixtureCwd(jsonl: string): string | undefined {
+  for (const line of jsonl.split('\n').filter(Boolean)) {
+    const row = JSON.parse(line) as { cwd?: unknown };
+    if (typeof row.cwd === 'string') return row.cwd;
+  }
+  return undefined;
+}
+
 function nodeRows(content: string = NATIVE_JSONL): Record<string, unknown>[] {
   const files: UploadedFile[] = [{ name: 'session.jsonl', content }];
   const { enrichedGraph } = runPipeline(files);
@@ -101,10 +111,10 @@ describe('numeric BIGINT time columns', () => {
 });
 
 describe('repo_path worktree normalization invariant', () => {
-  const MAIN_CWD = '/Users/ofek/projects/coach';
-  const WORKTREE_A = '/Users/ofek/projects/coach/.claude/worktrees/agent-aaaa/src/index.ts';
-  const WORKTREE_B = '/Users/ofek/projects/coach/.claude/worktrees/agent-bbbb/src/index.ts';
-  const MAIN_FILE = '/Users/ofek/projects/coach/src/index.ts';
+  const MAIN_CWD = '/Users/dev/projects/coach';
+  const WORKTREE_A = '/Users/dev/projects/coach/.claude/worktrees/agent-aaaa/src/index.ts';
+  const WORKTREE_B = '/Users/dev/projects/coach/.claude/worktrees/agent-bbbb/src/index.ts';
+  const MAIN_FILE = '/Users/dev/projects/coach/src/index.ts';
 
   it('collapses the same file under two different worktrees to ONE repo_path', () => {
     const a = normalizeRepoPath(WORKTREE_A, MAIN_CWD);
@@ -118,7 +128,7 @@ describe('repo_path worktree normalization invariant', () => {
   });
 
   it('never contains /.claude/worktrees/ and never has a leading /', () => {
-    const cwdInWorktree = '/Users/ofek/projects/coach/.claude/worktrees/agent-aaaa';
+    const cwdInWorktree = '/Users/dev/projects/coach/.claude/worktrees/agent-aaaa';
     for (const out of [
       normalizeRepoPath(WORKTREE_A, MAIN_CWD),
       normalizeRepoPath(WORKTREE_B, cwdInWorktree),
@@ -136,10 +146,8 @@ describe('repo_path worktree normalization invariant', () => {
   });
 
   it('anchors an out-of-project home .claude config file at .claude/', () => {
-    expect(normalizeRepoPath('/Users/ofek/.claude/plans/x.md', MAIN_CWD)).toBe(
-      '.claude/plans/x.md',
-    );
-    expect(normalizeRepoPath('/Users/ofek/.claude/projects/p/memory/MEMORY.md', MAIN_CWD)).toBe(
+    expect(normalizeRepoPath('/Users/dev/.claude/plans/x.md', MAIN_CWD)).toBe('.claude/plans/x.md');
+    expect(normalizeRepoPath('/Users/dev/.claude/projects/p/memory/MEMORY.md', MAIN_CWD)).toBe(
       '.claude/projects/p/memory/MEMORY.md',
     );
   });
@@ -166,7 +174,7 @@ describe('sessions cwd/branch + nodes.repo_path columns', () => {
     const { enrichedGraph } = runPipeline(files);
     const sessions = buildRecords(enrichedGraph).sessions ?? [];
     expect(sessions.length).toBeGreaterThan(0);
-    expect(sessions[0]?.cwd).toBe('/Users/ofek/projects/coach');
+    expect(sessions[0]?.cwd).toBe(fixtureCwd(NATIVE_JSONL));
     expect(sessions[0]?.branch).toBe('main');
   });
 

@@ -32,7 +32,7 @@ function encodeAbsolutePath(path: string): string {
 
 // A query matches a repo-root key when it is the key's exact encoded form (when an
 // absolute path is given) or its trailing path segment (when a bare name is given,
-// e.g. `coach` matches `-Users-ofek-projects-coach`).
+// e.g. `coach` matches `-Users-dev-projects-coach`).
 function matchesQuery(repoKey: string, query: string): boolean {
   if (query.startsWith('/')) return repoKey === encodeAbsolutePath(query);
   return repoKey === query || repoKey.endsWith(`-${query}`);

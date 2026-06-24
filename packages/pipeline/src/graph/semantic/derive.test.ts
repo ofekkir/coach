@@ -78,10 +78,10 @@ describe('toolPhrases (config-driven)', () => {
   it('fetches + notes weak-model processing when WebFetch carries a prompt', () => {
     expect(
       toolPhrases(defaultSemanticsConfig, 'WebFetch', {
-        url: 'https://www.ynet.co.il',
+        url: 'https://www.example.com',
         prompt: 'Summarize the headlines',
       }),
-    ).toEqual(['fetch ynet.co.il', 'process result with weak model']);
+    ).toEqual(['fetch example.com', 'process result with weak model']);
   });
 
   it('reads the selected tool out of a ToolSearch query via the extract regex', () => {

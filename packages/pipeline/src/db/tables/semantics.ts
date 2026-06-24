@@ -8,7 +8,7 @@ export const SEMANTICS: TableSpec = {
     {
       name: 'what',
       sqlType: 'JSON',
-      doc: 'Ordered list of atomic action phrases, e.g. ["fetch ynet.co.il","summarize headlines"].',
+      doc: 'Ordered list of atomic action phrases, e.g. ["fetch example.com","summarize headlines"].',
     },
     {
       name: 'comment',

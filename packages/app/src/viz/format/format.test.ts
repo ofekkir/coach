@@ -94,9 +94,9 @@ describe('buildNodeCard', () => {
   it('leads with the verb and carries the sub-verb + tool tag (enriched tool)', () => {
     const tool: ToolNode = { id: 'wf', type: 'tool', sessionId: SID, name: 'WebFetch', ...span };
     const card = buildNodeCard(
-      resolved(tool, { what: ['fetch ynet.co.il', 'summarize headlines'] }),
+      resolved(tool, { what: ['fetch example.com', 'summarize headlines'] }),
     );
-    expect(card.title).toBe('fetch ynet.co.il');
+    expect(card.title).toBe('fetch example.com');
     expect(card.subtitle).toBe('summarize headlines');
     expect(card.tag).toBe('ACTION · WEBFETCH');
   });
