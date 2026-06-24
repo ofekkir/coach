@@ -1,6 +1,0 @@
-{
-  "buildCommand": "pnpm --filter @coach/app build && pnpm --filter @coach/app ladle:build",
-  "outputDirectory": "packages/app/dist",
-  "installCommand": "pnpm install",
-  "framework": null
-}
