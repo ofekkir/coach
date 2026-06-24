@@ -2,7 +2,6 @@ import type { ExecutionGraph, ResolvedNode } from '@coach/pipeline';
 import { resolve } from '@coach/pipeline';
 import { useCallback, useMemo, useState } from 'react';
 
-import { DetailsPanel } from '../DetailsPanel/DetailsPanel.tsx';
 import { FlowInner } from '../FlowInner/FlowInner.tsx';
 import type { Elements } from '../FlowInner/FlowInner.tsx';
 import { allExpandableIds, agentRoot, buildElements, initialExpanded } from '../layout/queries.ts';
@@ -11,6 +10,7 @@ import { fonts, tokens } from '../theme.ts';
 import { summarizeRun } from '../TopBar/stats.ts';
 import { TopBar } from '../TopBar/TopBar.tsx';
 
+import { SelectedPanel } from './SelectedPanel.tsx';
 import { useViewportTargets } from './viewport-targets.ts';
 
 function selectedData(elements: Elements, selectedId: string | null): TraceRFNodeData | null {
@@ -129,20 +129,15 @@ export function App({
             highlightActive={highlightActive}
           />
         </div>
-        {selected != null && (
-          <DetailsPanel
-            key={selectedId}
-            card={selected.card}
-            resolved={selectedNode}
-            isLongest={selected.isLongest}
-            hiddenSubCall={selected.hiddenSubCall}
-            nested={selected.nested}
-            showRawDefault={showRawDefault}
-            onClose={() => {
-              setSelectedId(null);
-            }}
-          />
-        )}
+        <SelectedPanel
+          selected={selected}
+          selectedId={selectedId}
+          selectedNode={selectedNode}
+          showRawDefault={showRawDefault}
+          onClose={() => {
+            setSelectedId(null);
+          }}
+        />
       </div>
     </div>
   );
