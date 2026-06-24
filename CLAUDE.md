@@ -1,24 +1,14 @@
 # coach
 
-**The agent grades itself.** Coach turns an agent's own execution traces into a queryable model of
-what it did — then hands that model back to the agent through MCP, so Claude Code can load its own
-sessions and surface its own expensive, hallucinated, or wasteful steps. Existing agent tracing is
-built for the _engineer_ to observe the agent; coach's north star is to close that loop back to the
-**agent itself**, with the engineer monitoring the loop. It works on **OpenTelemetry (OTEL) traces**
-by design, which keeps coach **harness-agnostic**.
+Coach turns an agent's own execution traces into a queryable model of what it did, and hands that
+model back to the agent through MCP. This file is the **operating manual** for working in the repo;
+it does not restate the product vision.
 
-A **second pillar** sits beside that optimization work: because coach holds _complete sessions_ and
-_many of them_, it aims to infer user **intent in hindsight** and aggregate it across sessions into a
-per-agent **user model** — what users want, how they phrase it, what they leave unsaid, what needs
-clarification — a personalization signal population-level RLHF cannot produce. See
-`docs/agent-model.md` for the conceptual model.
-
-The shipped surface (what works today) is narrower than the vision above: a pure staged
-**pipeline**, a React Flow **visualization**, and a read-only **MCP query server**. See `README.md`
-for the two-tier shipped-vs-roadmap split.
-
-**`ARCHITECTURE.md` is a living document** — update it in the same change whenever package
-layout, module boundaries, or data flow change. Consult it before architectural tasks.
+- **What coach is, and the shipped-vs-roadmap split** → [`README.md`](README.md).
+- **The conceptual agent model** (the vision and second pillar) → [`docs/agent-model.md`](docs/agent-model.md).
+- **Package layout and data flow** → [`ARCHITECTURE.md`](ARCHITECTURE.md). It is a **living
+  document** — update it in the same change whenever package layout, module boundaries, or data flow
+  change, and consult it before architectural tasks.
 
 ## Tech stack
 
@@ -87,8 +77,3 @@ Enforced by `pnpm check:structure` (also runs in pre-commit):
 - **Named logic files:** when a module lives in its own directory, the core logic file is named after the directory — `enrich/enrich.ts`, not `enrich/index.ts`. This makes the file's purpose unambiguous without opening it.
 - **Barrel files are re-export only:** `index.ts` files may only contain `export … from` statements — no logic. Enforced by ESLint (`no-restricted-syntax` on `**/index.ts`). Avoid creating internal barrels; only the package root `index.ts` should aggregate exports.
 - **Tests live inside their module directory:** `enrich/enrich.test.ts`, not `etl/enrich.test.ts`. A test file must not be a sibling of the directory it tests.
-
-## Layout
-
-See `ARCHITECTURE.md` for the package layout and data flow — it is kept in sync with the code, so it
-is the single source of truth rather than a duplicated tree here.

@@ -1,7 +1,14 @@
 # Contributing to coach
 
-Thanks for helping improve coach. This guide distills the workflow; it does not repeat the design —
-for architecture see [ARCHITECTURE.md](ARCHITECTURE.md), and for the why see [README.md](README.md).
+Thanks for helping improve coach. This guide covers getting set up and the contribution process. It
+does **not** restate the engineering rules — those have a single home and apply to humans and agents
+alike:
+
+- **Code style, module file conventions, quality gates, and the branch/PR workflow** →
+  [`CLAUDE.md`](CLAUDE.md). It is the canonical operating manual for the repo; read it before your
+  first change.
+- **Architecture** (package layout, data flow) → [`ARCHITECTURE.md`](ARCHITECTURE.md).
+- **What coach is and where it's going** → [`README.md`](README.md).
 
 ## Prerequisites
 
@@ -12,52 +19,24 @@ for architecture see [ARCHITECTURE.md](ARCHITECTURE.md), and for the why see [RE
 pnpm install
 ```
 
-## Workflow
+## Making a change
 
-- **Branch off `main`.** Never commit to `main` directly — every change goes through a branch + PR.
-- Open a pull request. CI runs on PR open, on every push to the branch, and on pushes to `main`.
-- A PR is mergeable only when the full check passes:
+1. **Branch off `main`** — never commit to `main` directly. Every change goes through a branch + PR.
+2. Make your change, following the code style and module conventions in [`CLAUDE.md`](CLAUDE.md).
+3. Keep tests **basic**: cover the normal path and obvious error cases, not exotic edge cases.
+4. Run the full gate locally before pushing — a PR is mergeable only when it passes:
 
-  ```bash
-  pnpm check    # typecheck + lint + format:check + test + knip + structure (same as CI)
-  ```
+   ```bash
+   pnpm check    # typecheck + lint + format:check + test + knip + structure (same as CI)
+   ```
 
-- Keep tests **basic**: cover the normal path and obvious error cases, not exotic edge cases.
+5. Open a pull request. CI runs on PR open, on every push to the branch, and on pushes to `main`.
 
-## Quality gates
-
-Gates are enforced deterministically, not on trust — don't weaken them to make code pass, fix the
-code instead.
-
-- **`.husky/pre-commit`** runs `lint-staged` (ESLint `--fix` + Prettier on staged files),
-  `pnpm typecheck`, and `pnpm knip` on every commit.
-- **ESLint treats warnings as errors** (`--max-warnings=0`); TypeScript runs with `strict` plus
-  extra safety flags.
-- **[knip](https://knip.dev)** fails the build on unused files, exports, and dependencies.
-- **`pnpm check:structure`** enforces the module file conventions below.
-
-## Code style
-
-- Prefer named functions and descriptive names over comments that narrate steps. Comments are for
-  non-obvious **why**, not for labelling **what**.
-- **Max nesting depth 2** — use guard clauses (early return/continue/break), invert conditions, keep
-  the happy path at the lowest indent. No `else` after `return`.
-- Prefer array methods (`.filter()`, `.map()`, `.flatMap()`) over explicit loops where they read
-  clearly. Extract nested loops into named functions.
-
-## Module file conventions
-
-Enforced by `pnpm check:structure` (and pre-commit):
-
-- **Named logic files:** a module in its own directory names its core file after the directory —
-  `enrich/enrich.ts`, not `enrich/index.ts`.
-- **Barrel files are re-export only:** `index.ts` may only contain `export … from` statements.
-  Avoid internal barrels; only the package root `index.ts` aggregates exports.
-- **Tests live inside their module directory:** `enrich/enrich.test.ts`, not a sibling of the
-  directory it tests.
+The gates are enforced deterministically (pre-commit hooks + CI), not on trust — don't weaken them to
+make code pass; fix the code instead. See [`CLAUDE.md`](CLAUDE.md) for how the gates are wired.
 
 ## Reporting bugs and proposing features
 
 Use the GitHub issue templates. For broader questions or ideas, open a
-[GitHub Discussion](https://github.com/ofekkir/coach/discussions). To report a security
-issue, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+[GitHub Discussion](https://github.com/ofekkir/coach/discussions). To report a security issue, follow
+[`SECURITY.md`](SECURITY.md) instead of opening a public issue.
