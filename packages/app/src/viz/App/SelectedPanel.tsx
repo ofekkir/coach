@@ -7,7 +7,8 @@ interface SelectedPanelProps {
   selected: TraceRFNodeData | null;
   selectedId: string | null;
   selectedNode: ResolvedNode | undefined;
-  showRawDefault: boolean;
+  showRaw: boolean;
+  onToggleShowRaw: () => void;
   onClose: () => void;
 }
 
@@ -18,7 +19,8 @@ export function SelectedPanel({
   selected,
   selectedId,
   selectedNode,
-  showRawDefault,
+  showRaw,
+  onToggleShowRaw,
   onClose,
 }: SelectedPanelProps) {
   if (selected == null) return null;
@@ -30,7 +32,8 @@ export function SelectedPanel({
       isLongest={selected.isLongest}
       hiddenSubCall={selected.hiddenSubCall}
       nested={selected.nested}
-      showRawDefault={showRawDefault}
+      showRaw={showRaw}
+      onToggleShowRaw={onToggleShowRaw}
       onClose={onClose}
     />
   );

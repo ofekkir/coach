@@ -110,10 +110,6 @@ export function App({
         stats={stats}
         onExpandAll={onExpandAll}
         onCollapseAll={onCollapseAll}
-        showRaw={showRawDefault}
-        onToggleShowRaw={() => {
-          setShowRawDefault((v) => !v);
-        }}
         onFocus={onFocusId}
       />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -133,7 +129,10 @@ export function App({
           selected={selected}
           selectedId={selectedId}
           selectedNode={selectedNode}
-          showRawDefault={showRawDefault}
+          showRaw={showRawDefault}
+          onToggleShowRaw={() => {
+            setShowRawDefault((v) => !v);
+          }}
           onClose={() => {
             setSelectedId(null);
           }}

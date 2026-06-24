@@ -66,9 +66,11 @@ export function panelHeader(
 }
 
 // The footer: a clearly-interactive toggle (chevron + accent label) revealing the
-// raw node + its id. The accent + chevron mark it as a control, not a caption, so
-// the JSON tree is discoverable. `nodeId` is absent for entity selections (which
-// carry no node-table row).
+// raw node + its id. This is the single global control — flipping it shows/hides
+// the raw JSON in every card, so the label says "all cards" to set that
+// expectation. The accent + chevron mark it as a control, not a caption, so the
+// JSON tree is discoverable. `nodeId` is absent for entity selections (which carry
+// no node-table row).
 export function panelFooter(
   nodeId: string | undefined,
   showRaw: boolean,
@@ -95,7 +97,7 @@ export function panelFooter(
         {showRaw ? '▾' : '▸'}
       </span>
       <span style={{ fontFamily: fonts.mono, fontSize: 11, color: tokens.accentInkSoft }}>
-        {showRaw ? 'hide raw node' : 'view raw node'}
+        {showRaw ? 'hide raw node · all cards' : 'show raw node · all cards'}
       </span>
       {nodeId != null && (
         <span
