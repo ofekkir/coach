@@ -12,7 +12,6 @@ function render(showRaw: boolean): string {
     createElement(TopBar, {
       title: 'demo',
       stats,
-      onExpandAll: () => undefined,
       onCollapseAll: () => undefined,
       showRaw,
       onToggleShowRaw: () => undefined,

@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { FlowInner } from '../FlowInner/FlowInner.tsx';
 import type { Elements } from '../FlowInner/FlowInner.tsx';
-import { allExpandableIds, agentRoot, buildElements, initialExpanded } from '../layout/queries.ts';
+import { agentRoot, buildElements, initialExpanded } from '../layout/queries.ts';
 import type { TraceRFNodeData } from '../layout/types.ts';
 import { fonts, tokens } from '../theme.ts';
 import { summarizeRun } from '../TopBar/stats.ts';
@@ -29,21 +29,17 @@ function selectedResolved(
   return resolve(graph, selectedId);
 }
 
-// The TopBar's expand-all / collapse-all controls over the shared `expanded` set:
-// expand-all opens every expandable id; collapse-all leaves only the agent root.
+// The TopBar's collapse-all control over the shared `expanded` set:
+// collapse-all leaves only the agent root.
 function useExpandControls(
   data: ExecutionGraph,
   setExpanded: React.Dispatch<React.SetStateAction<Set<string>>>,
 ) {
-  const allExpandable = useMemo(() => allExpandableIds(data), [data]);
   const rootId = useMemo(() => agentRoot(data), [data]);
-  const onExpandAll = useCallback(() => {
-    setExpanded(new Set(allExpandable));
-  }, [allExpandable, setExpanded]);
   const onCollapseAll = useCallback(() => {
     setExpanded(new Set([rootId]));
   }, [rootId, setExpanded]);
-  return { onExpandAll, onCollapseAll };
+  return { onCollapseAll };
 }
 
 interface AppProps {
@@ -92,7 +88,7 @@ export function App({
   const selected = selectedData(elements, selectedId);
   const selectedNode = useMemo(() => selectedResolved(data, selectedId), [data, selectedId]);
 
-  const { onExpandAll, onCollapseAll } = useExpandControls(data, setExpanded);
+  const { onCollapseAll } = useExpandControls(data, setExpanded);
 
   return (
     <div
@@ -108,7 +104,6 @@ export function App({
       <TopBar
         title={title}
         stats={stats}
-        onExpandAll={onExpandAll}
         onCollapseAll={onCollapseAll}
         showRaw={showRawDefault}
         onToggleShowRaw={() => {
