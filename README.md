@@ -19,6 +19,13 @@ shipped surface you can run right now; **[Where this is going](#where-this-is-go
 roadmap — clearly labeled as not-yet-shipped — so the vision above never reads as a promise about
 the current build.
 
+<!-- TODO(demo): replace this placeholder with the recorded wow-moment walkthrough
+     — Claude Code loading its own sessions through the coach MCP and grading its own
+     expensive / hallucinated / wasteful steps (agent self-critique via MCP). -->
+
+> 🎥 **Demo (coming soon)** — a short walkthrough of the wow moment: an agent self-critiquing
+> via MCP, loading its own sessions and surfacing its own expensive or hallucinated steps.
+
 ## What works today
 
 The shipped surface is three things: a pure, staged **pipeline**, a React Flow **visualization**,
