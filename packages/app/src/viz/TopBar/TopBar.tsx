@@ -61,13 +61,11 @@ const textBtn: React.CSSProperties = {
 export function TopBar({
   title,
   stats,
-  onExpandAll,
   onCollapseAll,
   onFocus,
 }: {
   title: string;
   stats: RunStats;
-  onExpandAll: () => void;
   onCollapseAll: () => void;
   onFocus: (id: string) => boolean;
 }) {
@@ -105,9 +103,6 @@ export function TopBar({
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 18 }}>
         <FocusInput onFocus={onFocus} />
         <div style={{ display: 'flex', gap: 4 }}>
-          <button style={textBtn} onClick={onExpandAll}>
-            expand all
-          </button>
           <button style={textBtn} onClick={onCollapseAll}>
             collapse all
           </button>

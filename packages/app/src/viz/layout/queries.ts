@@ -68,29 +68,6 @@ export function initialExpanded(): Set<string> {
   return new Set<string>();
 }
 
-// Every node id in the subtree that has children — at any depth — so "expand
-// all" reaches nested calls (e.g. an llm_request inside a tool's execution).
-function expandableSubtreeIds(node: ExecutionNode): string[] {
-  if (node.children.length === 0) return [];
-  return [node.id, ...node.children.flatMap(expandableSubtreeIds)];
-}
-
-function expandableInteractionIds(interaction: InteractionExecution): string[] {
-  const memberIds = interaction.threads
-    .flatMap((thread) => thread.members)
-    .flatMap(expandableSubtreeIds);
-  return [interaction.interactionId, ...memberIds];
-}
-
-export function allExpandableIds(graph: ExecutionGraph): Set<string> {
-  const agent = toAgent(graph);
-  const sessionIds = agent.sessions.map((s) => s.session.id);
-  const interactionExpandables = agent.sessions.flatMap((s) =>
-    s.interactions.flatMap((i) => expandableInteractionIds(i)),
-  );
-  return new Set([agent.agent.id, ...sessionIds, ...interactionExpandables]);
-}
-
 export function agentRoot(graph: ExecutionGraph): string {
   return toAgent(graph).agent.id;
 }

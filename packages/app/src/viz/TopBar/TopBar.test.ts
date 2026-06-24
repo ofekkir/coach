@@ -12,7 +12,6 @@ function render(): string {
     createElement(TopBar, {
       title: 'demo',
       stats,
-      onExpandAll: () => undefined,
       onCollapseAll: () => undefined,
       onFocus: () => true,
     }),
