@@ -11,7 +11,7 @@ there are no maintained release branches yet.
 
 - **GitHub private vulnerability reporting** — open the repository's **Security** tab and choose
   **Report a vulnerability**. This keeps the report and discussion confidential until a fix ships.
-- **Email** — <security@headroomlabs.ai>.
+- **Email** — <ofekkir@gmail.com>.
 
 Please include enough detail to reproduce: affected component, version or commit, and steps or a
 proof of concept. We aim to acknowledge a report within a few business days and will keep you

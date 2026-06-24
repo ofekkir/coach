@@ -59,5 +59,5 @@ Enforced by `pnpm check:structure` (and pre-commit):
 ## Reporting bugs and proposing features
 
 Use the GitHub issue templates. For broader questions or ideas, open a
-[GitHub Discussion](https://github.com/headroomlabs-ai/coach/discussions). To report a security
+[GitHub Discussion](https://github.com/ofekkir/coach/discussions). To report a security
 issue, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
