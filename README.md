@@ -1,30 +1,41 @@
 # coach
 
-Improve agent harnesses — accuracy, latency, cost, and detection of hallucinations and operational
-errors — through **OpenTelemetry (OTEL) trace analysis**. OTEL keeps coach **harness-agnostic**.
+**The agent grades itself.** Coach turns an agent's own execution traces into a queryable model of
+what it did — then hands that model back to the agent through MCP, so Claude Code can load its own
+sessions and surface its own expensive, hallucinated, or wasteful steps. Existing agent tracing is
+built for the _engineer_ to observe the agent; coach's north star is to close that loop back to the
+**agent itself**, with the engineer monitoring the loop.
 
-Unlike tracing built for engineers to observe agents, coach aims to reflect findings back to the
-**agent itself**, with the engineer monitoring that loop. Stage one targets the engineer until we
-learn which problems are solvable.
+It works on **OpenTelemetry (OTEL) traces** by design, which keeps coach **harness-agnostic**.
 
-An emerging **second pillar** sits beside that optimization work: because coach holds _complete
-sessions_ and _many of them_, it can infer user **intent in hindsight** and aggregate it across
-sessions into a per-agent **user model** (what users want, how they phrase it, what they leave
-unsaid) — a personalization signal population-level RLHF cannot produce. See
+A **second pillar** sits beside that optimization work: because coach holds _complete sessions_ and
+_many of them_, it aims to infer user **intent in hindsight** and aggregate it across sessions into
+a per-agent **user model** (what users want, how they phrase it, what they leave unsaid) — a
+personalization signal population-level RLHF cannot produce. See
 **[docs/agent-model.md](docs/agent-model.md)** for the conceptual model.
 
-## How it works
+This README is split into two tiers on purpose: **[What works today](#what-works-today)** is the
+shipped surface you can run right now; **[Where this is going](#where-this-is-going)** is the
+roadmap — clearly labeled as not-yet-shipped — so the vision above never reads as a promise about
+the current build.
 
-Coach runs a pure, staged **pipeline** that turns trace/log files into a normalized, id-keyed
-**execution graph** — a model that maps 1:1 to a relational DB. That graph feeds two surfaces: a
-React Flow **visualization** (`@coach/app`) and a read-only, queryable **MCP server**
-(`@coach/mcp`) an analyst agent drives itself.
+## What works today
+
+The shipped surface is three things: a pure, staged **pipeline**, a React Flow **visualization**,
+and a read-only **MCP query server**.
+
+- **Pipeline** (`@coach/pipeline`) — turns trace/log files into a normalized, id-keyed **execution
+  graph**, a model that maps 1:1 to a relational DB. Pure and file-system-free; runs in Node and
+  the browser alike.
+- **Visualization** (`@coach/app`) — a React Flow renderer for a pre-computed execution graph.
+- **MCP query server** (`@coach/mcp`) — exposes that graph as a read-only, queryable relational
+  surface so an analyst agent drives its own analyses over your sessions.
 
 For the full picture — package layout, pipeline stages, data flow, the MCP query surface, and
 deployment — see **[ARCHITECTURE.md](ARCHITECTURE.md)**. It is the living source of truth; this
 README only covers getting started.
 
-## Quick start
+### Quick start
 
 Requires [pnpm](https://pnpm.io) (do not use npm/yarn) and Node ≥ 20.11.
 
@@ -52,7 +63,7 @@ Load a `06-enriched-graph.json` (or any pre-computed graph) via the **"Load pipe
 button, or boot directly from a URL with `?data=<url>`; add `?focus=<nodeId>` to reveal and center
 a node.
 
-## Use it from Claude Code (MCP)
+### Use it from Claude Code (MCP)
 
 Coach ships an MCP server (`@coach/mcp`) that exposes the analyzed execution graph as a read-only,
 queryable surface — so the agent can drive its own analyses over your sessions. **Claude Code is
@@ -95,7 +106,7 @@ A standalone DuckDB snapshot for ad-hoc inspection in the `duckdb` CLI is also a
 `pnpm build-db <traces-dir> [out.db]` (the MCP itself re-derives from source rather than loading
 it).
 
-## Development
+### Development
 
 | Command                                    | What it does                                          |
 | ------------------------------------------ | ----------------------------------------------------- |
@@ -106,12 +117,12 @@ it).
 | `pnpm e2e <fixture>`                       | Run pipeline + deterministic enrichment, write `out/` |
 | `pnpm mcp [dataset-dir]`                   | Serve the MCP analyst tools over stdio                |
 
-## Contributing workflow
+### Contributing workflow
 
 - Branch off `main`; **never commit to `main` directly**.
 - Open a PR — CI runs on open, on every push to the branch, and on pushes to `main`.
 
-### Recommended one-time setup (requires a GitHub remote)
+#### Recommended one-time setup (requires a GitHub remote)
 
 Make CI a required check so PRs can't merge red:
 
@@ -123,3 +134,21 @@ gh api -X PUT repos/{owner}/{repo}/branches/main/protection \
   -F required_pull_request_reviews.required_approving_review_count=1 \
   -F restrictions=
 ```
+
+## Where this is going
+
+Everything in this section is **roadmap — not yet shipped**. It states design intent, not current
+behavior. Today coach targets the **engineer**: you load a dataset and query it. The two threads
+below are about whom the findings ultimately serve.
+
+- **Closing the feedback loop back to the agent.** The north star is for the agent to act on its
+  own findings, not just for an engineer to read them — Claude Code loading its own sessions and
+  correcting its own expensive, hallucinated, or wasteful steps. How that loop is "closed" is still
+  undecided, so stage one deliberately targets the engineer until we learn which problems are
+  actually solvable.
+- **The cross-session per-agent user model (the second pillar).** Because coach holds complete
+  sessions and many of them, it aims to infer user **intent in hindsight** and roll it up across
+  sessions into a per-agent **user model** — what users want, how they phrase it, what they leave
+  unsaid, what needs a clarifying question. This is a separate output with a separate consumer (the
+  agent, for personalization); it does not replace the engineer-facing optimization work. The
+  conceptual model — and its honest caveats — lives in **[docs/agent-model.md](docs/agent-model.md)**.

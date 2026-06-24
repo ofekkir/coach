@@ -7,8 +7,9 @@
 ## Overview
 
 Coach processes agent execution traces and renders them as an interactive causal graph.
-The core thesis: harness-agnostic OTEL traces feed a pure data pipeline whose output can
-be reflected back to the agent (or its engineer) for improvement.
+The core thesis: harness-agnostic OTEL traces feed a pure data pipeline whose output is
+**today** surfaced to the engineer (query + viz) and is **intended** to be reflected back to the
+agent itself for improvement.
 
 The system is split into five packages plus a Node CLI layer:
 
