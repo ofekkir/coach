@@ -494,16 +494,3 @@ pipeline.)
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one gather all flow through
 the same pipeline. The CLI populates `UploadedFile.path` relative to the gather root so the
 session-id routing (with directory fallback for logs) groups them correctly.
-
-## Deploying to Vercel (static SPA)
-
-The app builds to static assets — no serverless functions.
-
-```
-Root directory:  packages/app
-Build command:   pnpm --filter @coach/app build
-Output dir:      packages/app/dist
-Install command: pnpm install (at repo root)
-```
-
-See `vercel.json` for the committed configuration.

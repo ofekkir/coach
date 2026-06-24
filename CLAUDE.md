@@ -1,20 +1,21 @@
 # coach
 
-Coach improves agent harnesses — accuracy, latency, cost, hallucination and operational-error
-detection — by analyzing **OpenTelemetry (OTEL) traces**. OTEL is used deliberately so coach stays
-**harness-agnostic**.
+**The agent grades itself.** Coach turns an agent's own execution traces into a queryable model of
+what it did — then hands that model back to the agent through MCP, so Claude Code can load its own
+sessions and surface its own expensive, hallucinated, or wasteful steps. Existing agent tracing is
+built for the _engineer_ to observe the agent; coach's north star is to close that loop back to the
+**agent itself**, with the engineer monitoring the loop. It works on **OpenTelemetry (OTEL) traces**
+by design, which keeps coach **harness-agnostic**.
 
-The thesis: existing agent tracing is built for the _engineer_ to observe and improve the agent.
-Coach instead aims to reflect findings back to the **agent itself**, with the engineer monitoring
-that loop. How the loop is ultimately "closed" back to the agent is undecided — so **stage one
-targets the engineer** until we learn which problems are actually solvable.
+A **second pillar** sits beside that optimization work: because coach holds _complete sessions_ and
+_many of them_, it aims to infer user **intent in hindsight** and aggregate it across sessions into a
+per-agent **user model** — what users want, how they phrase it, what they leave unsaid, what needs
+clarification — a personalization signal population-level RLHF cannot produce. See
+`docs/agent-model.md` for the conceptual model.
 
-An emerging **second pillar** sits beside that optimization work (and does not replace it): because
-coach holds _complete sessions_ and _many of them_, it can infer user **intent in hindsight** and
-roll those inferences up across sessions into a per-agent **user model** — what users want, how they
-phrase it, what they leave unsaid, what needs clarification. That is a personalization signal
-population-level RLHF structurally cannot produce. See `docs/agent-model.md` for the conceptual
-model.
+The shipped surface (what works today) is narrower than the vision above: a pure staged
+**pipeline**, a React Flow **visualization**, and a read-only **MCP query server**. See `README.md`
+for the two-tier shipped-vs-roadmap split.
 
 **`ARCHITECTURE.md` is a living document** — update it in the same change whenever package
 layout, module boundaries, or data flow change. Consult it before architectural tasks.
@@ -89,35 +90,5 @@ Enforced by `pnpm check:structure` (also runs in pre-commit):
 
 ## Layout
 
-```
-packages/
-  pipeline/           # @coach/pipeline — pure staged pipeline (no node:* imports)
-    src/
-      types.ts        # shared types (CanonicalNode, OTLP, stage records)
-      classify/       # stage 1 — tag each file by input type
-      route/          # stage 2 — group supported inputs by session id
-      canonical/      # stage 3 — inputs → CanonicalNode[] (enrich/native/transform internals)
-      aggregate/      # stage 4 — sessions → single-agent forest
-      graph/          # stage 5 view-model + stage 6 semantic/ (interpreter; consumes @coach/semantics)
-      orchestrate.ts  # runPipeline + buildVizResults — file-system-free orchestration
-      index.ts        # public exports
-    fixtures/         # test fixtures (native .jsonl + OTEL sets)
-  semantics/          # @coach/semantics — pure config package (schema + assembler + bundled JSON)
-    src/
-      config.ts       # Zod schemas + types + assembleSemanticsConfig + accessors
-      defaults.ts     # imports bundled JSON → defaultSemanticsConfig (no disk read)
-      data/           # ontology/ + agents/ JSON artifacts (data, not code; no project layer)
-  app/                # @coach/app — React SPA (upload UI + graph renderer)
-    src/
-      upload/         # UploadPage.tsx — landing page + file intake
-      viz/            # App.tsx, layout.ts, TraceNode.tsx
-      data-source.ts  # processUploads seam (swap for HTTP call to add a backend)
-      main.tsx
-scripts/              # Node CLI — reads from disk, delegates to @coach/pipeline
-.claude/
-  settings.json       # committed Claude Code config (PostToolUse lint + knip hooks)
-  hooks/lint.sh       # per-file lint hook script
-.husky/pre-commit     # git pre-commit gate
-.github/workflows/    # CI
-ARCHITECTURE.md       # living architecture doc — keep in sync with changes
-```
+See `ARCHITECTURE.md` for the package layout and data flow — it is kept in sync with the code, so it
+is the single source of truth rather than a duplicated tree here.
