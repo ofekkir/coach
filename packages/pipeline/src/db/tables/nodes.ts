@@ -38,8 +38,16 @@ export const NODES: TableSpec = {
     { name: 'model', sqlType: 'VARCHAR', doc: 'llm_request: model id.' },
     { name: 'source', sqlType: 'VARCHAR', doc: 'llm_request: emitting loop/source.' },
     { name: 'stop_reason', sqlType: 'VARCHAR', doc: 'llm_request: stop reason, when present.' },
-    { name: 'tokens_in', sqlType: 'DOUBLE', doc: 'llm_request: input tokens.' },
+    {
+      name: 'tokens_in',
+      sqlType: 'DOUBLE',
+      doc: 'llm_request: uncached input tokens (the delta billed at the full input rate).',
+    },
     { name: 'tokens_out', sqlType: 'DOUBLE', doc: 'llm_request: output tokens.' },
+    // prettier-ignore
+    { name: 'cache_read_tokens', sqlType: 'DOUBLE', doc: 'llm_request: prompt-cache read tokens — context served from a cached prefix (typically billed at a large discount). 0 when absent or unsupported by the provider.' },
+    // prettier-ignore
+    { name: 'cache_write_tokens', sqlType: 'DOUBLE', doc: 'llm_request: prompt-cache write tokens — context written into the cache this turn (typically billed at a small premium; not all providers report this). 0 when absent.' },
     { name: 'cost_usd', sqlType: 'DOUBLE', doc: 'llm_request: cost in USD, when present.' },
     { name: 'name', sqlType: 'VARCHAR', doc: 'tool/hook: the tool or hook name.' },
     {
