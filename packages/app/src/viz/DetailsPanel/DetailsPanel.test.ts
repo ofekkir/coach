@@ -7,11 +7,7 @@ import type { NodeCard } from '../format/format.ts';
 
 import { DetailsPanel } from './DetailsPanel.tsx';
 
-function render(
-  card: NodeCard,
-  resolved: ResolvedNode | undefined,
-  showRawDefault = false,
-): string {
+function render(card: NodeCard, resolved: ResolvedNode | undefined, showRaw = false): string {
   return renderToStaticMarkup(
     createElement(DetailsPanel, {
       card,
@@ -19,7 +15,8 @@ function render(
       isLongest: false,
       hiddenSubCall: undefined,
       nested: false,
-      showRawDefault,
+      showRaw,
+      onToggleShowRaw: () => undefined,
       onClose: () => undefined,
     }),
   );
@@ -84,7 +81,7 @@ describe('DetailsPanel error section', () => {
   });
 });
 
-describe('DetailsPanel raw-node default', () => {
+describe('DetailsPanel raw-node toggle (global, in-card)', () => {
   const card: NodeCard = {
     type: 'action',
     tag: 'ACTION · READ',
@@ -104,15 +101,15 @@ describe('DetailsPanel raw-node default', () => {
     },
   };
 
-  it('renders the raw node JSON open when the global default is on', () => {
+  it('renders the raw node JSON open and labels the global toggle when raw is on', () => {
     const markup = render(card, node, true);
     expect(markup).toContain('data-raw-node');
-    expect(markup).toContain('hide raw node');
+    expect(markup).toContain('hide raw node · all cards');
   });
 
-  it('keeps the raw node closed when the global default is off', () => {
+  it('keeps the raw node closed and labels the global toggle when raw is off', () => {
     const markup = render(card, node, false);
     expect(markup).not.toContain('data-raw-node');
-    expect(markup).toContain('view raw node');
+    expect(markup).toContain('show raw node · all cards');
   });
 });

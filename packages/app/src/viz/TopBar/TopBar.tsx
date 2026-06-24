@@ -63,16 +63,12 @@ export function TopBar({
   stats,
   onExpandAll,
   onCollapseAll,
-  showRaw,
-  onToggleShowRaw,
   onFocus,
 }: {
   title: string;
   stats: RunStats;
   onExpandAll: () => void;
   onCollapseAll: () => void;
-  showRaw: boolean;
-  onToggleShowRaw: () => void;
   onFocus: (id: string) => boolean;
 }) {
   return (
@@ -114,14 +110,6 @@ export function TopBar({
           </button>
           <button style={textBtn} onClick={onCollapseAll}>
             collapse all
-          </button>
-          <button
-            style={{ ...textBtn, color: showRaw ? tokens.accentInk : tokens.muted }}
-            onClick={onToggleShowRaw}
-            title="Toggle the raw node JSON in every detail card"
-            aria-pressed={showRaw}
-          >
-            {showRaw ? 'raw node ▾' : 'raw node ▸'}
           </button>
         </div>
         {stat(formatRunDuration(stats.durationMs), 'DURATION')}
