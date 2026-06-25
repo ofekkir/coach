@@ -4,8 +4,8 @@
 > to the right unit — and the basis for what the visualization renders.
 >
 > This is a **conceptual** document. It defines the vocabulary and the model; it does not
-> prescribe types or file layout (see `docs/implementation-prompt.md` and `ARCHITECTURE.md`
-> for that). Keep it honest as the model evolves.
+> prescribe types or file layout — see [`ARCHITECTURE.md`](../ARCHITECTURE.md) for that.
+> Keep it honest as the model evolves.
 
 ## Why this model exists
 
@@ -200,6 +200,10 @@ Because every level is named, findings can be keyed precisely:
 
 This is what "reflecting findings back to the agent" stands on: a shared, precise vocabulary
 for _which_ part of its own behavior the agent is being told about.
+
+The **action**- and **interaction**-level rows of that table are not hypothetical — [`case-study.md`](case-study.md)
+keys real findings to exactly those levels (failed tool calls ranked by recovery cost) over the
+maintainer's own session history, using only the shipped query surface.
 
 ## Hindsight intent & the user model
 

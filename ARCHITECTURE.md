@@ -254,6 +254,18 @@ is not what was actually charged), and once written into `cost_usd` it is indist
 cost — so "don't know" is recorded as NULL, not approximated. `intent_category` is 100% non-NULL on
 interactions (fallback `other`).
 
+**`tokens_out` is the honest cost proxy.** With `cost_usd` usually NULL, the reliable cost signal is
+output tokens: `tokens_out` is complete in the logs, whereas `tokens_in` carries only the _uncached_
+fresh delta (the raw Anthropic `input_tokens`, ~tens of tokens/call) — summing it undercounts the
+context the model actually processed by 10–100×, so it must **not** be read as "input cost." The two
+large prompt-cache fields are captured as their own provider-neutral columns — `cache_read_tokens`
+and `cache_write_tokens` (deliberately not the Anthropic-specific `cache_creation_*` names: the
+`CanonicalNode` boundary is exactly where provider identity stops, since caching is multi-provider).
+Because cache reads bill at ~0.1× while output bills at ~5× base input, output dominates the real
+dollar cost of a cached agent loop, so ranking by `tokens_out` is both an honest floor and a decent
+marginal-cost proxy. [`docs/case-study.md`](docs/case-study.md) works an end-to-end analysis on this
+basis.
+
 All sessions roll up under one agent into a single execution graph, and sessions are navigated by
 expand/collapse inside the graph. Unsupported files are carried through `classified` (never silently
 dropped) and surfaced as a count. The graph is consumed only by the renderer — no raw

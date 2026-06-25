@@ -26,6 +26,10 @@ the current build.
 > 🎥 **Demo (coming soon)** — a short walkthrough of the wow moment: an agent self-critiquing
 > via MCP, loading its own sessions and surfacing its own expensive or hallucinated steps.
 
+Until the video lands, the same moment is written up in text: **[docs/case-study.md](docs/case-study.md)**
+walks coach pointed at its author's own ~148 Claude Code sessions, ranking its mistakes by
+_preventable cost_ — a worked example that runs entirely on the shipped query surface.
+
 ## What works today
 
 The shipped surface is three things: a pure, staged **pipeline**, a React Flow **visualization**,
@@ -113,6 +117,9 @@ A standalone DuckDB snapshot for ad-hoc inspection in the `duckdb` CLI is also a
 `pnpm build-db <traces-dir> [out.db]` (the MCP itself re-derives from source rather than loading
 it).
 
+For a worked analysis built from these tools — failed tool calls ranked by recovery cost, with the
+SQL — see **[docs/case-study.md](docs/case-study.md)**.
+
 ### Development
 
 | Command                                    | What it does                                          |
@@ -124,12 +131,12 @@ it).
 | `pnpm e2e <fixture>`                       | Run pipeline + deterministic enrichment, write `out/` |
 | `pnpm mcp [dataset-dir]`                   | Serve the MCP analyst tools over stdio                |
 
-### Contributing workflow
+### Contributing
 
-- Branch off `main`; **never commit to `main` directly**.
-- Open a PR — CI runs on open, on every push to the branch, and on pushes to `main`.
+Branch off `main`, open a PR, and make sure `pnpm check` is green. The full process, code style, and
+module conventions live in **[CONTRIBUTING.md](CONTRIBUTING.md)** and **[CLAUDE.md](CLAUDE.md)**.
 
-#### Recommended one-time setup (requires a GitHub remote)
+#### Maintainer one-time setup (requires a GitHub remote)
 
 Make CI a required check so PRs can't merge red:
 
