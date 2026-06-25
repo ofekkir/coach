@@ -23,8 +23,7 @@ the current build.
      — Claude Code loading its own sessions through the coach MCP and grading its own
      expensive / hallucinated / wasteful steps (agent self-critique via MCP). -->
 
-> 🎥 **Demo (coming soon)** — a short walkthrough of the wow moment: an agent self-critiquing
-> via MCP, loading its own sessions and surfacing its own expensive or hallucinated steps.
+> 🎥 **Demo — coming soon.**
 
 Until the video lands, the same moment is written up in text: **[docs/case-study.md](docs/case-study.md)**
 walks coach pointed at its author's own ~148 Claude Code sessions, ranking its mistakes by
