@@ -1,0 +1,107 @@
+stateDiagram-v2
+    [*] --> Orient
+
+    state Orient {
+        [*] --> CheckIntent
+        CheckIntent: Classify task (in llm_request, no tool)
+        CheckIntent --> ReadArch: structural
+        CheckIntent --> SkipArch: local change
+        ReadArch: Read ARCHITECTURE.md<br/>=== 46x | 0.1 min ===
+        SkipArch: (skip)
+        ReadArch --> [*]
+        SkipArch --> [*]
+    }
+
+    Orient --> WorktreeSetup: isolated / parallel work
+    Orient --> Locate: in-place work
+
+    state WorktreeSetup {
+        [*] --> BranchOffMain
+        BranchOffMain: git worktree, branch off main (NOT current branch)
+        BranchOffMain --> PinSHA
+        PinSHA: Pin integration SHA in agent prompt
+        PinSHA --> Install
+        Install: pnpm install IN the worktree<br/>=== 45x | 2.5 min ===
+        Install --> InstallCheck
+        state InstallCheck <<choice>>
+        InstallCheck --> Install: missing -> edits would no-op
+        InstallCheck --> [*]: deps present
+    }
+    WorktreeSetup --> Locate
+
+    state Locate {
+        [*] --> PlanSearch
+        PlanSearch: Plan the query (in llm_request, no tool)
+        PlanSearch --> FireOnce
+        FireOnce: ONE broad search (Grep/Glob/Explore)<br/>=== 225x | 0.9 min | 116k tok ===
+        FireOnce --> HaveSites
+        state HaveSites <<choice>>
+        HaveSites --> [*]: sites found
+        HaveSites --> Widen: empty result
+        Widen: Broaden scope (still one shot)
+        Widen --> [*]
+    }
+    Locate --> ChangeCycle
+
+    state ChangeCycle {
+        [*] --> Read
+        Read: Read target file FULLY<br/>=== 1163x | 0.5 min | 592k tok ===
+        Read --> Edit
+        Edit: Author / batch independent edits<br/>=== EDIT 1566x | 28.6 min | 928k tok ===<br/>=== AUTHOR 295x | 4.8 min | 633k tok ===
+        state EditResult <<choice>>
+        Edit --> EditResult
+        EditResult --> Read: rejected 56x (unread / stale)
+        EditResult --> MoreEdits: applied 1510x
+        state MoreEdits <<choice>>
+        MoreEdits --> Edit: more edits queued
+        MoreEdits --> BashMutate: file-mutating Bash needed
+        MoreEdits --> Run: edits done
+        BashMutate: sed / perl / git mv / rm<br/>=== 155x | 2.2 min | 154k tok ===
+        BashMutate --> Read: re-read (read-cache invalidated)
+        Run: Run NARROWEST check<br/>=== 666x | 13.4 min | 436k tok ===
+        state RunResult <<choice>>
+        Run --> RunResult
+        RunResult --> Read: fail 39x -> fix
+        RunResult --> [*]: pass 793x
+    }
+    ChangeCycle --> Validation
+
+    state Validation {
+        [*] --> Verify
+        Verify: Verify behavior vs goal<br/>=== 140x | 5.3 min | 20k tok ===
+        state VerifyResult <<choice>>
+        Verify --> VerifyResult
+        VerifyResult --> Reenter: wrong 44x
+        VerifyResult --> CoverageCheck: matches goal 262x
+        Reenter: back to ChangeCycle (re-read first)
+        Reenter --> [*]
+        CoverageCheck: Is file TS/JS? (judgment, no tool)
+        state CovChoice <<choice>>
+        CoverageCheck --> CovChoice
+        CovChoice --> HandVerify: non-TS 57 files (NO hook)
+        CovChoice --> Gate: TS/JS 192 files (hook-covered)
+        HandVerify: Verify by hand (eyeball, no tool)
+        HandVerify --> Gate
+        Gate: pnpm check (full backstop)<br/>=== 227x | 28.7 min | 55k tok ===
+        state GateResult <<choice>>
+        Gate --> GateResult
+        GateResult --> Reenter: red 38x
+        GateResult --> [*]: green 189x
+    }
+
+    Validation --> ChangeCycle: re-enter on failure
+    Validation --> Ship: green + verified
+
+    state Ship {
+        [*] --> Push
+        Push: Commit + push branch<br/>=== 90x | 7.5 min | (vcs 70k tok) ===
+        Push --> OpenPR
+        OpenPR: Open PR (gh pr)<br/>=== 35x | 4.1 min ===
+        OpenPR --> HandVerifyPrompt
+        HandVerifyPrompt: Attach clean-session verification prompt (generation, no tool)
+        HandVerifyPrompt --> [*]
+    }
+
+    Ship --> Review
+    Review: STOP - maintainer approves and merges (human, off-trace)
+    Review --> [*]

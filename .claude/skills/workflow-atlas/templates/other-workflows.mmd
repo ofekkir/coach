@@ -1,0 +1,49 @@
+stateDiagram-v2
+    [*] --> Router
+    Router: Route by interaction (n=557, 21.6h total)
+    Router --> CHANGE: 191 int | 15.83h (see change-loop diagram)
+    Router --> INVESTIGATE: 85 int | 2.62h | 354k tok
+    Router --> OPS: 121 int | 1.89h | 323k tok
+    Router --> DIRECT: 139 int | 0.88h | 226k tok
+
+    CHANGE: CHANGE / build loop (separate diagram)
+
+    %% ================= INVESTIGATE =================
+    state INVESTIGATE {
+        [*] --> I_Search
+        I_Search: Search (Grep/Glob/Explore)<br/>=== 210x | 15.1 min | 46k tok ===
+        I_Search --> I_Read
+        I_Read: Read files<br/>=== 443x | 0.2 min | 79k tok ===
+        I_Read --> I_Probe
+        I_Probe: Run probe (no writes)<br/>=== 151x | 10.7 min | 67k tok ===
+        state I_ProbeRes <<choice>>
+        I_Probe --> I_ProbeRes
+        I_ProbeRes --> I_Search: not enough -> dig more (ok 142 / fail 9)
+        I_ProbeRes --> I_Answer: question answered
+        I_Answer: Synthesize and respond (llm_request, no tool)
+        I_Answer --> [*]
+    }
+
+    %% ================= OPS =================
+    state OPS {
+        [*] --> O_Run
+        O_Run: Run check / command<br/>=== 193x | 5.9 min | 155k tok ===
+        O_Run --> O_Gate
+        O_Gate: Gate (pnpm check)<br/>=== 32x | 2.7 min | 22k tok ===
+        state O_GateRes <<choice>>
+        O_Gate --> O_GateRes
+        O_GateRes --> O_Run: red -> fix (run ok 174 / fail 22)
+        O_GateRes --> O_VCS: green
+        O_VCS: Commit / push / PR<br/>=== 217x | 6.4 min | 56k tok ===
+        state O_VcsRes <<choice>>
+        O_VCS --> O_VcsRes
+        O_VcsRes --> O_Run: vcs failed 17x -> retry
+        O_VcsRes --> [*]: done
+    }
+
+    %% ================= DIRECT =================
+    state DIRECT {
+        [*] --> D_Think
+        D_Think: Prompt -> answer, NO tools<br/>=== 139 int | 0.88h | 226k tok ===
+        D_Think --> [*]
+    }
