@@ -29,6 +29,31 @@ Until the video lands, the same moment is written up in text: **[docs/case-study
 walks coach pointed at its author's own ~148 Claude Code sessions, ranking its mistakes by
 _preventable cost_ — a worked example that runs entirely on the shipped query surface.
 
+## Why coach exists
+
+Coach rests on a handful of observations about how agents are built and operated today:
+
+- **Much of what agents call an LLM to do could be a script.** A large share of agentic
+  "workflows" are LLM inference where a deterministic program would do — editing a `package.json`,
+  formatting a file, applying a known transform. The script version is deterministic, fast, and
+  cheap; the inference version is none of those. Knowing which steps a session actually took is the
+  prerequisite to spotting the ones that never needed a model.
+- **Agent observability is aimed at engineers, but the data is too big for engineers.** The
+  platforms that exist surface traces for a human to read, yet the volume of session data is a
+  glacier — a person can barely touch its edge, let alone mine the insights buried in it. There is,
+  however, exactly the right technology for reading that much data: agents.
+- **Coding agents are the beachhead, and the Claude ecosystem is the most mature one.** The most
+  widely used agents today are coding agents, and within them Claude Code is the most adopted and
+  mature. That is where the richest traces — and the most leverage — currently live.
+- **Most developers don't own their session data.** Claude Code already writes detailed logs of
+  every session, and for almost everyone they sit unused. That data is a standing asset; coach turns
+  it into a queryable model instead of leaving it on the floor.
+- **The agent's control flow should be derived, not hand-drawn.** Early agents were built as
+  explicit graphs; that felt too rigid, so the field moved to reactive (ReAct-style) loops. The
+  better path looks like neither hand-authored extreme: derive the graph from what the agent
+  actually did and let it adapt continuously and automatically. Coach's execution graph — recovered
+  in hindsight from real traces — is the first step toward that.
+
 ## What works today
 
 The shipped surface is three things: a pure, staged **pipeline**, a React Flow **visualization**,
