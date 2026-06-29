@@ -36,8 +36,9 @@ Coach rests on a handful of observations about how agents are built and operated
 - **Much of what agents call an LLM to do could be a script.** A large share of agentic
   "workflows" are LLM inference where a deterministic program would do — editing a `package.json`,
   formatting a file, applying a known transform. The script version is deterministic, fast, and
-  cheap; the inference version is none of those. Knowing which steps a session actually took is the
-  prerequisite to spotting the ones that never needed a model.
+  cheap; the inference version is none of those. Once you know which steps occur and how often, you
+  can tell which are worth converting into code rather than paying for a one-off inference every time
+  ([is it worth the time?](https://xkcd.com/1205/)).
 - **Agent observability is aimed at engineers, but the data is too big for engineers.** The
   platforms that exist surface traces for a human to read, yet the volume of session data is a
   glacier — a person can barely touch its edge, let alone mine the insights buried in it. There is,
