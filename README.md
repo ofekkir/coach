@@ -1,23 +1,10 @@
 # coach
 
-**The agent grades itself.** Coach turns an agent's own execution traces into a queryable model of
-what it did — then hands that model back to the agent through MCP, so Claude Code can load its own
-sessions and surface its own expensive, hallucinated, or wasteful steps. Existing agent tracing is
-built for the _engineer_ to observe the agent; coach's north star is to close that loop back to the
-**agent itself**, with the engineer monitoring the loop.
-
-It works on **OpenTelemetry (OTEL) traces** by design, which keeps coach **harness-agnostic**.
-
-A **second pillar** sits beside that optimization work: because coach holds _complete sessions_ and
-_many of them_, it aims to infer user **intent in hindsight** and aggregate it across sessions into
-a per-agent **user model** (what users want, how they phrase it, what they leave unsaid) — a
-personalization signal population-level RLHF cannot produce. See
-**[docs/agent-model.md](docs/agent-model.md)** for the conceptual model.
-
-This README is split into two tiers on purpose: **[What works today](#what-works-today)** is the
-shipped surface you can run right now; **[Where this is going](#where-this-is-going)** is the
-roadmap — clearly labeled as not-yet-shipped — so the vision above never reads as a promise about
-the current build.
+**Agents have potential, but they need reinforcement to fulfill it.** Coach provides that locally,
+from an agent's own past executions — developing the skills it lacks, heading off errors it has made
+before, turning repeated actions into code (muscle memory), and dropping to cheaper, dumber models
+where they're good enough (auto-pilot). The result: agents that are faster, cheaper, and more
+accurate.
 
 <!-- TODO(demo): replace this placeholder with the recorded wow-moment walkthrough
      — Claude Code loading its own sessions through the coach MCP and grading its own
@@ -29,10 +16,35 @@ Until the video lands, the same moment is written up in text: **[docs/case-study
 walks coach pointed at its author's own ~148 Claude Code sessions, ranking its mistakes by
 _preventable cost_ — a worked example that runs entirely on the shipped query surface.
 
+## Key Observations
+
+- **Much of what agents call an LLM to do could be a script.** A large share of agentic
+  "workflows" are LLM inference where a deterministic program would do — editing a `package.json`,
+  formatting a file, applying a known transform. The script version is deterministic, fast, and
+  cheap; the inference version is none of those. Once you know which steps occur and how often, you
+  can tell which are worth converting into code rather than paying for a one-off inference every time
+  ([is it worth the time?](https://xkcd.com/1205/)).
+- **Agent observability is aimed at engineers, but the data is too big for engineers.** The
+  platforms that exist surface traces for a human to read, yet the volume of session data is a
+  glacier — a person can barely touch its edge, let alone mine the insights buried in it. There is,
+  however, exactly the right technology for reading that much data: agents.
+- **The agent's control flow should be derived, not hand-drawn.** Early agents were built as
+  explicit graphs; that felt too rigid, so the field moved to reactive (ReAct-style) loops. The
+  better path looks like neither hand-authored extreme: derive the graph from what the agent
+  actually did and let it adapt continuously and automatically. Coach's execution graph — recovered
+  in hindsight from real traces — is the first step toward that.
+- **Coding agents are the beachhead, and the Claude ecosystem is the most mature one.** The most
+  widely used agents today are coding agents, and within them Claude Code is the most adopted and
+  mature. That is where the richest traces — and the most leverage — currently live.
+  - **Most developers don't own their session data.** Claude Code already writes detailed logs of
+    every session, and for almost everyone they sit unused. That data is a standing asset; coach
+    turns it into a queryable model instead of leaving it on the floor.
+
 ## What works today
 
-The shipped surface is three things: a pure, staged **pipeline**, a React Flow **visualization**,
-and a read-only **MCP query server**.
+It works on **OpenTelemetry (OTEL) traces** by design, which keeps coach **harness-agnostic**. The
+shipped surface is three things: a pure, staged **pipeline**, a React Flow **visualization**, and a
+read-only **MCP query server**.
 
 - **Pipeline** (`@coach/pipeline`) — turns trace/log files into a normalized, id-keyed **execution
   graph**, a model that maps 1:1 to a relational DB. Pure and file-system-free; runs in Node and
@@ -121,32 +133,8 @@ SQL — see **[docs/case-study.md](docs/case-study.md)**.
 
 ### Development
 
-| Command                                    | What it does                                          |
-| ------------------------------------------ | ----------------------------------------------------- |
-| `pnpm check`                               | Full gate: typecheck, lint, format, test, knip        |
-| `pnpm lint:fix`                            | Auto-fix lint issues                                  |
-| `pnpm format`                              | Auto-format with Prettier                             |
-| `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                                  |
-| `pnpm e2e <fixture>`                       | Run pipeline + deterministic enrichment, write `out/` |
-| `pnpm mcp [dataset-dir]`                   | Serve the MCP analyst tools over stdio                |
-
-### Contributing
-
-Branch off `main`, open a PR, and make sure `pnpm check` is green. The full process, code style, and
-module conventions live in **[CONTRIBUTING.md](CONTRIBUTING.md)** and **[CLAUDE.md](CLAUDE.md)**.
-
-#### Maintainer one-time setup (requires a GitHub remote)
-
-Make CI a required check so PRs can't merge red:
-
-```bash
-gh api -X PUT repos/{owner}/{repo}/branches/main/protection \
-  -F required_status_checks.strict=true \
-  -F 'required_status_checks.contexts[]=check' \
-  -F enforce_admins=true \
-  -F required_pull_request_reviews.required_approving_review_count=1 \
-  -F restrictions=
-```
+The full command reference, quality gates, and module conventions live in
+**[CLAUDE.md](CLAUDE.md)**.
 
 ## Where this is going
 
@@ -162,6 +150,7 @@ below are about whom the findings ultimately serve.
 - **The cross-session per-agent user model (the second pillar).** Because coach holds complete
   sessions and many of them, it aims to infer user **intent in hindsight** and roll it up across
   sessions into a per-agent **user model** — what users want, how they phrase it, what they leave
-  unsaid, what needs a clarifying question. This is a separate output with a separate consumer (the
-  agent, for personalization); it does not replace the engineer-facing optimization work. The
-  conceptual model — and its honest caveats — lives in **[docs/agent-model.md](docs/agent-model.md)**.
+  unsaid, what needs a clarifying question — a personalization signal population-level RLHF cannot
+  produce. This is a separate output with a separate consumer (the agent, for personalization); it
+  does not replace the engineer-facing optimization work. The conceptual model — and its honest
+  caveats — lives in **[docs/agent-model.md](docs/agent-model.md)**.
