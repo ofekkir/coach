@@ -6,19 +6,6 @@ sessions and surface its own expensive, hallucinated, or wasteful steps. Existin
 built for the _engineer_ to observe the agent; coach's north star is to close that loop back to the
 **agent itself**, with the engineer monitoring the loop.
 
-It works on **OpenTelemetry (OTEL) traces** by design, which keeps coach **harness-agnostic**.
-
-A **second pillar** sits beside that optimization work: because coach holds _complete sessions_ and
-_many of them_, it aims to infer user **intent in hindsight** and aggregate it across sessions into
-a per-agent **user model** (what users want, how they phrase it, what they leave unsaid) — a
-personalization signal population-level RLHF cannot produce. See
-**[docs/agent-model.md](docs/agent-model.md)** for the conceptual model.
-
-This README is split into two tiers on purpose: **[What works today](#what-works-today)** is the
-shipped surface you can run right now; **[Where this is going](#where-this-is-going)** is the
-roadmap — clearly labeled as not-yet-shipped — so the vision above never reads as a promise about
-the current build.
-
 <!-- TODO(demo): replace this placeholder with the recorded wow-moment walkthrough
      — Claude Code loading its own sessions through the coach MCP and grading its own
      expensive / hallucinated / wasteful steps (agent self-critique via MCP). -->
@@ -29,7 +16,7 @@ Until the video lands, the same moment is written up in text: **[docs/case-study
 walks coach pointed at its author's own ~148 Claude Code sessions, ranking its mistakes by
 _preventable cost_ — a worked example that runs entirely on the shipped query surface.
 
-## Why coach exists
+## Key Observations
 
 Coach rests on a handful of observations about how agents are built and operated today:
 
@@ -57,8 +44,9 @@ Coach rests on a handful of observations about how agents are built and operated
 
 ## What works today
 
-The shipped surface is three things: a pure, staged **pipeline**, a React Flow **visualization**,
-and a read-only **MCP query server**.
+It works on **OpenTelemetry (OTEL) traces** by design, which keeps coach **harness-agnostic**. The
+shipped surface is three things: a pure, staged **pipeline**, a React Flow **visualization**, and a
+read-only **MCP query server**.
 
 - **Pipeline** (`@coach/pipeline`) — turns trace/log files into a normalized, id-keyed **execution
   graph**, a model that maps 1:1 to a relational DB. Pure and file-system-free; runs in Node and
@@ -183,6 +171,7 @@ below are about whom the findings ultimately serve.
 - **The cross-session per-agent user model (the second pillar).** Because coach holds complete
   sessions and many of them, it aims to infer user **intent in hindsight** and roll it up across
   sessions into a per-agent **user model** — what users want, how they phrase it, what they leave
-  unsaid, what needs a clarifying question. This is a separate output with a separate consumer (the
-  agent, for personalization); it does not replace the engineer-facing optimization work. The
-  conceptual model — and its honest caveats — lives in **[docs/agent-model.md](docs/agent-model.md)**.
+  unsaid, what needs a clarifying question — a personalization signal population-level RLHF cannot
+  produce. This is a separate output with a separate consumer (the agent, for personalization); it
+  does not replace the engineer-facing optimization work. The conceptual model — and its honest
+  caveats — lives in **[docs/agent-model.md](docs/agent-model.md)**.
