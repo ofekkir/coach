@@ -155,12 +155,7 @@ SQL — see **[docs/case-study.md](docs/case-study.md)**.
 | `pnpm e2e <fixture>`                       | Run pipeline + deterministic enrichment, write `out/` |
 | `pnpm mcp [dataset-dir]`                   | Serve the MCP analyst tools over stdio                |
 
-### Contributing
-
-Branch off `main`, open a PR, and make sure `pnpm check` is green. The full process, code style, and
-module conventions live in **[CONTRIBUTING.md](CONTRIBUTING.md)** and **[CLAUDE.md](CLAUDE.md)**.
-
-#### Maintainer one-time setup (requires a GitHub remote)
+### Maintainer one-time setup (requires a GitHub remote)
 
 Make CI a required check so PRs can't merge red:
 
