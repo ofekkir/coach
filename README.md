@@ -93,22 +93,19 @@ Coach ships an MCP server (`@coach/mcp`) that exposes the analyzed execution gra
 queryable surface — so the agent can drive its own analyses over your sessions. **Claude Code is
 the only supported agent for now.**
 
-**1. Register the server.** Run from anywhere — use the absolute path to this repo so it resolves
-regardless of where Claude Code launches the server:
+**1. Register the server.** The quickest way is to let Claude install it — paste this into a fresh
+Claude Code session:
 
-```bash
-# preload a dataset (a directory of OTEL trace/log JSON, or native .jsonl sessions)
-claude mcp add coach -- node --experimental-strip-types \
-  /ABSOLUTE/PATH/TO/coach/packages/mcp/bin/mcp.ts /ABSOLUTE/PATH/TO/traces
-
-# …or omit the directory and load data at runtime via the load_dataset tool
-claude mcp add coach -- node --experimental-strip-types \
-  /ABSOLUTE/PATH/TO/coach/packages/mcp/bin/mcp.ts
+```text
+Install the coach MCP server from source on this machine: clone https://github.com/ofekkir/coach,
+run `pnpm install`, then register it with Claude Code over stdio using the ABSOLUTE path to the
+clone and NO preloaded dataset:
+  claude mcp add coach -- node --experimental-strip-types <ABS_PATH>/packages/mcp/bin/mcp.ts
+Then tell me to restart Claude Code and confirm `coach` shows up in `/mcp`.
 ```
 
-The server speaks MCP over stdio. The optional trailing directory is preloaded so the dataset is
-queryable immediately; without it, ask the agent to call `load_dataset` with a path first. During
-development you can also run it directly with `pnpm mcp [dataset-dir]` from the repo root.
+Prefer to run it yourself, or want to preload a dataset instead of loading at runtime? See
+**[INSTALL.md](INSTALL.md)** for the shell-command path and all options.
 
 **2. Verify and use it.** In a Claude Code session, run `/mcp` to confirm "coach" is connected,
 then ask in plain language — e.g. _"load the traces in ./out and find the most expensive

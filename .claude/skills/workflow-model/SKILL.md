@@ -1,37 +1,37 @@
 ---
 name: workflow-model
 description: >-
-  Use the coach MCP to analyze how a developer actually worked on a project across
-  their Claude Code sessions, and produce a workflow model: a state machine of their
-  recurring workflows (CHANGE / INVESTIGATE / OPS / DIRECT) with every state and
-  transition decorated by how much it cost — count, wall-clock, output tokens — plus
-  pass/fail branch rates and a deviation-by-intent breakdown. Use when asked to
-  "model how I work", "build my workflow state machine", "analyze my development on
-  this project", or "where does my work go off the path". Works on ANY repo.
+  Use the coach MCP to visualize how a developer actually worked on a project across
+  their Claude Code sessions: render a state-machine diagram of their recurring
+  workflows (families clustered from the data — typically CHANGE / INVESTIGATE / OPS /
+  DIRECT), each state and transition decorated
+  with its cost — count, wall-clock, output tokens — and pass/fail branch rates. The
+  rendered diagram is the deliverable. Use when asked to "visualize my workflows",
+  "show me how I work as a diagram", "draw my workflow state machine", "map how I
+  develop on this project", or "where does my work go off the path". Works on ANY repo.
 ---
 
-# Modeling a developer's workflows with coach
+# Visualizing a developer's workflows with coach
 
-Coach turns Claude Code execution traces into a queryable **execution graph**. This
-skill aggregates that graph across a developer's sessions into a higher-level
-**workflow model** — a state machine of how they actually work, where each state and
-transition is decorated with its cost. The rendered graph is the deliverable
-(Mermaid for now; the technique is renderer-agnostic).
+Coach ingests Claude Code traces and logs into a **queryable database** and layers
+**semantic structure** on top of the raw events — so you can ask both _what happened_
+(the low-level tool calls) and _how the work flowed_ (interactions, intents, families,
+causal edges), and analyse either. This skill drives that database to **aggregate a
+developer's most common workflows into a single state machine** — one diagram per
+recurring workflow family — with each state and transition decorated by the cost and
+branch rates measured across all their sessions. **The rendered diagram is the
+deliverable** (Mermaid → PNG for now; the technique is renderer-agnostic). Everything
+before §6 — the families, the per-state cost, the branch rates — exists to produce the
+labels on that diagram, not as a standalone report. Aim every query at "what goes on
+the picture," then draw and render it.
 
 ## 0 — Get coach running as MCP (one-time, per machine)
 
-If `/mcp` does not list `coach`, install it. Coach is a TypeScript repo; the server
-runs over stdio via Node's type-stripping. Use ABSOLUTE paths.
-
-```bash
-git clone https://github.com/ofekkir/coach && cd coach && pnpm install
-# register with no preload — we load the target project at runtime
-claude mcp add coach -- node --experimental-strip-types \
-  /ABSOLUTE/PATH/TO/coach/packages/mcp/bin/mcp.ts
-```
-
-Restart Claude Code, confirm with `/mcp`. Remove later: `claude mcp remove coach`.
-Rendering needs `pnpm` and a Chromium (system Chrome is fine).
+If `/mcp` does not list `coach`, install it — see
+**[INSTALL.md](https://github.com/ofekkir/coach/blob/main/INSTALL.md)** for the two
+options: shell commands, or a copy-paste prompt that has Claude do the install for you.
+Restart Claude Code afterwards and confirm with `/mcp`. Rendering needs `pnpm` and a
+Chromium (system Chrome is fine).
 
 ## 1 — Load the developer's logs for the target project
 
@@ -42,31 +42,74 @@ load_dataset(repo: "<repo-name-or-abs-path>", includeWorktrees: true)
 Loads the repo's Claude Code logs across the main checkout AND every git worktree.
 Check the returned `sessions` / `interactions` / `nodes` counts are non-trivial,
 then call `describe_schema` ONCE — the schema is the source of truth; trust it over
-the column names below if they ever disagree.
+the column names below if they ever disagree. The queries below read the **typed
+views** the schema exposes — `tools`, `llm_requests`, `interactions`,
+`interaction_metrics` (each a documented projection of `nodes` by `type`) — instead of
+filtering `nodes WHERE type=…` by hand; prefer them.
 
-## 2 — Classify every interaction into a workflow family
+## 2 — Cluster interactions into workflow families (data-driven, not hardcoded)
 
-One interaction → one family. This is the spine of the state machine.
+One interaction → one family. This is the spine of the state machine. **Do not assume
+the family taxonomy** — derive it from the `action` vocabulary that is actually in this
+DB. `CHANGE / INVESTIGATE / OPS / DIRECT` is the _typical_ outcome on a coding repo, but
+a different project may surface different actions, and inventing buckets the data can't
+fill produces a fake diagram.
+
+**2a — Learn the vocabulary.** See which actions exist and how common they are before
+writing any CASE:
 
 ```sql
-WITH fam AS (
-  SELECT interaction_id,
-    BOOL_OR(action IN ('author','edit')) AS cl,
-    BOOL_OR(action='explore') AS expl,
-    BOOL_OR(action='run') AS run, BOOL_OR(action='vcs') AS vcs
-  FROM nodes WHERE type='tool' AND action IS NOT NULL GROUP BY interaction_id
-)
-SELECT n.id AS interaction_id,
-  CASE WHEN f.interaction_id IS NULL THEN 'DIRECT'   -- no tools: pure Q&A
-       WHEN f.cl   THEN 'CHANGE'                     -- authored or edited code
-       WHEN f.expl THEN 'INVESTIGATE'                -- explored, no writes
-       WHEN f.vcs OR f.run THEN 'OPS'                -- only ran / committed
-       ELSE 'OTHER' END AS family
-FROM nodes n LEFT JOIN fam f ON f.interaction_id=n.id WHERE n.type='interaction';
+SELECT action, COUNT(*) AS calls, COUNT(DISTINCT interaction_id) AS interactions
+FROM tools WHERE action IS NOT NULL    -- `tools` = the type='tool' slice of nodes (a schema view)
+GROUP BY action ORDER BY calls DESC;
 ```
 
-Roll up per family (interactions / hours / output-tokens) to see where the work
-goes; draw a state machine only for families above ~5% of time.
+**2b — Fingerprint each interaction.** Reduce every interaction to the _set_ of actions
+it used (plus a flag for no-tools), so it can be clustered:
+
+```sql
+SELECT n.id AS interaction_id,
+  COALESCE(STRING_AGG(DISTINCT f.action, ',' ORDER BY f.action), '<none>') AS action_set
+FROM interactions n
+LEFT JOIN tools f ON f.interaction_id=n.id AND f.action IS NOT NULL
+GROUP BY n.id;
+```
+
+**2c — Cluster with the LLM.** Group the distinct `action_set` fingerprints into a
+small set of named families (aim for 3–6) by what the developer was _trying to do_, not
+by tool mechanics. Always include an explicit **`OTHER`** bucket for fingerprints that
+don't fit. Then express that clustering as a single CASE that maps each interaction to
+exactly one family — the typical mapping (adapt the actions to whatever 2a returned):
+
+```sql
+-- f = per-interaction action flags from the BOOL_OR pattern over the actions in 2a
+CASE WHEN f.interaction_id IS NULL          THEN 'DIRECT'        -- no tools: pure Q&A
+     WHEN f.has_author OR f.has_edit        THEN 'CHANGE'        -- authored / edited code
+     WHEN f.has_explore                     THEN 'INVESTIGATE'   -- explored, no writes
+     WHEN f.has_vcs OR f.has_run            THEN 'OPS'           -- only ran / committed
+     ELSE 'OTHER' END AS family
+```
+
+**2d — Roll up and SANITY-GATE before proceeding.** Count interactions / hours /
+output-tokens per family:
+
+```sql
+SELECT family, COUNT(*) AS interactions,
+       ROUND(100.0*COUNT(*)/SUM(COUNT(*)) OVER (),0) AS pct
+FROM (/* the 2c classification */) g GROUP BY family ORDER BY interactions DESC;
+```
+
+Now **verify the numbers make sense, and STOP if they don't**:
+
+- **`OTHER` is large** (say >20% of interactions) → the clustering missed real
+  behaviour or the `action` column is under-populated. Do **not** draw. Inspect the
+  `action_set` fingerprints landing in `OTHER`, refine 2c, and re-gate.
+- **One family swallows ~everything** (e.g. 90% `DIRECT`, or 90% any single bucket) →
+  this almost always means **ingestion is broken** — actions aren't being labelled, or
+  only one session loaded. Do **not** proceed: report the distribution and the likely
+  ingestion problem (re-check `load_dataset` counts from §1 and the §2a vocabulary),
+  and ask before continuing.
+- Numbers look plausible → draw a state machine only for families above ~5% of time.
 
 ## 3 — Cost per state and per transition
 
@@ -77,7 +120,7 @@ tools. Keep `Gate`/`Verify` before the generic `Run`, and `BashMutate` before `R
 
 ```sql
 WITH scope AS (  -- swap the filter to target one family (here: CHANGE)
-  SELECT DISTINCT interaction_id FROM nodes WHERE type='tool' AND action IN ('author','edit')
+  SELECT DISTINCT interaction_id FROM tools WHERE action IN ('author','edit')
 ),
 tmap AS (
   SELECT t.id, t.duration_ms, ce.from_id AS inf,
@@ -96,13 +139,13 @@ tmap AS (
       WHEN t.action='explore' THEN 'Search'
       ELSE 'other'
     END AS state
-  FROM nodes t LEFT JOIN causal_edges ce ON ce.to_id=t.id
-  WHERE t.type='tool' AND t.interaction_id IN (SELECT interaction_id FROM scope)
+  FROM tools t LEFT JOIN causal_edges ce ON ce.to_id=t.id
+  WHERE t.interaction_id IN (SELECT interaction_id FROM scope)
 ),
 tok AS (
   SELECT state, SUM(tokens_out) AS out_tok FROM (
     SELECT DISTINCT m.state, m.inf, n.tokens_out
-    FROM tmap m JOIN nodes n ON n.id=m.inf AND n.type='llm_request'
+    FROM tmap m JOIN llm_requests n ON n.id=m.inf
   ) GROUP BY state
 )
 SELECT m.state, COUNT(*) AS times, ROUND(SUM(m.duration_ms)/60000.0,1) AS minutes,
@@ -127,9 +170,9 @@ happy-path vs failure via `is_error`; these become edge labels like
 `rejected 56x` / `applied 1510x`.
 
 ```sql
-WITH t AS (SELECT * FROM nodes WHERE type='tool'
-           AND interaction_id IN (SELECT DISTINCT interaction_id FROM nodes
-                                  WHERE type='tool' AND action IN ('author','edit')))
+WITH t AS (SELECT * FROM tools
+           WHERE interaction_id IN (SELECT DISTINCT interaction_id FROM tools
+                                    WHERE action IN ('author','edit')))
 SELECT
   COUNT(*) FILTER (WHERE name IN ('Edit','MultiEdit') AND is_error) AS edit_rejected,
   COUNT(*) FILTER (WHERE name IN ('Edit','MultiEdit') AND (is_error IS NULL OR NOT is_error)) AS edit_applied,
@@ -148,7 +191,7 @@ An interaction "deviates" if it has any tool error OR redundant calls (identical
 ```sql
 WITH redundant AS (
   SELECT interaction_id FROM (
-    SELECT interaction_id, name, tool_input, COUNT(*) c FROM nodes WHERE type='tool'
+    SELECT interaction_id, name, tool_input, COUNT(*) c FROM tools
     GROUP BY interaction_id, name, tool_input HAVING COUNT(*) >= 2
   ) GROUP BY interaction_id
 )
