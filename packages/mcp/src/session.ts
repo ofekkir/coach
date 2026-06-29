@@ -4,13 +4,19 @@
 // dataset at a time, replaced on each load. A load always re-derives from source:
 // the directory's trace/native files run through the pipeline, then materialized.
 
-import type { ExecutionGraph, PipelineResult } from '@coach/pipeline';
+import {
+  loadPipelineResult,
+  loadPipelineResultFromDirs,
+  resolveRepoDirs,
+  type ExecutionGraph,
+  type PipelineResult,
+  type ResolveOptions,
+} from '@coach/pipeline';
 
 import { dumpPipelineOutputs } from './dump.ts';
-import { loadPipelineResult, loadPipelineResultFromDirs, type Dataset } from './load.ts';
+import type { Dataset } from './load.ts';
 import { outputDir } from './output-dir.ts';
 import type { Store } from './query-core.ts';
-import { resolveRepoDirs, type ResolveOptions } from './resolve-dataset.ts';
 import { createStore } from './store.ts';
 
 /** What `load_dataset` reports back: where it loaded from and how much it found. */

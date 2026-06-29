@@ -6,7 +6,7 @@
 // module maps a repo name (or absolute path) to that whole family of directories
 // so `load_dataset` can fold a repo's main checkout and all its worktrees into a
 // single dataset by default. This is the only place that knows the on-disk
-// projects layout; `load.ts` just consumes absolute directories.
+// projects layout; `intake.ts` just consumes absolute directories.
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';

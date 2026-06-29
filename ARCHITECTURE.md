@@ -24,7 +24,7 @@ The system is split into five packages plus a Node CLI layer:
 │           ┌───────────────────┘                         │
 │           ▼                                             │
 │  @coach/pipeline (packages/pipeline)                    │
-│  Pure data processing · No node:* imports               │
+│  Pure transform (browser-safe) + node intake/           │
 │  classify → route → canonical → aggregate →             │
 │            execution graph  (run offline by the CLI/MCP)│
 └─────────────────────────────────────────────────────────┘
@@ -38,21 +38,23 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Package layout
 
-| Package / dir        | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `packages/pipeline`  | Pure staged pipeline: classify → route → canonical → aggregate → execution graph → semantic enrichment, plus orchestration, plus the graph→DB SQL (`db/`: the relational schema specs + `materializeSql`). Ends at the enriched graph — curated analysis is queries, not a stage. Organizes data losslessly; carries no presentation. Zero `node:*` imports — runs in browser and Node alike.                                                                                                                                               |
-| `packages/app`       | React SPA: renders a pre-computed `ExecutionGraph` (loaded from a file or fetched via `?data=<url>`); graph visualization + data-source seam. Does not run the pipeline in the browser.                                                                                                                                                                                                                                                                                                                                                     |
-| `packages/mcp`       | MCP server over the stage-6 graph. Owns the backend-neutral query core (`query-core.ts` + `guard.ts`/`result.ts`: read-only UX guard, capped JSON-safe results, graph traversal) over a `Connection` port, plus the node-api `Connection` (`duckdb.ts`) that runs `@coach/pipeline`'s `materializeSql` into a temp file-backed DuckDB and serves it through a READ_ONLY handle. Exposes read-only SQL + graph-traversal tools so an analyst agent drives its own analyses. Node-only (filesystem + native DuckDB). See "MCP query surface". |
-| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README.                                                                                                                                                                                                                                                                                                      |
-| `scripts/`           | Node CLI over the same pipeline. Reads fixture files from disk, writes `out/*.json` artifacts. Uses `@coach/logger` for structured log output.                                                                                                                                                                                                                                                                                                                                                                                              |
+| Package / dir        | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `packages/pipeline`  | Staged pipeline: classify → route → canonical → aggregate → execution graph → semantic enrichment, plus orchestration, plus the graph→DB SQL (`db/`: the relational schema specs + `materializeSql`), plus filesystem **intake** (`intake/`: directory/repo-name → `PipelineResult`, shared by the MCP and the e2e CLI). Ends at the enriched graph — curated analysis is queries, not a stage. Organizes data losslessly; carries no presentation. The staged transform + graph + DB SQL are pure (zero `node:*`); `intake/` is the one node-only surface (`node:fs`/`node:os`), kept in its own module so the browser app — which imports only the pure graph/types/orchestration exports — never reaches it (its exports tree-shake out of the browser bundle). |
+| `packages/app`       | React SPA: renders a pre-computed `ExecutionGraph` (loaded from a file or fetched via `?data=<url>`); graph visualization + data-source seam. Does not run the pipeline in the browser.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `packages/mcp`       | MCP server over the stage-6 graph. Owns the backend-neutral query core (`query-core.ts` + `guard.ts`/`result.ts`: read-only UX guard, capped JSON-safe results, graph traversal) over a `Connection` port, plus the node-api `Connection` (`duckdb.ts`) that runs `@coach/pipeline`'s `materializeSql` into a temp file-backed DuckDB and serves it through a READ_ONLY handle. Exposes read-only SQL + graph-traversal tools so an analyst agent drives its own analyses. Node-only (filesystem + native DuckDB). See "MCP query surface".                                                                                                                                                                                                                        |
+| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `scripts/`           | Node CLI over the same pipeline. `pnpm e2e <dir \| repo-name>` calls `@coach/pipeline`'s `loadFromSource` (the same intake the MCP uses) and writes `out/*.json` + `.db` artifacts. Uses `@coach/logger` for structured log output.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ## Data flow
 
 `packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — six
 named stages, each surfaced as a member: `classified`, `sessions`, `canonicalBySession`,
-`agentGraph`, `executionGraph`, `enrichedGraph`. It is pure and file-system-free; the CLI
-and the app both call it. Stage 6 enrichment is deterministic, always runs (using `config`,
+`agentGraph`, `executionGraph`, `enrichedGraph`. The transform itself is pure and
+file-system-free (the app calls it directly); the directory/repo gather that feeds it lives
+beside it in `intake/` (`loadPipelineResult`, `loadPipelineResultFromDirs`, `loadFromSource`),
+which the MCP and the e2e CLI share. Stage 6 enrichment is deterministic, always runs (using `config`,
 defaulting to the bundled `defaultSemanticsConfig`), and is the final stage — curated analysis is
 not a pipeline stage (every rollup is a query; see "MCP query surface").
 `buildVizResultFromExecutionGraph` is a thin adapter that wraps a pre-computed execution graph in the
@@ -419,7 +421,7 @@ outDir)` writes the six `01..06` stage JSON files + a standalone `graph.db` (the
   relative to the package) plus those dumped JSON files, erroring with a build hint if `dist` is missing.
   `coach-viz [data-file] [focus] [--source <id>] [--dest <id>]` (its bin) boots the server and opens
   the browser.
-- **Repo-name resolution (`resolve-dataset.ts`).** Claude Code stores each working directory's
+- **Repo-name resolution (`@coach/pipeline` → `intake/resolve-dataset.ts`).** Claude Code stores each working directory's
   session logs under `~/.claude/projects/<encoded-path>/`, where the absolute path is encoded by
   replacing `/` and `.` with `-`. A repo's main checkout and each git worktree are **separate**
   encoded directories sharing a common prefix; the worktree ones append `…-claude-worktrees-<id>…`.
@@ -427,12 +429,13 @@ outDir)` writes the six `01..06` stage JSON files + a standalone `graph.db` (the
   worktree suffix), matches the requested name (bare name → trailing segment; absolute path → exact
   encoded form), and returns the whole family — main checkout **plus every worktree by default**
   (`includeWorktrees: false` keeps only the main checkout). It is the one place that knows the on-disk
-  projects layout; `load.ts` just consumes absolute directories. `loadPipelineResultFromDirs` gathers
+  projects layout; `intake.ts` just consumes absolute directories. `loadPipelineResultFromDirs` gathers
   all of them — each rooted at its own parent so the route stage's per-directory grouping survives —
   and runs **one** pipeline, so a repo's sessions across all worktrees aggregate into a single forest
   (the store already normalizes worktree `file_path`s to a repo-relative form, so cross-worktree
-  analysis lines up).
-- **Session + loading (`session.ts`, `load.ts`, `server.ts`, `bin/mcp.ts`).** The server holds one
+  analysis lines up). `loadFromSource(source)` wraps both: an existing directory loads literally,
+  anything else resolves as a repo name — the one-positional convenience the e2e CLI exposes.
+- **Session + loading (`session.ts`, `@coach/pipeline` `intake/`, `server.ts`, `bin/mcp.ts`).** The server holds one
   mutable session: the dataset currently loaded. `load_dataset` takes either a `repo` name (resolved
   to the main checkout + worktrees above) or a single `path` **directory** of trace/native
   files (read into the same `UploadedFile[]` the browser produces, run through the pipeline,
@@ -488,11 +491,12 @@ error screen rather than a blank page.
 
 ## Fixture modes
 
-`pnpm e2e` accepts a path (relative to cwd) or a fixture name under
-`packages/pipeline/fixtures/`. It calls `runPipeline` and dumps every stage member to
-`out/<name>/`, so each stage is independently inspectable. (The earlier per-stage scripts —
-`scripts/viz.ts`, `scripts/enrich.ts`, `scripts/etl.ts` — were removed; `e2e` covers the full
-pipeline.)
+`pnpm e2e <dir | repo-name>` accepts a directory path (relative to cwd — e.g. a fixture under
+`packages/pipeline/fixtures/`) **or** a repo name like `coach`, which resolves to that repo's Claude
+Code logs across the main checkout + every git worktree — the same `loadFromSource` convenience the
+MCP's `load_dataset` exposes. It dumps every stage member to `out/<name>/`, so each stage is
+independently inspectable. (The earlier per-stage scripts — `scripts/viz.ts`, `scripts/enrich.ts`,
+`scripts/etl.ts` — were removed; `e2e` covers the full pipeline.)
 
 | Member file                    | Stage | Contents                                                             |
 | ------------------------------ | ----- | -------------------------------------------------------------------- |

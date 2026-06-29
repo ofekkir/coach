@@ -3,7 +3,7 @@
 // analyses (read-only SQL + graph traversal) instead of consuming the fixed
 // stage-7 findings. See ARCHITECTURE.md → "MCP query surface".
 
-export { loadDataset, loadPipelineResult } from './load.ts';
+export { loadDataset } from './load.ts';
 export type { Dataset } from './load.ts';
 export { dumpPipelineOutputs } from './dump.ts';
 export { outputDir } from './output-dir.ts';
