@@ -30,17 +30,17 @@ Coach rests on a handful of observations about how agents are built and operated
   platforms that exist surface traces for a human to read, yet the volume of session data is a
   glacier — a person can barely touch its edge, let alone mine the insights buried in it. There is,
   however, exactly the right technology for reading that much data: agents.
-- **Coding agents are the beachhead, and the Claude ecosystem is the most mature one.** The most
-  widely used agents today are coding agents, and within them Claude Code is the most adopted and
-  mature. That is where the richest traces — and the most leverage — currently live.
-- **Most developers don't own their session data.** Claude Code already writes detailed logs of
-  every session, and for almost everyone they sit unused. That data is a standing asset; coach turns
-  it into a queryable model instead of leaving it on the floor.
 - **The agent's control flow should be derived, not hand-drawn.** Early agents were built as
   explicit graphs; that felt too rigid, so the field moved to reactive (ReAct-style) loops. The
   better path looks like neither hand-authored extreme: derive the graph from what the agent
   actually did and let it adapt continuously and automatically. Coach's execution graph — recovered
   in hindsight from real traces — is the first step toward that.
+- **Coding agents are the beachhead, and the Claude ecosystem is the most mature one.** The most
+  widely used agents today are coding agents, and within them Claude Code is the most adopted and
+  mature. That is where the richest traces — and the most leverage — currently live.
+  - **Most developers don't own their session data.** Claude Code already writes detailed logs of
+    every session, and for almost everyone they sit unused. That data is a standing asset; coach
+    turns it into a queryable model instead of leaving it on the floor.
 
 ## What works today
 
