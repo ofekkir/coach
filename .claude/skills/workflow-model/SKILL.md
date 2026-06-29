@@ -1,56 +1,52 @@
 ---
-name: workflow-atlas
+name: workflow-model
 description: >-
-  Turn a Claude Code user's own session logs into a decorated "workflow atlas" —
-  state machines of how they actually work (CHANGE / INVESTIGATE / OPS / DIRECT),
-  every node stamped with times | minutes | output-tokens and pass/fail branch
-  rates, plus a deviation-by-intent breakdown of how often work goes off the
-  optimal path. Uses the coach MCP. Use when the request is "build my workflow
-  state machine", "how do I actually work", "usage atlas", "analyze my agent
-  workflows", or "where does my work go off the rails". Works on ANY repo, not
-  just coach's own.
+  Use the coach MCP to analyze how a developer actually worked on a project across
+  their Claude Code sessions, and produce a workflow model: a state machine of their
+  recurring workflows (CHANGE / INVESTIGATE / OPS / DIRECT) with every state and
+  transition decorated by how much it cost — count, wall-clock, output tokens — plus
+  pass/fail branch rates and a deviation-by-intent breakdown. Use when asked to
+  "model how I work", "build my workflow state machine", "analyze my development on
+  this project", or "where does my work go off the path". Works on ANY repo.
 ---
 
-# Building a usage workflow atlas with coach
+# Modeling a developer's workflows with coach
 
-This skill reproduces, end to end, the analysis that turns raw Claude Code logs
-into a decorated state-machine atlas of how a user works. It is **project-agnostic**
-— point it at any repo. The output is a set of rendered PNG state machines plus a
-deviation report.
+Coach turns Claude Code execution traces into a queryable **execution graph**. This
+skill aggregates that graph across a developer's sessions into a higher-level
+**workflow model** — a state machine of how they actually work, where each state and
+transition is decorated with its cost. The rendered graph is the deliverable
+(Mermaid for now; the technique is renderer-agnostic).
 
-## 0 — Prereqs: get coach running as MCP (one-time, per machine)
+## 0 — Get coach running as MCP (one-time, per machine)
 
 If `/mcp` does not list `coach`, install it. Coach is a TypeScript repo; the server
 runs over stdio via Node's type-stripping. Use ABSOLUTE paths.
 
 ```bash
-# clone + install once
 git clone https://github.com/ofekkir/coach && cd coach && pnpm install
-
-# register (no preload — we load the target repo at runtime)
+# register with no preload — we load the target project at runtime
 claude mcp add coach -- node --experimental-strip-types \
   /ABSOLUTE/PATH/TO/coach/packages/mcp/bin/mcp.ts
 ```
 
-Then restart Claude Code and confirm with `/mcp`. Remove later with
-`claude mcp remove coach`. Rendering also needs `pnpm` (any repo) and a Chromium
-(system Chrome is fine) + Python 3 with Pillow (`pip install pillow`).
+Restart Claude Code, confirm with `/mcp`. Remove later: `claude mcp remove coach`.
+Rendering needs `pnpm` and a Chromium (system Chrome is fine).
 
-## 1 — Load the target user's logs
+## 1 — Load the developer's logs for the target project
 
 ```
-load_dataset(repo: "<their-repo-name-or-abs-path>", includeWorktrees: true)
+load_dataset(repo: "<repo-name-or-abs-path>", includeWorktrees: true)
 ```
 
-`repo` resolves the repo's Claude Code logs across the main checkout AND every git
-worktree. Confirm the returned `sessions` / `interactions` / `nodes` counts are
-non-trivial. Then `describe_schema` ONCE — the schema evolves; trust it over the
-column names below if they ever disagree.
+Loads the repo's Claude Code logs across the main checkout AND every git worktree.
+Check the returned `sessions` / `interactions` / `nodes` counts are non-trivial,
+then call `describe_schema` ONCE — the schema is the source of truth; trust it over
+the column names below if they ever disagree.
 
 ## 2 — Classify every interaction into a workflow family
 
-This is the spine. One interaction → one family. Run as the basis for everything
-after. (Worktree-normalized; `action` is the deterministic activity bucket.)
+One interaction → one family. This is the spine of the state machine.
 
 ```sql
 WITH fam AS (
@@ -64,24 +60,23 @@ SELECT n.id AS interaction_id,
   CASE WHEN f.interaction_id IS NULL THEN 'DIRECT'   -- no tools: pure Q&A
        WHEN f.cl   THEN 'CHANGE'                     -- authored or edited code
        WHEN f.expl THEN 'INVESTIGATE'                -- explored, no writes
-       WHEN f.vcs OR f.run THEN 'OPS'                -- only ran/committed
+       WHEN f.vcs OR f.run THEN 'OPS'                -- only ran / committed
        ELSE 'OTHER' END AS family
 FROM nodes n LEFT JOIN fam f ON f.interaction_id=n.id WHERE n.type='interaction';
 ```
 
-Roll it up (interactions / hours / output-tokens per family) to learn where the
-time goes and which families are worth drawing (skip a family with <~5% of time).
+Roll up per family (interactions / hours / output-tokens) to see where the work
+goes; draw a state machine only for families above ~5% of time.
 
-## 3 — Decorate each state: times | minutes | output-tokens
+## 3 — Cost per state and per transition
 
-Per state = a tool bucket. Time and count come straight from tool nodes; **tokens
-are attributed to the inference that EMITTED the call** via `causal_edges`, deduped
-per (state, inference) so one turn's tokens aren't multiplied across its tools.
-The CASE below is the canonical state mapping — keep `Gate`/`Verify` BEFORE the
-generic `Run`, and keep file-mutating Bash (`BashMutate`) before `Run`.
+Each state is a tool bucket. Count and wall-clock come straight from tool nodes;
+**tokens are attributed to the inference that EMITTED the call** via `causal_edges`,
+deduped per (state, inference) so one turn's tokens are not multiplied across its
+tools. Keep `Gate`/`Verify` before the generic `Run`, and `BashMutate` before `Run`.
 
 ```sql
-WITH scope AS (  -- swap the family filter to target one workflow
+WITH scope AS (  -- swap the filter to target one family (here: CHANGE)
   SELECT DISTINCT interaction_id FROM nodes WHERE type='tool' AND action IN ('author','edit')
 ),
 tmap AS (
@@ -116,14 +111,19 @@ FROM tmap m LEFT JOIN tok k ON k.state=m.state GROUP BY m.state, k.out_tok
 ORDER BY minutes DESC;
 ```
 
-The `Gate` bucket is repo-specific (`pnpm check`). Adapt it to the target repo's
-real gate command (`make check`, `npm run ci`, `cargo test`, …) — find it from the
-most common validation Bash commands before drawing.
+For **transition cost** (the edges), measure each `state[seq] -> state[seq+1]`
+adjacency within an interaction — count how often the transition is taken and the
+wall-clock spent in the destination state. Adjacent steps share `interaction_id`
+and order by `seq`; self-join on `seq+1` to weight each edge.
 
-## 4 — Branch frequencies for the decision diamonds (the back-edges)
+The `Gate` bucket is repo-specific (`pnpm check`). Adapt it to the target repo's
+real gate (`make check`, `npm run ci`, `cargo test`, …) — find it from the most
+common validation Bash commands before drawing.
+
+## 4 — Branch frequencies for the decision points
 
 The recovery edges are the most insightful labels. For each gating state, count
-happy-path vs failure via `is_error`. These become edge labels like
+happy-path vs failure via `is_error`; these become edge labels like
 `rejected 56x` / `applied 1510x`.
 
 ```sql
@@ -140,7 +140,7 @@ SELECT
 FROM t;
 ```
 
-## 5 — Deviation-by-intent: how often work goes off the optimal path
+## 5 — Deviation-by-intent: how often work goes off the path
 
 An interaction "deviates" if it has any tool error OR redundant calls (identical
 `(name, tool_input)` ≥2× = wasted work). Report per `intent_category`.
@@ -162,39 +162,57 @@ LEFT JOIN redundant r ON r.interaction_id=i.id
 GROUP BY i.intent_category ORDER BY deviating DESC;
 ```
 
-Caveats to STATE in the report: the two columns overlap (union ≠ sum); an
+State these caveats in the report: the columns overlap (union ≠ sum); an
 `is_error` can be a legitimate probe (a test meant to fail), so this is an UPPER
 bound — offer to tighten to `not_found`/`invalid_args` on Edit/Write + redundancy
 for the "genuinely preventable" subset.
 
-## 6 — Draw the state machines (Mermaid)
+## 6 — Draw the state machine (Mermaid)
 
-Write one `stateDiagram-v2` per non-trivial family. Decorate each measurable node
-with `<br/>=== {times}x | {minutes} min | {tok}k tok ===` and put branch
-frequencies on the edges out of `<<choice>>` nodes. Leave decision/thinking/human
-nodes blank but LABEL them with why (e.g. "judgment, no tool" / "human, off-trace")
-so a blank never reads as a gap. The canonical CHANGE skeleton:
+Write one `stateDiagram-v2` per non-trivial family. Decorate each measurable state
+with `<br/>=== {times}x | {minutes} min | {tok}k tok ===`, and label each transition
+with its frequency and cost (e.g. `rejected 56x`, `applied 1510x`). Leave
+decision/thinking/human states blank but LABEL why (e.g. "judgment, no tool" /
+"human, off-trace") so a blank never reads as a gap. Canonical CHANGE skeleton —
+note mutating loops back-edge to **Read**, not Edit (a `sed`/`rm`/`git mv` or a
+failed run invalidates the read-cache; re-read before re-editing):
 
+```mermaid
+stateDiagram-v2
+    [*] --> Locate
+    Locate: Search === Nx | M min | K tok ===
+    Locate --> Read
+    Read: Read target === Nx | M min | K tok ===
+    Read --> Edit
+    Edit: Edit / author === Nx | M min | K tok ===
+    state EditRes <<choice>>
+    Edit --> EditRes
+    EditRes --> Read: rejected Nx (stale)
+    EditRes --> Run: applied Nx
+    Run: Run check === Nx | M min | K tok ===
+    state RunRes <<choice>>
+    Run --> RunRes
+    RunRes --> Read: fail Nx
+    RunRes --> Gate: pass Nx
+    Gate: Gate (repo check) === Nx | M min | K tok ===
+    state GateRes <<choice>>
+    Gate --> GateRes
+    GateRes --> Read: red Nx
+    GateRes --> Ship: green Nx
+    Ship: Commit + PR === Nx | M min | K tok ===
+    Ship --> Review
+    Review: STOP - human review (off-trace)
+    Review --> [*]
 ```
-Orient -> (WorktreeSetup | Locate) -> ChangeCycle{Read->Edit->Run, back-edges to Read}
-       -> Validation{Verify -> CoverageCheck -> Gate} -> Ship{commit->PR} -> Review(STOP)
-```
 
-Mutating loops back-edge to **Read**, not Edit (a `sed`/`rm`/`git mv` or a failed
-run invalidates the read-cache; you must re-read before re-editing). See
-`templates/change-loop.mmd` for a full decorated example to adapt.
-
-## 7 — Render + assemble the atlas
+## 7 — Render
 
 ```bash
-# render one diagram to PNG (auto-detects system Chrome for puppeteer)
-scripts/render-mermaid.sh path/to/diagram.mmd path/to/out.png
-# stitch many PNGs into one titled atlas page
-python3 scripts/build-atlas.py out/atlas.png "CHANGE:change.png" "REST:other.png" ...
+node --experimental-strip-types scripts/render-mermaid.ts diagram.mmd out/diagram.png
 ```
 
-Then `open out/atlas.png` (macOS) / `xdg-open` (Linux) and deliver the PNGs to the
-user. Offer landscape (`LR`) re-render if the vertical scroll is too tall.
+The TypeScript helper auto-detects system Chrome for mermaid-cli's renderer. Open
+the PNG (`open` on macOS, `xdg-open` on Linux) and deliver it with the analysis.
 
 ## Guardrails
 
@@ -203,5 +221,5 @@ user. Offer landscape (`LR`) re-render if the vertical scroll is too tall.
   column to a workflow total). State both in the report.
 - coach has zero `hook` nodes — deterministic PostToolUse hooks are invisible. A
   "build without verify" means no AGENT-issued check, not "no gate ran".
-- Repo-specific buckets (`Gate`, test commands, file-type coverage for the
-  TS/JS-only hook split) MUST be adapted to the target repo before drawing.
+- Repo-specific buckets (`Gate`, test commands, file-type coverage for any
+  hook-coverage split) MUST be adapted to the target repo before drawing.
