@@ -1,10 +1,8 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename } from 'node:path';
 
 import { log } from '@coach/logger';
 import { dumpPipelineOutputs } from '@coach/mcp';
-import { runPipeline } from '@coach/pipeline';
-import type { UploadedFile } from '@coach/pipeline';
+import { loadFromSource, type LoadedDataset } from '@coach/pipeline';
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -20,51 +18,49 @@ if (debugFlag) log.level = 'debug';
 
 if (!arg) {
   log.error(
-    'Usage: pnpm e2e <path> [--debug]  (e.g. pnpm e2e packages/pipeline/fixtures/otel/fetch-website)',
+    'Usage: pnpm e2e <dir | repo-name> [--debug]\n' +
+      '  dir       a directory of OTEL/native files (e.g. packages/pipeline/fixtures/otel/fetch-website)\n' +
+      "  repo-name a repo (e.g. 'coach') — loads its Claude Code logs across the main checkout + all worktrees",
   );
   process.exit(1);
 }
 
-function resolveInput(a: string): string {
-  const direct = resolve(process.cwd(), a);
-  if (existsSync(direct)) return direct;
-  log.error(`Input not found: '${direct}'`);
-  process.exit(1);
+// ── Load (the same convenience the MCP's `load_dataset` exposes) ────────────────
+
+// An existing directory loads literally; any other string resolves as a repo name
+// to the main checkout + every worktree — both run through the full pipeline.
+function load(source: string): LoadedDataset {
+  try {
+    return loadFromSource(source);
+  } catch (err) {
+    log.error((err as Error).message);
+    process.exit(1);
+  }
 }
 
-const inputDir = resolveInput(arg);
-const outDir = `out/${basename(inputDir)}`;
+const { dirs, result } = load(arg);
+log.info({ dirs: dirs.length, paths: dirs }, 'loaded source directories');
 
-// ── Gather files (the same flat UploadedFile[] the browser upload produces) ─────
+// ── Dump each stage member ──────────────────────────────────────────────────────
 
-function gatherFiles(dir: string, rootDir: string): UploadedFile[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) return gatherFiles(fullPath, rootDir);
-    const lower = entry.name.toLowerCase();
-    if (!lower.endsWith('.jsonl') && !lower.endsWith('.json')) return [];
-    const rel = fullPath.startsWith(rootDir + '/')
-      ? fullPath.slice(rootDir.length + 1)
-      : entry.name;
-    return [{ name: entry.name, content: readFileSync(fullPath, 'utf8'), path: rel }];
-  });
-}
+const outDir = `out/${basename(arg)}`;
 
-// ── Run the pipeline and dump each stage member ────────────────────────────────
-
-const files = gatherFiles(inputDir, inputDir);
-log.info({ files: files.length }, 'gathered input files');
-
-// runPipeline runs all seven stages, including deterministic enrichment + analysis.
-const result = runPipeline(files);
-
-// Shared with the MCP's directory load: writes 01..07 JSON + the self-contained .db.
+// Shared with the MCP's directory load: writes 01..06 JSON + the self-contained .db.
 const written = await dumpPipelineOutputs(result, outDir);
 for (const path of written) log.info(`  → ${path}`);
 
+// A repo load sweeps in every sidecar file (`.meta.json`, `.txt`, …); the
+// classifier ignores them. Summarize rather than dumping the whole list.
+const UNSUPPORTED_SAMPLE = 5;
 const unsupported = result.classified.filter((c) => c.type === 'unsupported');
 if (unsupported.length > 0) {
-  log.warn({ files: unsupported.map((u) => u.file.name) }, 'unsupported inputs ignored');
+  log.warn(
+    {
+      count: unsupported.length,
+      sample: unsupported.slice(0, UNSUPPORTED_SAMPLE).map((u) => u.file.name),
+    },
+    'unsupported inputs ignored',
+  );
 }
 log.info(
   { sessions: result.sessions.length, agentGraphNodes: result.agentGraph.nodes.length },

@@ -51,6 +51,14 @@ export { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 export { buildVizResultFromExecutionGraph, runPipeline } from './orchestrate.ts';
 export type { PipelineResult } from './orchestrate.ts';
 
+// Filesystem intake (node-only): directory/repo name → PipelineResult. The
+// pipeline's one `node:*` surface — the browser app imports only the pure
+// graph/types/orchestration exports above, never this.
+export { loadFromSource, loadPipelineResult, loadPipelineResultFromDirs } from './intake/intake.ts';
+export type { LoadedDataset } from './intake/intake.ts';
+export { resolveRepoDirs } from './intake/resolve-dataset.ts';
+export type { ResolveOptions, ResolvedRepo } from './intake/resolve-dataset.ts';
+
 // Graph → DB SQL (the relational schema specs + the graph→SQL materializer). Pure
 // string generation; the DuckDB engine that runs it lives in @coach/mcp.
 export { materializeSql } from './db/materialize.ts';

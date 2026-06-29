@@ -66,14 +66,16 @@ pnpm install
 pnpm check                       # typecheck + lint + format + test + knip (same as CI)
 ```
 
-Produce an execution graph from a directory of traces and inspect the per-stage output:
+Produce an execution graph and inspect the per-stage output:
 
 ```bash
-pnpm e2e <path-or-fixture>       # writes out/<name>/01-classified.json … 06-enriched-graph.json
+pnpm e2e <dir | repo-name>       # writes out/<name>/01-classified.json … 06-enriched-graph.json + graph.db
 ```
 
-`<path-or-fixture>` is a path relative to cwd, or the name of a fixture under
-`packages/pipeline/fixtures/`.
+The argument is either a directory of traces (a path relative to cwd, e.g. a fixture under
+`packages/pipeline/fixtures/`) or a repo name like `coach`, which loads that repo's Claude Code
+logs across the main checkout and every git worktree — the same convenience the MCP's
+`load_dataset` exposes.
 
 View a graph in the browser:
 

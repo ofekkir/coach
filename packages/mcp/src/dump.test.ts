@@ -3,11 +3,11 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { loadPipelineResult } from '@coach/pipeline';
 import { DuckDBInstance } from '@duckdb/node-api';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { dumpPipelineOutputs } from './dump.ts';
-import { loadPipelineResult } from './load.ts';
 
 const FIXTURE = fileURLToPath(
   new URL('../../pipeline/fixtures/otel/fetch-website', import.meta.url),
