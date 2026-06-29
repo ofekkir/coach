@@ -1,10 +1,10 @@
 # coach
 
-**The agent grades itself.** Coach turns an agent's own execution traces into a queryable model of
-what it did — then hands that model back to the agent through MCP, so Claude Code can load its own
-sessions and surface its own expensive, hallucinated, or wasteful steps. Existing agent tracing is
-built for the _engineer_ to observe the agent; coach's north star is to close that loop back to the
-**agent itself**, with the engineer monitoring the loop.
+**Agents have potential, but they need reinforcement to fulfill it.** Coach provides that locally,
+from an agent's own past executions — developing the skills it lacks, heading off errors it has made
+before, turning repeated actions into code (muscle memory), and dropping to cheaper, dumber models
+where they're good enough (auto-pilot). The result: agents that are faster, cheaper, and more
+accurate.
 
 <!-- TODO(demo): replace this placeholder with the recorded wow-moment walkthrough
      — Claude Code loading its own sessions through the coach MCP and grading its own
@@ -17,8 +17,6 @@ walks coach pointed at its author's own ~148 Claude Code sessions, ranking its m
 _preventable cost_ — a worked example that runs entirely on the shipped query surface.
 
 ## Key Observations
-
-Coach rests on a handful of observations about how agents are built and operated today:
 
 - **Much of what agents call an LLM to do could be a script.** A large share of agentic
   "workflows" are LLM inference where a deterministic program would do — editing a `package.json`,
