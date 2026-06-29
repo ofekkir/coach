@@ -133,14 +133,8 @@ SQL — see **[docs/case-study.md](docs/case-study.md)**.
 
 ### Development
 
-| Command                                    | What it does                                          |
-| ------------------------------------------ | ----------------------------------------------------- |
-| `pnpm check`                               | Full gate: typecheck, lint, format, test, knip        |
-| `pnpm lint:fix`                            | Auto-fix lint issues                                  |
-| `pnpm format`                              | Auto-format with Prettier                             |
-| `pnpm --filter @coach/pipeline test:watch` | Vitest in watch mode                                  |
-| `pnpm e2e <fixture>`                       | Run pipeline + deterministic enrichment, write `out/` |
-| `pnpm mcp [dataset-dir]`                   | Serve the MCP analyst tools over stdio                |
+The full command reference, quality gates, and module conventions live in
+**[CLAUDE.md](CLAUDE.md)**.
 
 ### Maintainer one-time setup (requires a GitHub remote)
 
