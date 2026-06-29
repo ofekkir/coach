@@ -136,19 +136,6 @@ SQL — see **[docs/case-study.md](docs/case-study.md)**.
 The full command reference, quality gates, and module conventions live in
 **[CLAUDE.md](CLAUDE.md)**.
 
-### Maintainer one-time setup (requires a GitHub remote)
-
-Make CI a required check so PRs can't merge red:
-
-```bash
-gh api -X PUT repos/{owner}/{repo}/branches/main/protection \
-  -F required_status_checks.strict=true \
-  -F 'required_status_checks.contexts[]=check' \
-  -F enforce_admins=true \
-  -F required_pull_request_reviews.required_approving_review_count=1 \
-  -F restrictions=
-```
-
 ## Where this is going
 
 Everything in this section is **roadmap — not yet shipped**. It states design intent, not current
