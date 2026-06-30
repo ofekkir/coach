@@ -1,52 +1,61 @@
 ---
 name: workflow-model
 description: >-
-  Use the coach MCP to visualize how a developer actually worked on a project across
-  their Claude Code sessions, as a CAUSAL STATE MACHINE built from coach's semantic layer.
-  The `semantics` table is one row per act (`action` = an input-independent label, the
-  argument stripped into `repo_path`/`url`) plus an optional `comment`; states and edges
-  are derived from those plus `causal_edges` — never a hardcoded taxonomy. The model is the
-  atom-level machine (one state per distinct act), optionally merged one level so each
-  `invoke X` folds into the tool `X` it dispatched (dropping the inference↔tool relay),
-  decorating states with the INFERENCE's real cost (output tokens + wall-clock) and edges
-  with action + pass/fail outcome. The rendered diagram is the deliverable. Use when asked to "visualize my
-  workflows", "show me how I work as a diagram", "draw my workflow state machine", "map how
-  I develop", or "where does my work go off the path". Works on ANY repo.
+  Use the coach MCP to visualize how a developer actually worked on a project across their
+  Claude Code sessions, as a TOOL-LEVEL CAUSAL STATE MACHINE built from coach's semantic
+  layer. States are the tools the developer ran (each `semantics.action`) plus the terminal
+  `respond`; an edge is the single inference that bridges two tool calls (`tool → inference →
+  tool`), i.e. the "think" between two acts — plus the direct `tool → respond`. Every edge is
+  split by whether the SOURCE tool errored (ok vs error/recovery). States are labeled with
+  visit count + total tool time; edges with transition count + the bridging inference's tokens
+  read (in) and produced (out). The coarse shell labels (`run`/`search`) are refined by
+  clustering their `comment`s into 3-4 word acts — never a hardcoded taxonomy. The rendered
+  diagram is the deliverable. Use when asked to "visualize my workflows", "show me how I work
+  as a diagram", "draw my workflow state machine", "map how I develop", or "where does my work
+  go off the path". Works on ANY repo.
 ---
 
 # Visualizing a developer's workflows with coach
 
-Coach ingests Claude Code traces into a **queryable database** with a **semantic layer**:
-the `semantics` table holds **one row per atomic act** — an `action` label (input-independent:
-the filename/program/query is stripped out, into `repo_path`/`package`/`url`), ordered within
-its node by `sequence_in_node`, plus an optional `comment` (e.g. a Bash `description`). A node
-maps to N rows (an inference that fires three tools → three rows). This skill turns that into a
-**causal state machine** at the **atom level** (one state per distinct act), optionally
-**merged one level** so each `invoke X` folds into the tool `X` it dispatched.
+Coach ingests Claude Code traces into a **queryable database** with a **semantic layer**: the
+`semantics` table holds **one row per atomic act** — an `action` label (input-independent: the
+filename/program/query is stripped into `repo_path`/`package`/`url`), plus an optional `comment`
+(e.g. a Bash `description`). This skill turns that into a **tool-level causal state machine**:
+
+- **A state is a tool the developer ran** — its `semantics.action` (`read source code`,
+  `edit source code`, `version control`, …) — plus the terminal **`respond`** (the one
+  inference kept as a state).
+- **An edge is the inference between two tools.** The causal flow is
+  `tool_A → inference → tool_B`: the model read tool_A's result, thought, and called tool_B.
+  That one "think" step **is the edge** — so the token cost of reasoning lands on transitions,
+  while the cheap tool spans are the states.
 
 **Principles — violate them and the diagram lies:**
 
-1. **States and edges come from the SEMANTIC LAYER + `causal_edges`, never invented.** A
-   state is a semantic act (a `semantics.action`); an edge exists because a `causal_edges`
-   row connects two nodes, weighted by how many. Derive from THIS DB — a different project
-   has a different vocabulary.
+1. **States and edges come from the SEMANTIC LAYER + `causal_edges`, never invented.** A state
+   is a tool's `semantics.action` (or a comment-derived refinement of it); an edge exists
+   because a 2-hop causal path connects two tools. Derive from THIS DB — a different project
+   has a different vocabulary. Labels below (`read source code`, `run full check`, …) are
+   **example output**, not a taxonomy to apply.
 
-2. **The inference is the unit of work, not the tool.** Cost lives on the inference (in
-   coach's logs ~1200 min of inference wall-clock vs ~200 min of tool spans; 100% of output
-   tokens are on inferences) and so does intent (`plan`, `respond` exist ONLY on the
-   inference). The tool is the inference's effect.
+2. **Refine the coarse shell labels from the `comment`.** Every Bash call collapses to bare
+   `run` or `search` (the program is stripped out), which is too coarse — a `run` is anything
+   from `cat` to `pnpm check` to `rm`. The **`comment`** is the only intent signal; cluster the
+   recurring shell comments into 3-4 word acts (`run full check`, `list files`, `deploy to
+production`) and relabel. One-off comments stay as bare `run`/`search`.
 
-3. **Order is the causal DAG, not `seq`.** A node's flow is
-   `inference →(fan-out)→ tool(s) →(fan-in)→ inference`. One inference fans out to 1–N
-   parallel tools (unordered — `seq` among them is meaningless) that re-converge to ONE
-   next inference. Walk `causal_edges`.
+3. **Edges are exactly the 2-hop tool→tool bridge, plus the direct tool→respond.** No tool→tool
+   is direct in the causal DAG — it always passes through one inference (fan-in then fan-out).
+   `respond` is reached at distance 1 (`tool → respond`). Every edge is **split by whether the
+   SOURCE tool errored** — the error edge is the recovery path.
 
 ## 0 — Setup
 
 If `/mcp` doesn't list `coach`, install it — see
-**[INSTALL.md](https://github.com/ofekkir/coach/blob/main/INSTALL.md)**. The atom-level
-machine is dense (~140 states), so render it with **Graphviz** (`dot`) — Mermaid OOMs its
-renderer past ~150 nodes. `brew install graphviz` (or apt).
+**[INSTALL.md](https://github.com/ofekkir/coach/blob/main/INSTALL.md)**. The machine is dense
+(~70–90 states), so render with **Graphviz** (`dot`) — Mermaid OOMs its renderer past ~150
+nodes. `brew install graphviz` (or apt). Queries that exceed the MCP 1000-row cap run over the
+dumped `graph.db` with the `duckdb` CLI.
 
 ## 1 — Load
 
@@ -54,105 +63,132 @@ renderer past ~150 nodes. `brew install graphviz` (or apt).
 load_dataset(repo: "<repo-name-or-abs-path>", includeWorktrees: true)
 ```
 
-Check counts are non-trivial, then `describe_schema` ONCE — it is the source of truth for
-tables/columns; trust it over anything below. Key surfaces: `semantics(id, sequence_in_node,
-action, repo_path, package, url, comment)` — one row per act, joined to `nodes` by `id`;
-`causal_edges(from_id, to_id)`; `nodes`/`llm_requests`/`tools`. Note `action`/`repo_path` are
-**no longer on `nodes`** (they moved to `semantics`); `tools` is a view that joins back for them.
+Check counts are non-trivial, then `describe_schema` ONCE — the source of truth for
+tables/columns. Key surfaces: `semantics(id, sequence_in_node, action, comment, …)` — one row
+per act, joined to `nodes` by `id`; `nodes`/`tools` carry `is_error`, `duration_ms`,
+`tokens_in`, `tokens_out`; `causal_edges(from_id, to_id)` is the DAG. The directory load also
+dumps `out/graph.db` (a DuckDB file) — query it with the `duckdb` CLI for the heavy steps.
 
-## 2 — Build the atom-level causal state machine
+## 2 — Refine shell labels: cluster comments → 3-4 word acts
 
-Each `semantics` row is **already one atomic act** (`action`), ordered within its node by
-`sequence_in_node` — no array splitting (the old `what` array is gone). Because the label is
-input-independent, the vocabulary is compact (coach: ~140 distinct atoms). Build edges from
-`causal_edges` with these rules — **the `invoke X` rule is the important one**:
-
-- **Fan-out `invoke X → X`** — every `invoke X` atom has EXACTLY ONE outgoing edge, to the
-  tool `X` it dispatched (from `causal_edges` inference→tool). An inference's other atoms
-  (`plan`, a second `invoke Y`) are co-occurring, NOT successors of `invoke X`.
-- **Co-occur `plan/respond → invoke …`** — a non-invoke act in the same node points at the
-  invokes it precedes.
-- **Fan-in `X → next inference's entry`** — the tool `X` points at the first atom of the
-  inference it fans into (`causal_edges` tool→inference).
+`run`/`search` are too coarse. Extract the **recurring** shell comments and cluster each into a
+short input-independent act, exactly like the structured actions:
 
 ```sql
-WITH atoms AS (SELECT id, sequence_in_node AS pos, action AS atom FROM semantics),  -- already one row per act
-toolatom AS (SELECT a.id, a.atom FROM atoms a JOIN nodes n ON n.id=a.id WHERE n.type='tool'),
-infentry AS (SELECT a.id, arg_min(a.atom,a.pos) atom FROM atoms a JOIN nodes n ON n.id=a.id WHERE n.type='llm_request' GROUP BY a.id),
-r1 AS (SELECT 'invoke '||t.atom s, t.atom d FROM causal_edges e JOIN toolatom t ON t.id=e.to_id JOIN nodes n ON n.id=e.from_id AND n.type='llm_request'),  -- invoke X -> X
-r2 AS (SELECT a1.atom s, a2.atom d FROM atoms a1 JOIN atoms a2 ON a1.id=a2.id AND a2.pos>a1.pos WHERE a1.atom NOT LIKE 'invoke %'),                          -- plan/respond -> invokes
-r3 AS (SELECT t.atom s, ie.atom d FROM causal_edges e JOIN toolatom t ON t.id=e.from_id JOIN infentry ie ON ie.id=e.to_id)                                   -- X -> next inference entry
-SELECT s, d, COUNT(*) w FROM (SELECT s,d FROM r1 UNION ALL SELECT s,d FROM r2 UNION ALL SELECT s,d FROM r3) WHERE s<>d GROUP BY s,d ORDER BY w DESC;
+SELECT COUNT(*) freq, any_value(action) act, comment
+FROM semantics WHERE comment IS NOT NULL AND action IN ('run','search')
+GROUP BY comment HAVING COUNT(*) >= 2 ORDER BY freq DESC;
 ```
 
-**Sanity check:** every `invoke …` state must have out-degree 1 (only `→ X`). If not, the
-co-occurrence chaining leaked — fix before rendering.
+Cluster the result (the LLM step) — e.g. "Run full check suite" / "Run full CI gate" /
+"Confirm full check passes" → `run full check`; "Push branch to origin" / "Push to remote" →
+`push branch`. **Persist the map** to a TSV (`what⇥comment`) so it is inspectable and reusable;
+one-off comments are left unmapped (they stay bare `run`/`search`). Build it once; every later
+query joins it.
 
-## 3 — (optional) Merge the invoke relay (L1)
+```
+# comment_whats.tsv
+what⇥comment
+run full check⇥Run full check suite
+push branch⇥Push branch to origin
+…
+```
 
-The atom machine has a grey relay: every inference's `invoke X` points only at its tool `X`.
-**L1 collapses that relay** — relabel each state by stripping the `invoke ` prefix, so
-`invoke read source code` and `read source code` become one state. The edge construction is
-identical; only the node label changes — strip the prefix on both endpoints of every L0 edge,
-drop the resulting self-loops (the relay `invoke X → X` becomes `X → X` and vanishes), and
-re-aggregate. This removes ~half the states and leaves pure act→act flow (`plan → read`,
-`read → edit`, …).
+## 3 — States: count + total time
+
+A state is a (possibly relabeled) tool action, plus `respond`. The shared relabel CTE `tn`
+(reused in §4):
 
 ```sql
-WITH atoms AS (SELECT id, sequence_in_node AS pos, action AS atom FROM semantics),
-toolatom AS (SELECT a.id, a.atom FROM atoms a JOIN nodes n ON n.id=a.id WHERE n.type='tool'),
-infentry AS (SELECT a.id, arg_min(a.atom,a.pos) atom FROM atoms a JOIN nodes n ON n.id=a.id WHERE n.type='llm_request' GROUP BY a.id),
-r1 AS (SELECT 'invoke '||t.atom s, t.atom d FROM causal_edges e JOIN toolatom t ON t.id=e.to_id JOIN nodes n ON n.id=e.from_id AND n.type='llm_request'),
-r2 AS (SELECT a1.atom s, a2.atom d FROM atoms a1 JOIN atoms a2 ON a1.id=a2.id AND a2.pos>a1.pos WHERE a1.atom NOT LIKE 'invoke %'),
-r3 AS (SELECT t.atom s, ie.atom d FROM causal_edges e JOIN toolatom t ON t.id=e.from_id JOIN infentry ie ON ie.id=e.to_id),
-l0 AS (SELECT s,d FROM r1 UNION ALL SELECT s,d FROM r2 UNION ALL SELECT s,d FROM r3),
-merged AS (SELECT
-  CASE WHEN s LIKE 'invoke %' THEN substr(s,8) ELSE s END s,   -- 'invoke ' = 7 chars
-  CASE WHEN d LIKE 'invoke %' THEN substr(d,8) ELSE d END d
-  FROM l0)
-SELECT s, d, COUNT(*) w FROM merged WHERE s<>d GROUP BY s,d ORDER BY w DESC;
+WITH map AS (SELECT what, comment FROM read_csv_auto('comment_whats.tsv', sep='\t', header=true)),
+tn AS (                                       -- every tool node, relabeled
+  SELECT n.id,
+         CASE WHEN s.action IN ('run','search') AND m.what IS NOT NULL THEN m.what ELSE s.action END AS act,
+         n.duration_ms, n.tokens_in, n.tokens_out, COALESCE(n.is_error,false) AS err
+  FROM nodes n JOIN semantics s ON s.id=n.id AND s.sequence_in_node=0
+  LEFT JOIN map m ON m.comment = s.comment
+  WHERE n.type='tool'),
+rn AS (SELECT n.id, n.duration_ms FROM nodes n JOIN semantics s ON s.id=n.id
+       WHERE n.type='llm_request' AND s.action='respond')
+SELECT act AS state, COUNT(*) visits, ROUND(SUM(duration_ms)/60000,1) min FROM tn GROUP BY act
+UNION ALL
+SELECT 'respond', COUNT(*), ROUND(SUM(duration_ms)/60000,1) FROM rn
+ORDER BY visits DESC;
 ```
 
-Cost is unaffected — it already lives on the inference, counted once; the merged state just
-carries the same inference cost under the un-prefixed label. Render the same way (§5).
+State label = `{visits}x · {min}m`. (Tool spans are cheap; the costly time is `respond` and
+the per-edge token cost below.)
 
-## 4 — Decorate
+## 4 — Edges: 2-hop tool→tool + tool→respond, split by source-tool error
 
-- **Cost per state** = sum over the **inferences** in that state (counted ONCE — never
-  multiply across a fan-out's tools): visits, `SUM(tokens_out)`, `SUM(duration_ms)`. Cost
-  lands on the reasoning step.
-- **Edge weight** = `causal_edges` count for that `src→dst`.
-- **Branch/outcome** = whether the bridging tool(s) errored (`is_error`); a back-edge to an
-  earlier state on error is the recovery loop — the most insightful label. Pull the
-  underlying `comment`s on hot/recovery edges to narrate _what_ happened.
+Two edge kinds, each split by whether the **source tool** errored. Edge tokens = the **bridging
+inference's** `tokens_in` (read) and `tokens_out` (produced); for `tool → respond` the bridge
+is the `respond` node itself.
 
-## 5 — Render
+```sql
+WITH map AS (SELECT what, comment FROM read_csv_auto('comment_whats.tsv', sep='\t', header=true)),
+tn AS (
+  SELECT n.id,
+         CASE WHEN s.action IN ('run','search') AND m.what IS NOT NULL THEN m.what ELSE s.action END AS act,
+         COALESCE(n.is_error,false) AS err
+  FROM nodes n JOIN semantics s ON s.id=n.id AND s.sequence_in_node=0
+  LEFT JOIN map m ON m.comment = s.comment
+  WHERE n.type='tool'),
+rn AS (SELECT n.id, n.tokens_in, n.tokens_out FROM nodes n JOIN semantics s ON s.id=n.id
+       WHERE n.type='llm_request' AND s.action='respond'),
+tt AS (                                        -- tool_A → inference m → tool_B
+  SELECT ta.act src, tb.act dst, CASE WHEN ta.err THEN 1 ELSE 0 END e,
+         COUNT(*) cnt, SUM(m.tokens_in) tin, SUM(m.tokens_out) tout
+  FROM causal_edges e1 JOIN nodes m ON m.id=e1.to_id AND m.type='llm_request'
+  JOIN causal_edges e2 ON e2.from_id=m.id
+  JOIN tn ta ON ta.id=e1.from_id JOIN tn tb ON tb.id=e2.to_id
+  GROUP BY ta.act, tb.act, ta.err),
+tr AS (                                        -- tool_A → respond (direct)
+  SELECT ta.act src, 'respond' dst, CASE WHEN ta.err THEN 1 ELSE 0 END e,
+         COUNT(*) cnt, SUM(r.tokens_in) tin, SUM(r.tokens_out) tout
+  FROM causal_edges ed JOIN tn ta ON ta.id=ed.from_id JOIN rn r ON r.id=ed.to_id
+  GROUP BY ta.act, ta.err)
+SELECT * FROM tt UNION ALL SELECT * FROM tr;
+```
 
-Emit a `.dot` (one line per node, one per edge; weight as `penwidth`/label; tint heavy or
-error edges), then:
+Edge label = `{✗ if error}{cnt} | {tin}k in · {tout}k out`. The **error edges are the recovery
+structure** — e.g. `edit source code ✗→ read source code` is "edit failed, go re-read".
+
+> **Token caveat — state it.** A bridging inference with _I_ incoming tools and _O_ outgoing
+> tools sits on _I×O_ tool→tool pairs, so its tokens are summed once **per pair**: the `cnt` is
+> a true path count, but the token sums over-count across fan-out and exceed real spend
+> (~10% of coach inferences fan out). `is_error` NULL (no matched result) is treated as ok.
+
+## 5 — Render (Graphviz)
+
+Emit a `.dot`: nodes `{state}\n{visits}x · {min}m`; ok edges grey/amber (tint `→respond`),
+**error edges red dashed** with a `✗`; `penwidth` ∝ √count. Color tool families (read/search
+blue, edit/write green, verify/test purple, version-control pink) and outline the
+comment-derived states so the shell refinement is visible. Then:
 
 ```bash
-dot -Tsvg graph.dot -o out/graph.svg     # SVG: vector + zoomable — the right format when dense
-dot -Tpng -Gsize="34,34\!" graph.dot -o out/thumb.png   # capped PNG thumbnail (full PNG can be >50MB)
+dot -Tsvg graph.dot -o out/graph.svg     # vector + zoomable — the right format when dense
+dot -Tpng -Gsize="34,34\!" graph.dot -o out/thumb.png   # capped PNG (full PNG can be >50MB)
 ```
 
-Generate the `.dot` straight from SQL (the query above) — pipe `duckdb <db> -noheader -list`
-over the dumped `graph.db`, or the MCP `query`. Open the SVG and deliver.
+The full machine is too dense to read at fit-scale — also emit a **readable focus**: the
+comment-derived states + the spine they touch, edges above a count threshold. Generate the
+`.dot` straight from the §3/§4 SQL (pipe `duckdb out/graph.db -noheader -csv`). Open the SVG and
+deliver both.
 
 ## Guardrails
 
-- **Never hardcode the vocabulary** — re-derive atoms from this DB every run.
-- **`invoke X` has exactly one out-edge (`→ X`).** Co-occurring atoms in a node are not its
-  successors. Assert out-degree 1 on every `invoke …` state.
-- Cost is the INFERENCE's output tokens + tool-span wall-clock (excludes model thinking
-  between calls — state it). Tokens overlap across states; don't sum to one total.
-- Fan-out: one inference → 1–N parallel tools → one next inference. One transition per
-  `A→B`; inference cost counted once. (~10% of coach inferences fan out, up to 8-wide.)
-- `semantics` is **one row per act** (`action`), not an array; the stripped argument lives in
-  `repo_path`/`package`/`url`; `action`/`repo_path` are NOT on `nodes` anymore.
-- Shell labels are input-independent: **every shell call is bare `run`** (program stripped into
-  `bash_command`/`comment`). A run step's intent is only as good as its `comment`; no comment →
-  unknowable from the data (note it).
-- Mermaid can't render past ~150 nodes (its browser renderer OOMs) — use Graphviz.
+- **Never hardcode the vocabulary** — re-derive states from this DB, and re-cluster the shell
+  comments every run (other projects: data→`research`/`mcp`, web→`browser`).
+- **States are tools (+ `respond`); edges are the inference between tools.** Token cost lives on
+  the EDGE (the think step), tool time on the state. `respond` is the only llm state.
+- **Edges = 2-hop `tool→inference→tool`, plus direct `tool→respond`.** No tool→tool is direct;
+  count one transition per `(tool_A, inference, tool_B)`.
+- **Every edge is split by SOURCE-tool error.** The error edge back to an earlier state is the
+  recovery loop — the most insightful label.
+- **Shell `run`/`search` are coarse** (program stripped into `bash_command`/`comment`); refine
+  from the `comment`. No comment → intent is unknowable; it stays bare `run`/`search`.
+- Mind the fan-out token over-count (above). Don't sum edge tokens to a grand total.
+- Mermaid can't render past ~150 nodes — use Graphviz.
 - coach has zero `hook` nodes — deterministic PostToolUse hooks are invisible; "no verify"
   means no AGENT-issued check, not "no gate ran".
