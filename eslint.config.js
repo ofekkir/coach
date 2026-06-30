@@ -45,6 +45,7 @@ export default tseslint.config(
       'node_modules/**',
       '.claire/**',
       '.claude/worktrees/**',
+      '.claude/skills/**',
       'packages/*/dist/**',
       'src/graph/viz-dist/**',
     ],
