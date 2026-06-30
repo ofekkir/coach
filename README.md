@@ -69,7 +69,7 @@ pnpm check                       # typecheck + lint + format + test + knip (same
 Produce an execution graph and inspect the per-stage output:
 
 ```bash
-pnpm e2e <dir | repo-name>       # writes out/<name>/01-classified.json … 06-enriched-graph.json + graph.db
+pnpm e2e <dir | repo-name>       # writes out/<name>/01-classified.json … 07-resolved-graph.json + graph.db
 ```
 
 The argument is either a directory of traces (a path relative to cwd, e.g. a fixture under
@@ -83,7 +83,7 @@ View a graph in the browser:
 pnpm --filter @coach/app dev     # landing page at http://localhost:5173
 ```
 
-Load a `06-enriched-graph.json` (or any pre-computed graph) via the **"Load pipeline output"**
+Load a `07-resolved-graph.json` (or any pre-computed graph) via the **"Load pipeline output"**
 button, or boot directly from a URL with `?data=<url>`; add `?focus=<nodeId>` to reveal and center
 a node.
 

@@ -42,8 +42,8 @@ export interface CardMetrics {
 /** The typed view-model for one node card. `type` is the display discriminant
  *  the renderer keys its glyph/role on (e.g. `tool.execution` → `execution`).
  *  `tag` is the mono type tag shown above the title (e.g. `ACTION · WEBFETCH`);
- *  `title` is the verb that leads the card (`what[0]`); `subtitle` the second
- *  `what[]` line; `model` the machine id shown at the card's foot. `prompt` is the
+ *  `title` is the verb that leads the card (the first entry's `action`); `subtitle`
+ *  the second entry's `action`; `model` the machine id shown at the card's foot. `prompt` is the
  *  full prompt text, set only on the synthesized spine-head anchor (no backing
  *  node), so the details panel can show it in full. */
 export interface NodeCard {
@@ -127,8 +127,8 @@ function field(label: string, value: string | undefined): CardField[] {
   return value != null && value !== '' ? [{ label, value }] : [];
 }
 
-/** Display type + tag + title + structural fields for a node. `what` (from the
- *  semantics overlay) supplies the verb (`what[0]`) and sub-verb (`what[1]`), with
+/** Display type + tag + title + structural fields for a node. The semantics overlay's
+ *  entries supply the verb (entries[0].action) and sub-verb (entries[1].action), with
  *  the structural name/model as fallback. Content lives in the JSON viewer. */
 interface CardShape {
   type: string;
@@ -152,14 +152,14 @@ function toolTag(name: string | undefined): string {
   return name != null && name !== '' ? `ACTION · ${name.toUpperCase()}` : 'ACTION';
 }
 
-// An enriched tool: a `tool` node with a semantics row. The verb leads from
-// `what`, the structural tool name backs the tag.
+// An enriched tool: a `tool` node with a semantics row. The verb leads from the
+// first entry's action label, the structural tool name backs the tag.
 function actionShape(node: ToolNode, semantics: SemanticFields): CardShape {
   return {
     type: 'action',
     tag: toolTag(node.name),
-    title: semantics.what[0] ?? node.name,
-    subtitle: semantics.what[1],
+    title: semantics.entries[0]?.action ?? node.name,
+    subtitle: semantics.entries[1]?.action,
   };
 }
 
@@ -168,8 +168,8 @@ function inferenceShape(node: LlmRequestNode, semantics: SemanticFields): CardSh
   return {
     type: 'inference',
     tag: `INFERENCE${sourceSuffix(node.source)}`,
-    title: semantics.what[0] ?? node.model,
-    subtitle: semantics.what[1],
+    title: semantics.entries[0]?.action ?? node.model,
+    subtitle: semantics.entries[1]?.action,
     model: node.model,
   };
 }

@@ -7,11 +7,10 @@
 
 import type { IntentCategory } from '@coach/semantics';
 
-import { extractBashCommand, extractFilePath, parseToolInput } from '../graph/semantic/derive.ts';
+import { extractBashCommand, parseToolInput } from '../graph/semantic/derive.ts';
 import type { ExecutionGraph, InteractionExecution } from '../graph/types.ts';
 import type { Agent, CanonicalNode, Session } from '../types.ts';
 
-import { filePathFromToolInput, normalizeRepoPath } from './repo-path.ts';
 import { TABLES } from './schema.ts';
 import { seqByNodeId } from './seq.ts';
 import type { ColumnSpec, TableSpec } from './spec.ts';
@@ -101,8 +100,6 @@ function baseNodeRecord(node: CanonicalNode): Record<string, unknown> {
 
 function typeNodeRecord(
   node: CanonicalNode,
-  action: string | undefined,
-  cwd: string | undefined,
   intent: IntentCategory | undefined,
 ): Record<string, unknown> {
   if (node.type === 'llm_request')
@@ -122,14 +119,11 @@ function typeNodeRecord(
       name: node.name,
       tool_use_id: node.tool_use_id,
       tool_input: node.tool_input,
-      file_path: extractFilePath(input),
       bash_command: extractBashCommand(input),
-      action: action ?? 'other',
       is_error: node.is_error,
       error_kind: node.error_kind,
       output_size: node.output_size,
       error_message: node.error_message,
-      repo_path: normalizeRepoPath(filePathFromToolInput(node.tool_input), cwd),
     };
   }
   if (node.type === 'hook') return { name: node.name };
@@ -140,16 +134,30 @@ function typeNodeRecord(
 
 function nodeRecord(
   node: CanonicalNode,
-  actions: Readonly<Record<string, string>>,
   intents: Readonly<Record<string, IntentCategory>>,
   seq: Map<string, number>,
-  cwdBySession: ReadonlyMap<string, string | undefined>,
 ): Record<string, unknown> {
   return {
     ...baseNodeRecord(node),
-    ...typeNodeRecord(node, actions[node.id], cwdBySession.get(node.sessionId), intents[node.id]),
+    ...typeNodeRecord(node, intents[node.id]),
     seq: seq.get(node.id),
   };
+}
+
+// One row per semantic ENTRY: a node maps to N rows ordered by `sequence_in_node`.
+// The node-level `comment` rides on the first entry (tool nodes are single-entry).
+function semanticsRecords(graph: ExecutionGraph): Record<string, unknown>[] {
+  return Object.entries(graph.semantics).flatMap(([id, fields]) =>
+    fields.entries.map((entry, sequenceInNode) => ({
+      id,
+      sequence_in_node: sequenceInNode,
+      action: entry.action,
+      repo_path: entry.repoPath,
+      package: entry.package,
+      url: entry.url,
+      comment: sequenceInNode === 0 ? fields.comment : undefined,
+    })),
+  );
 }
 
 interface GraphStructure {
@@ -190,19 +198,14 @@ export function buildRecords(graph: ExecutionGraph): Record<string, Record<strin
   const nodes = Object.values(graph.nodes);
   const { agents, sessions, interactions } = collectStructure(graph);
   const seq = seqByNodeId(nodes);
-  const cwdBySession = new Map(sessions.map((s) => [s.id, s.cwd]));
   return {
-    nodes: nodes.map((node) => nodeRecord(node, graph.actions, graph.intents, seq, cwdBySession)),
+    nodes: nodes.map((node) => nodeRecord(node, graph.intents, seq)),
     deltas: Object.entries(graph.deltas).map(([id, d]) => ({
       id,
       request_messages_delta: d.requestMessagesDelta,
       response_messages_delta: d.responseMessagesDelta,
     })),
-    semantics: Object.entries(graph.semantics).map(([id, s]) => ({
-      id,
-      what: s.what,
-      comment: s.comment,
-    })),
+    semantics: semanticsRecords(graph),
     containment: nodes
       .filter((n) => n.parent != null)
       .map((n) => ({ parent_id: n.parent, child_id: n.id })),

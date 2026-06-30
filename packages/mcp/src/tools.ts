@@ -2,10 +2,10 @@
 // dataset: load it, describe the schema, run read-only SQL, three graph
 // primitives (resolve / subtree / causal_path), and open the visualization. The
 // point is flexibility — the agent loads data and composes its own queries rather
-// than consuming a fixed set of hardcoded findings. (The stage-7 analysis still
-// runs in the pipeline and drives the viz; it is just not re-exposed as a tool —
-// every rollup it computes is a one-line query over the tables described by
-// `describe_schema`.)
+// than consuming a fixed set of hardcoded findings. (There is no curated-analysis
+// stage or tool: the deterministic pipeline through stage 7 produces the queryable
+// tables, and every rollup one would compute is a one-line query over the tables
+// described by `describe_schema`.)
 //
 // Tools carry a Zod input shape; the MCP layer (server.ts) validates args against
 // it before dispatch. Data-bound tools read through the session, which throws a
@@ -56,7 +56,7 @@ function schemaDescription(): unknown {
       'A normalized, id-keyed relational model of agent execution. Every node carries session_id and interaction_id FKs, so per-scope aggregation is a flat filter. Join layers by node id. Load data with `load_dataset`, then query with `query` (read-only SQL); walk the tree/DAG with `subtree` / `causal_path`.',
     tables: TABLES.map((t) => ({ name: t.name, doc: t.doc, columns: t.columns })),
     vocabulary: {
-      doc: 'The closed ontology behind the `semantics.what` action phrases. Use it to interpret or filter semantic labels.',
+      doc: 'The ontology vocabulary behind the `semantics.action` labels. Use it to interpret or filter semantic labels.',
       actions: ontology.actions.map((a) => ({ id: a.id, label: a.label, group: a.group })),
       objects: ontology.objects.map((o) => ({ id: o.id, label: o.label })),
     },
@@ -113,7 +113,7 @@ function schemaTool(): Tool {
   return {
     name: 'describe_schema',
     description:
-      'Return the queryable schema: tables, columns (with docs), the semantic vocabulary, and example queries (including the stage-7 detectors as SQL). Works without a dataset loaded — call it first to plan your queries.',
+      'Return the queryable schema: tables, columns (with docs), the semantic vocabulary, and example queries (the common rollups as SQL). Works without a dataset loaded — call it first to plan your queries.',
     inputShape: {},
     handle: () => Promise.resolve(schemaDescription()),
   };
@@ -165,18 +165,18 @@ function causalPathTool(session: Session): Tool {
   };
 }
 
-const DEFAULT_VIZ_FILE = '06-enriched-graph.json';
+const DEFAULT_VIZ_FILE = '07-resolved-graph.json';
 
 function openVizTool(): Tool {
   return {
     name: 'open_viz',
     description:
-      'Open the interactive graph visualization. Starts a local web server over the built app and the stage JSON dumped into the `out/` dir by the last directory `load_dataset`, and returns a URL. Pass a dumped JSON file name (default `06-enriched-graph.json`). Use `focus` to center on a single node, OR `source` + `dest` to highlight a related PAIR distinctly (e.g. a failed call as `source` and the call that recovered it as `dest`) and fit both into view at once — either of source/dest alone is also valid. Requires the app to be built (`pnpm --filter @coach/app build`).',
+      'Open the interactive graph visualization. Starts a local web server over the built app and the stage JSON dumped into the `out/` dir by the last directory `load_dataset`, and returns a URL. Pass a dumped JSON file name (default `07-resolved-graph.json`). Use `focus` to center on a single node, OR `source` + `dest` to highlight a related PAIR distinctly (e.g. a failed call as `source` and the call that recovered it as `dest`) and fit both into view at once — either of source/dest alone is also valid. Requires the app to be built (`pnpm --filter @coach/app build`).',
     inputShape: {
       file: z
         .string()
         .optional()
-        .describe('Dumped JSON file name to visualize. Default 06-enriched-graph.json.'),
+        .describe('Dumped JSON file name to visualize. Default 07-resolved-graph.json.'),
       focus: z.string().optional().describe('Node id to center the graph on.'),
       source: z
         .string()

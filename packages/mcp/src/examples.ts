@@ -26,7 +26,7 @@ ORDER BY cost_usd DESC`,
     title: 'Per-interaction rollup, pre-aggregated (the interaction_metrics view)',
     sql: `SELECT interaction_id, shape, tool_count, llm_count,
        tokens_in, tokens_out, cost_usd, duration_ms,
-       first_action, last_action, distinct_files, error_count
+       distinct_files, error_count
 FROM interaction_metrics
 ORDER BY duration_ms DESC`,
   },
@@ -62,13 +62,14 @@ ORDER BY duration_ms DESC`,
   },
   {
     title: 'Misleading files: most failed Edit/Write calls per file',
-    sql: `SELECT file_path,
-       COUNT(*)  AS failed_edits,
-       list(id)  AS node_ids
-FROM nodes
-WHERE type='tool' AND is_error
-  AND name IN ('Edit','Write','MultiEdit','NotebookEdit')
-GROUP BY file_path
+    sql: `SELECT s.repo_path,
+       COUNT(*)   AS failed_edits,
+       list(n.id) AS node_ids
+FROM nodes n
+JOIN semantics s ON s.id = n.id AND s.sequence_in_node = 0
+WHERE n.type='tool' AND n.is_error
+  AND n.name IN ('Edit','Write','MultiEdit','NotebookEdit')
+GROUP BY s.repo_path
 ORDER BY failed_edits DESC`,
   },
   {

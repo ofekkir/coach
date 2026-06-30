@@ -283,29 +283,36 @@ export interface MessageDeltas {
   readonly responseMessagesDelta?: readonly ResponseMessage[];
 }
 
-/** Stage 6 — the semantic label for a relabeled node. `what` is an ordered list of
- *  atomic action phrases (a node often does several things in sequence — e.g.
- *  ["fetch example.com", "summarize headlines"]); a single-action node carries a
- *  one-element array. `comment` is an OPTIONAL agent-authored annotation harvested
- *  verbatim from a per-agent-configured input field (e.g. Claude Code's Bash
- *  `description`) — free text, a display signal only, never part of the closed
- *  `what` vocabulary. Sparse: only relabeled (`tool`/`llm_request`) nodes get a row.
- *  The presence of a row IS the "is this enriched?" flag — there is no node type. */
-/** Structured, machine-readable context for a relabeled node — the data the `what`
- *  phrase used to flatten into a parenthetical (`(package=pipeline)`) or fold into a
- *  basename. Promoted out of the phrase so a consumer can read the package/file/url
- *  as data. All fields optional; the whole object is absent when nothing applies.
- *  `package`: the workspace deduced from the path (e.g. `pipeline`). `file`: the
- *  repo-relative file path (worktree-normalized, same basis as `repo_path`). `url`:
- *  the target URL for web/fetch tools. */
-export interface SemanticContext {
+/** Stage 6 — ONE atomic semantic entry of a relabeled node. A node "does" an ordered
+ *  sequence of these (a tool call is usually one; an inference that fires three tools
+ *  emits one entry per call). `action` is the INPUT-INDEPENDENT label — the act with
+ *  the specific argument stripped, so every "load a tool schema" reads the same
+ *  ("load tool schema", not "load EnterWorktree tool schema"). The argument the entry
+ *  acted on survives as the structured fields, never folded back into `action`:
+ *  - `repoPath`: the repo-relative, worktree+cwd-normalized path this entry touched.
+ *    Grounded in stage 7; absent for non-path entries.
+ *  - `package`: the workspace deduced from the path (e.g. `pipeline`); grounded in
+ *    stage 7 alongside `repoPath`.
+ *  - `url`: the target URL host for web/fetch entries.
+ *  - `rawPath`: INTERNAL — the un-normalized absolute path carried from stage 6 to
+ *    stage 7, where it becomes `repoPath`/`package` and is dropped. Never materialized. */
+export interface SemanticEntry {
+  readonly action: string;
+  readonly repoPath?: string;
   readonly package?: string;
-  readonly file?: string;
   readonly url?: string;
+  readonly rawPath?: string;
 }
 
+/** Stage 6 — the semantic label for a relabeled node: an ordered list of atomic
+ *  {@link SemanticEntry} rows plus an optional node-level `comment`. `comment` is an
+ *  agent-authored annotation harvested verbatim from a per-agent-configured input
+ *  field (e.g. Claude Code's Bash `description`) — free text, a display signal only,
+ *  never part of the closed `static` vocabulary. Sparse: only relabeled (`tool` /
+ *  `llm_request`) nodes get a row. The presence of a row IS the "is this enriched?"
+ *  flag — there is no node type. Materialized one DB row per entry (see the
+ *  `semantics` table), so a node maps to N rows ordered by `sequence_in_node`. */
 export interface SemanticFields {
-  readonly what: readonly string[];
+  readonly entries: readonly SemanticEntry[];
   readonly comment?: string;
-  readonly context?: SemanticContext;
 }

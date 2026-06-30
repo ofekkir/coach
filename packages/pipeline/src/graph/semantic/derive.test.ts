@@ -1,158 +1,126 @@
 import { defaultSemanticsConfig } from '@coach/semantics';
 import { describe, expect, it } from 'vitest';
 
-import { toolContext } from './context.ts';
 import {
   extractBashCommand,
-  extractFilePath,
-  markerLabel,
+  markerEntries,
   parseToolInput,
   responseText,
-  structuralPrefix,
+  structuralEntries,
 } from './derive.ts';
-import { toolPhrases } from './tool-intent.ts';
+import { toolEntries } from './tool-intent.ts';
 
-describe('extractFilePath / extractBashCommand (promoted-column source)', () => {
-  it('pulls file_path from a Read input and leaves the command NULL', () => {
-    const input = parseToolInput(JSON.stringify({ file_path: '/tmp/a.ts' }));
-    expect(extractFilePath(input)).toBe('/tmp/a.ts');
-    expect(extractBashCommand(input)).toBeNull();
-  });
+const actions = (entries: { action: string }[]): string[] => entries.map((e) => e.action);
 
-  it('pulls notebook_path for NotebookEdit', () => {
-    expect(extractFilePath(parseToolInput(JSON.stringify({ notebook_path: '/n.ipynb' })))).toBe(
-      '/n.ipynb',
+describe('extractBashCommand (promoted-column source)', () => {
+  it('pulls command from a Bash input', () => {
+    expect(extractBashCommand(parseToolInput(JSON.stringify({ command: 'ls -la' })))).toBe(
+      'ls -la',
     );
   });
 
-  it('pulls command from a Bash input and leaves the path NULL', () => {
-    const input = parseToolInput(JSON.stringify({ command: 'ls -la' }));
-    expect(extractBashCommand(input)).toBe('ls -la');
-    expect(extractFilePath(input)).toBeNull();
-  });
-
-  it('returns NULL for both on malformed/missing input and never throws', () => {
-    const malformed = parseToolInput('{not json');
-    expect(extractFilePath(malformed)).toBeNull();
-    expect(extractBashCommand(malformed)).toBeNull();
-
-    const empty = parseToolInput(undefined);
-    expect(extractFilePath(empty)).toBeNull();
-    expect(extractBashCommand(empty)).toBeNull();
-
-    const wrongTypes = parseToolInput(JSON.stringify({ file_path: 42, command: false }));
-    expect(extractFilePath(wrongTypes)).toBeNull();
-    expect(extractBashCommand(wrongTypes)).toBeNull();
+  it('returns NULL on missing/malformed input and never throws', () => {
+    expect(extractBashCommand(parseToolInput('{not json'))).toBeNull();
+    expect(extractBashCommand(parseToolInput(undefined))).toBeNull();
+    expect(extractBashCommand(parseToolInput(JSON.stringify({ command: false })))).toBeNull();
   });
 });
 
-describe('toolPhrases (config-driven)', () => {
+describe('toolEntries (config-driven, static labels)', () => {
   it('derives read intent and the agent well-known path label, not the tool name', () => {
-    expect(
-      toolPhrases(defaultSemanticsConfig, 'Read', { file_path: '/Users/x/.claude/settings.json' }),
-    ).toEqual(['read claude code user settings']);
+    const entries = toolEntries(defaultSemanticsConfig, 'Read', {
+      file_path: '/Users/x/.claude/settings.json',
+    });
+    expect(entries).toEqual([
+      { action: 'read claude code user settings', rawPath: '/Users/x/.claude/settings.json' },
+    ]);
   });
 
-  it('maps Edit to an edit intent on the same well-known object', () => {
-    expect(
-      toolPhrases(defaultSemanticsConfig, 'Edit', { file_path: '/Users/x/.claude/settings.json' }),
-    ).toEqual(['edit claude code user settings']);
+  it('renders the convention object TYPE — the specific file lives on rawPath, not the label', () => {
+    const entries = toolEntries(defaultSemanticsConfig, 'Edit', {
+      file_path: 'packages/pipeline/src/graph/semantic/derive.ts',
+    });
+    expect(actions(entries)).toEqual(['edit source code']);
+    expect(entries[0]?.rawPath).toBe('packages/pipeline/src/graph/semantic/derive.ts');
+    // package / repoPath are NOT grounded here — that is stage 7 (resolve).
+    expect(entries[0]?.repoPath).toBeUndefined();
+    expect(entries[0]?.package).toBeUndefined();
   });
 
-  it('renders the convention object type without folding the package into the phrase', () => {
-    expect(
-      toolPhrases(defaultSemanticsConfig, 'Edit', {
-        file_path: 'packages/pipeline/src/graph/semantic/derive.ts',
-      }),
-    ).toEqual(['edit source code']);
+  it('drops the specific URL from the label and carries the host on `url`', () => {
+    const entries = toolEntries(defaultSemanticsConfig, 'WebFetch', {
+      url: 'https://www.example.com',
+      prompt: 'Summarize the headlines',
+    });
+    expect(actions(entries)).toEqual(['fetch web page', 'process result with weak model']);
+    expect(entries[0]?.url).toBe('example.com');
   });
 
-  it('promotes the package + repo-relative file to structured context (not the phrase)', () => {
-    expect(
-      toolContext(defaultSemanticsConfig, 'Edit', {
-        file_path: 'packages/pipeline/src/graph/semantic/derive.ts',
-      }),
-    ).toEqual({ package: 'pipeline', file: 'packages/pipeline/src/graph/semantic/derive.ts' });
+  it('gives every "load a tool schema" the SAME static label (input stripped)', () => {
+    const a = toolEntries(defaultSemanticsConfig, 'ToolSearch', { query: 'select:WebFetch' });
+    const b = toolEntries(defaultSemanticsConfig, 'ToolSearch', { query: 'select:EnterWorktree' });
+    expect(actions(a)).toEqual(['load tool schema']);
+    expect(actions(b)).toEqual(['load tool schema']);
   });
 
-  it('fetches + notes weak-model processing when WebFetch carries a prompt', () => {
+  it('names the skill intent without the specific skill', () => {
     expect(
-      toolPhrases(defaultSemanticsConfig, 'WebFetch', {
-        url: 'https://www.example.com',
-        prompt: 'Summarize the headlines',
-      }),
-    ).toEqual(['fetch example.com', 'process result with weak model']);
-  });
-
-  it('reads the selected tool out of a ToolSearch query via the extract regex', () => {
-    expect(
-      toolPhrases(defaultSemanticsConfig, 'ToolSearch', {
-        query: 'select:WebFetch',
-        max_results: 5,
-      }),
-    ).toEqual(['load WebFetch tool schema']);
-  });
-
-  it('names the skill intent from the skill field', () => {
-    expect(
-      toolPhrases(defaultSemanticsConfig, 'Skill', { skill: 'update-config', args: '...' }),
-    ).toEqual(['use update-config skill']);
+      actions(toolEntries(defaultSemanticsConfig, 'Skill', { skill: 'update-config' })),
+    ).toEqual(['use skill']);
   });
 
   it('falls back to the lowercased tool name for unknown tools', () => {
-    expect(toolPhrases(defaultSemanticsConfig, 'SomeTool', {})).toEqual(['sometool']);
+    expect(actions(toolEntries(defaultSemanticsConfig, 'SomeTool', {}))).toEqual(['sometool']);
   });
 });
 
-describe('structuralPrefix (config-driven roles)', () => {
+describe('structuralEntries (config-driven roles)', () => {
   it('uses the tool_use rule override for a Skill call', () => {
-    expect(
-      structuralPrefix(defaultSemanticsConfig, [
-        { type: 'tool_use', name: 'Skill', input: { skill: 'x' } },
-      ]),
-    ).toEqual(['decide on skill use']);
+    const entries = structuralEntries(defaultSemanticsConfig, [
+      { type: 'tool_use', name: 'Skill', input: { skill: 'x' } },
+    ]);
+    expect(actions(entries)).toEqual(['decide on skill use']);
   });
 
   it('emits thinking → plan then the derived tool intent for a trailing tool call', () => {
-    expect(
-      structuralPrefix(defaultSemanticsConfig, [
-        { type: 'thinking', thinking: '<REDACTED>' },
-        { type: 'tool_use', name: 'Read', input: { file_path: '/Users/x/.claude/settings.json' } },
-      ]),
-    ).toEqual(['plan next steps', 'invoke read claude code user settings']);
+    const entries = structuralEntries(defaultSemanticsConfig, [
+      { type: 'thinking', thinking: '<REDACTED>' },
+      { type: 'tool_use', name: 'Read', input: { file_path: '/Users/x/.claude/settings.json' } },
+    ]);
+    expect(actions(entries)).toEqual(['plan next steps', 'invoke read claude code user settings']);
+    // the invoke entry carries the call's own path, so parallel calls each keep theirs
+    expect(entries[1]?.rawPath).toBe('/Users/x/.claude/settings.json');
   });
 
   it('emits nothing for a plain terminal text message', () => {
-    expect(structuralPrefix(defaultSemanticsConfig, [{ type: 'text', text: 'all done' }])).toEqual(
+    expect(structuralEntries(defaultSemanticsConfig, [{ type: 'text', text: 'all done' }])).toEqual(
       [],
     );
   });
 });
 
-describe('markerLabel (config-driven harness markers)', () => {
+describe('markerEntries (config-driven harness markers)', () => {
   it('labels a session-title JSON response from the responseJsonHasStringKey rule', () => {
-    expect(
-      markerLabel(
-        defaultSemanticsConfig,
-        [],
-        [{ type: 'text', text: '{"title": "Add Grafana MCP server"}' }],
-      ),
-    ).toEqual(['generate session title']);
+    const entries = markerEntries(
+      defaultSemanticsConfig,
+      [],
+      [{ type: 'text', text: '{"title": "Add Grafana MCP server"}' }],
+    );
+    expect(entries != null && actions(entries)).toEqual(['generate session title']);
   });
 
   it('labels suggestion mode from the requestTextStartsWith rule', () => {
-    expect(
-      markerLabel(
-        defaultSemanticsConfig,
-        [{ role: 'user', content: '[SUGGESTION MODE: predict next]' }],
-        [],
-      ),
-    ).toEqual(['predict next user prompt']);
+    const entries = markerEntries(
+      defaultSemanticsConfig,
+      [{ role: 'user', content: '[SUGGESTION MODE: predict next]' }],
+      [],
+    );
+    expect(entries != null && actions(entries)).toEqual(['predict next user prompt']);
   });
 
   it('returns undefined when no marker matches', () => {
     expect(
-      markerLabel(
+      markerEntries(
         defaultSemanticsConfig,
         [{ role: 'user', content: 'hi' }],
         [{ type: 'text', text: 'ok' }],

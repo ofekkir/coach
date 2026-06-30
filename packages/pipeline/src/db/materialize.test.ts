@@ -29,10 +29,24 @@ function fixtureCwd(jsonl: string): string | undefined {
   return undefined;
 }
 
-function nodeRows(content: string = NATIVE_JSONL): Record<string, unknown>[] {
+function records(content: string = NATIVE_JSONL): Record<string, Record<string, unknown>[]> {
   const files: UploadedFile[] = [{ name: 'session.jsonl', content }];
-  const { enrichedGraph } = runPipeline(files);
-  return buildRecords(enrichedGraph).nodes ?? [];
+  // The DB materializes the stage-7 RESOLVED graph (semantics entries grounded with
+  // repo_path/package), so tests read the same graph the store does.
+  return buildRecords(runPipeline(files).resolvedGraph);
+}
+
+function nodeRows(content: string = NATIVE_JSONL): Record<string, unknown>[] {
+  return records(content).nodes ?? [];
+}
+
+function semanticsRows(content: string = NATIVE_JSONL): Record<string, unknown>[] {
+  return records(content).semantics ?? [];
+}
+
+function resolvedSql(content: string = NATIVE_JSONL): string[] {
+  const files: UploadedFile[] = [{ name: 'session.jsonl', content }];
+  return materializeSql(runPipeline(files).resolvedGraph);
 }
 
 function rowsByInteraction(
@@ -74,7 +88,7 @@ describe('seq invariant', () => {
   });
 });
 
-describe('promoted file_path / bash_command columns', () => {
+describe('promoted bash_command + per-entry repo_path', () => {
   it("every name='Bash' node carries a non-NULL bash_command", () => {
     const bashRows = nodeRows(REFACTOR_JSONL).filter((r) => r.name === 'Bash');
     expect(bashRows.length).toBeGreaterThan(0);
@@ -82,10 +96,15 @@ describe('promoted file_path / bash_command columns', () => {
     expect(missing.length).toBe(0);
   });
 
-  it("every name='Read' node carries a non-NULL file_path", () => {
-    const readRows = nodeRows(REFACTOR_JSONL).filter((r) => r.name === 'Read');
-    expect(readRows.length).toBeGreaterThan(0);
-    const missing = readRows.filter((r) => r.file_path == null);
+  it("every name='Read' node has a semantics entry carrying its repo_path", () => {
+    const readIds = new Set(
+      nodeRows(REFACTOR_JSONL)
+        .filter((r) => r.name === 'Read')
+        .map((r) => r.id),
+    );
+    expect(readIds.size).toBeGreaterThan(0);
+    const readEntries = semanticsRows(REFACTOR_JSONL).filter((r) => readIds.has(r.id));
+    const missing = readEntries.filter((r) => r.repo_path == null);
     expect(missing.length).toBe(0);
   });
 });
@@ -101,10 +120,7 @@ describe('numeric BIGINT time columns', () => {
   });
 
   it('declares the BIGINT columns and emits unquoted integer literals in the DDL/DML', () => {
-    const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
-    const { enrichedGraph } = runPipeline(files);
-    const sql = materializeSql(enrichedGraph);
-
+    const sql = resolvedSql();
     expect(sql.some((s) => s.includes('start_time_ns BIGINT'))).toBe(true);
     expect(sql.some((s) => s.includes('seq INTEGER'))).toBe(true);
   });
@@ -159,27 +175,26 @@ describe('repo_path worktree normalization invariant', () => {
   });
 });
 
-describe('sessions cwd/branch + nodes.repo_path columns', () => {
-  it('declares the session and node columns in the DDL', () => {
-    const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
-    const { enrichedGraph } = runPipeline(files);
-    const sql = materializeSql(enrichedGraph);
+describe('sessions cwd/branch + semantics.repo_path columns', () => {
+  it('declares the session and semantics columns in the DDL', () => {
+    const sql = resolvedSql();
     expect(sql.some((s) => s.includes('cwd VARCHAR'))).toBe(true);
     expect(sql.some((s) => s.includes('branch VARCHAR'))).toBe(true);
     expect(sql.some((s) => s.includes('repo_path VARCHAR'))).toBe(true);
   });
 
   it('populates sessions.cwd/branch from native session metadata', () => {
-    const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
-    const { enrichedGraph } = runPipeline(files);
-    const sessions = buildRecords(enrichedGraph).sessions ?? [];
+    const sessions = records().sessions ?? [];
     expect(sessions.length).toBeGreaterThan(0);
     expect(sessions[0]?.cwd).toBe(fixtureCwd(NATIVE_JSONL));
     expect(sessions[0]?.branch).toBe('main');
   });
 
-  it('derives repo_path on tool nodes that touch a file', () => {
-    const withRepoPath = nodeRows().filter((r) => typeof r.repo_path === 'string');
+  it('grounds repo_path on semantics entries that touched a file', () => {
+    const withRepoPath = semanticsRows(REFACTOR_JSONL).filter(
+      (r) => typeof r.repo_path === 'string',
+    );
+    expect(withRepoPath.length).toBeGreaterThan(0);
     for (const row of withRepoPath) {
       expect(row.repo_path as string).not.toContain('/.claude/worktrees/');
       expect((row.repo_path as string).startsWith('/')).toBe(false);
@@ -241,7 +256,6 @@ describe('cost_usd (traced only, never estimated)', () => {
       nodes: { [traced.id]: traced, [untraced.id]: untraced },
       deltas: {},
       semantics: {},
-      actions: {},
       intents: {},
     };
     const rows = buildRecords(graph).nodes ?? [];
@@ -263,10 +277,7 @@ describe('intent_category', () => {
   });
 
   it('declares the intent_category column in the DDL', () => {
-    const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
-    const { enrichedGraph } = runPipeline(files);
-    const sql = materializeSql(enrichedGraph);
-    expect(sql.some((s) => s.includes('intent_category VARCHAR'))).toBe(true);
+    expect(resolvedSql().some((s) => s.includes('intent_category VARCHAR'))).toBe(true);
   });
 });
 
@@ -274,9 +285,7 @@ describe('intent_category', () => {
 
 describe('derived + per-type relations are views', () => {
   it('emits CREATE VIEW (not CREATE TABLE) for each, and inserts no rows for them', () => {
-    const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
-    const { enrichedGraph } = runPipeline(files);
-    const sql = materializeSql(enrichedGraph);
+    const sql = resolvedSql();
 
     for (const name of ['interaction_metrics', 'llm_requests', 'tools', 'interactions']) {
       expect(sql.some((s) => s.startsWith(`CREATE VIEW ${name} AS`))).toBe(true);
@@ -286,9 +295,7 @@ describe('derived + per-type relations are views', () => {
   });
 
   it('the view reads from nodes only after the nodes table is created', () => {
-    const files: UploadedFile[] = [{ name: 'session.jsonl', content: NATIVE_JSONL }];
-    const { enrichedGraph } = runPipeline(files);
-    const sql = materializeSql(enrichedGraph);
+    const sql = resolvedSql();
     const nodesTableAt = sql.findIndex((s) => s.startsWith('CREATE TABLE nodes '));
     const metricsViewAt = sql.findIndex((s) => s.startsWith('CREATE VIEW interaction_metrics AS'));
     expect(nodesTableAt).toBeGreaterThanOrEqual(0);

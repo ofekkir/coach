@@ -1,7 +1,7 @@
 // Per-type VIEW: the interaction slice of `nodes`. A typed, documented surface (the
 // interaction-specific columns, with other types' NULLs dropped) for the analyst who
 // wants `SELECT * FROM interactions`. For richer per-turn rollups (tool_count, cost,
-// shape, first/last action) use `interaction_metrics` instead. The physical table is
+// shape, distinct_files) use `interaction_metrics` instead. The physical table is
 // still `nodes`; an interaction's own id IS its interaction_id, so that FK is omitted.
 
 import { pickColumns, type TableSpec } from '../spec.ts';

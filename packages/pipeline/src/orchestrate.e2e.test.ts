@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { defaultSemanticsConfig } from '@coach/semantics';
 import { describe, expect, it } from 'vitest';
 
 import type { ExecutionGraph } from './graph/types.ts';
@@ -38,19 +37,17 @@ describe('pipeline e2e', () => {
   // native (span attr stamped by the native builder) and OTEL (attr enriched onto
   // the tool span from its decision log). A session with tool calls must yield
   // causal edges either way — this is the harness-agnostic promise.
-  // Canonical `action` invariant: every tool node carries a non-NULL action drawn
-  // from the closed set, and the per-action counts are identical across two runs of
-  // the same fixture (the derivation is pure — no model, no nondeterminism).
-  it('otel/fetch-website — every tool node has a non-NULL action; counts are deterministic', () => {
+  // `action` label invariant: every tool node gets a non-NULL action label, and the
+  // per-label counts are identical across two runs of the same fixture (the
+  // derivation is pure — no model, no nondeterminism).
+  it('otel/fetch-website — every tool node has an action label; counts are deterministic', () => {
     const files = loadFixtureDir('otel/fetch-website');
-    const first = runPipeline(files).enrichedGraph;
-    const second = runPipeline(files).enrichedGraph;
+    const first = runPipeline(files).resolvedGraph;
+    const second = runPipeline(files).resolvedGraph;
 
-    const closed: ReadonlySet<string> = new Set(defaultSemanticsConfig.ontology.coarseActions);
     const toolIds = toolNodeIds(first);
     expect(toolIds.length).toBeGreaterThan(0);
-    const actions = toolIds.map((id) => first.actions[id]);
-    expect(actions.every((action) => action != null && closed.has(action))).toBe(true);
+    expect(toolIds.every((id) => toolAction(first, id) != null)).toBe(true);
     expect(actionCounts(first)).toEqual(actionCounts(second));
   });
 
@@ -74,10 +71,15 @@ function toolNodeIds(graph: ExecutionGraph): string[] {
     .map((node) => node.id);
 }
 
+// A tool node is single-entry, so its action label is its entry[0].action.
+function toolAction(graph: ExecutionGraph, id: string): string | undefined {
+  return graph.semantics[id]?.entries[0]?.action;
+}
+
 function actionCounts(graph: ExecutionGraph): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const id of toolNodeIds(graph)) {
-    const action = graph.actions[id] ?? 'other';
+    const action = toolAction(graph, id) ?? 'other';
     counts[action] = (counts[action] ?? 0) + 1;
   }
   return counts;

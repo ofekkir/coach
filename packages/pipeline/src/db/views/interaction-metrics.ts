@@ -1,8 +1,10 @@
 // One row per interaction node, every column a plain GROUP BY aggregate over that
 // interaction's nodes. As a VIEW (computed on read against `nodes`) it can never
 // drift from its source — a columnar engine makes a stored copy buy no query power.
-// arg_min/arg_max over `seq` give the first/last tool action; FILTER (...) yields
-// NULL when the interaction has no tool nodes.
+// FILTER (...) yields NULL when the interaction has no tool nodes. A tool node's
+// `repo_path` lives in `semantics` (one entry per tool node), so we LEFT JOIN it at
+// sequence_in_node=0 — that keeps it 1:1 with the node, never multiplying the
+// per-node token/cost aggregates.
 
 import type { TableSpec } from '../spec.ts';
 
@@ -21,12 +23,11 @@ SELECT
   SUM(n.cost_usd) FILTER (WHERE n.type = 'llm_request') AS cost_usd,
   i.duration_ms,
   CASE WHEN COUNT(*) FILTER (WHERE n.type = 'tool') > 0 THEN 'agentic' ELSE 'direct' END AS shape,
-  arg_min(n.action, n.seq) FILTER (WHERE n.type = 'tool') AS first_action,
-  arg_max(n.action, n.seq) FILTER (WHERE n.type = 'tool') AS last_action,
-  COUNT(DISTINCT n.file_path) FILTER (WHERE n.type = 'tool') AS distinct_files,
+  COUNT(DISTINCT s.repo_path) FILTER (WHERE n.type = 'tool') AS distinct_files,
   COUNT(*) FILTER (WHERE n.type = 'tool' AND n.is_error) AS error_count
 FROM nodes i
 JOIN nodes n ON n.interaction_id = i.id
+LEFT JOIN semantics s ON s.id = n.id AND s.sequence_in_node = 0
 WHERE i.type = 'interaction'
 GROUP BY i.id, i.session_id, i.sequence, i.prompt, i.duration_ms`;
 
@@ -83,11 +84,7 @@ export const INTERACTION_METRICS: TableSpec = {
     // prettier-ignore
     { name: 'shape', sqlType: 'VARCHAR', doc: "'agentic' iff tool_count>0 (the interaction called at least one tool), else 'direct'." },
     // prettier-ignore
-    { name: 'first_action', sqlType: 'VARCHAR', doc: 'The `action` of the first tool node by seq. NULL when the interaction has no tool nodes.' },
-    // prettier-ignore
-    { name: 'last_action', sqlType: 'VARCHAR', doc: 'The `action` of the last tool node by seq. NULL when the interaction has no tool nodes.' },
-    // prettier-ignore
-    { name: 'distinct_files', sqlType: 'INTEGER', doc: "Count of distinct non-NULL file_path among the interaction's tool nodes." },
+    { name: 'distinct_files', sqlType: 'INTEGER', doc: "Count of distinct non-NULL semantics.repo_path among the interaction's tool nodes." },
     {
       name: 'error_count',
       sqlType: 'INTEGER',

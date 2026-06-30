@@ -1,15 +1,30 @@
-import type { ResolvedNode, SemanticContext } from '@coach/pipeline';
+import type { ResolvedNode } from '@coach/pipeline';
 
 import { fonts, monoLabel, tokens } from '../theme.ts';
 
-// Self-contained render block for the structured `what`-context (package/file/url)
-// the pipeline promoted out of the flattened `what` phrase. Each present field is a
-// labeled row; `url` renders as a clickable link. Absent fields are omitted, and the
-// whole block is omitted when the node carries no context. Kept localized (own file +
-// one call site in panelBody) so unrelated detail-card work rebases cleanly.
+// Self-contained render block for the structured argument (package/file/url) the
+// pipeline grounds onto each semantic entry — the input that was stripped out of the
+// static label. A node can have several entries; this surfaces the first grounded
+// value of each kind. Each present field is a labeled row; `url` renders as a
+// clickable link. Absent fields are omitted, and the whole block is omitted when the
+// node carries no grounded context. Kept localized (own file + one call site in
+// panelBody) so unrelated detail-card work rebases cleanly.
 
-function contextOf(resolved: ResolvedNode | undefined): SemanticContext | undefined {
-  return resolved?.semantics?.context;
+interface EntryContext {
+  package?: string | undefined;
+  file?: string | undefined;
+  url?: string | undefined;
+}
+
+function contextOf(resolved: ResolvedNode | undefined): EntryContext | undefined {
+  const entries = resolved?.semantics?.entries ?? [];
+  const context: EntryContext = {
+    package: entries.find((e) => e.package != null)?.package,
+    file: entries.find((e) => e.repoPath != null)?.repoPath,
+    url: entries.find((e) => e.url != null)?.url,
+  };
+  const empty = context.package == null && context.file == null && context.url == null;
+  return empty ? undefined : context;
 }
 
 function rowLabel(label: string): React.ReactNode {
@@ -54,7 +69,7 @@ function urlRow(url: string): React.ReactNode {
   );
 }
 
-function contextRows(context: SemanticContext): React.ReactNode[] {
+function contextRows(context: EntryContext): React.ReactNode[] {
   const rows: React.ReactNode[] = [];
   if (context.package != null) rows.push(textRow('PACKAGE', context.package));
   if (context.file != null) rows.push(textRow('FILE', context.file));

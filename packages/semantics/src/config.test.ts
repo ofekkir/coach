@@ -18,8 +18,7 @@ describe('defaultSemanticsConfig', () => {
 describe('assembleSemanticsConfig', () => {
   const ontology = {
     id: 'coding',
-    actions: [{ id: 'read', group: 'work', coarse: 'explore', label: 'read' }],
-    coarseActions: ['explore'],
+    actions: [{ id: 'read', group: 'work', label: 'read' }],
     commands: { runners: [], tokenRules: [], taskRules: [], default: 'read' },
     objects: [{ id: 'unknown', label: 'unknown' }],
     escape: { action: 'read', object: 'unknown' },
@@ -44,14 +43,6 @@ describe('assembleSemanticsConfig', () => {
   it('throws when an agent references an object id absent from the ontology', () => {
     const bad = { ...agent, tools: { Read: { action: 'read', object: 'spaceship' } } };
     expect(() => assembleSemanticsConfig(ontology, bad)).toThrow(/spaceship/);
-  });
-
-  it('throws when an action.coarse is not a declared coarseActions id', () => {
-    const bad = {
-      ...ontology,
-      actions: [{ id: 'read', group: 'work', coarse: 'nope', label: 'r' }],
-    };
-    expect(() => assembleSemanticsConfig(bad, agent)).toThrow(/coarse/);
   });
 
   it('throws when a command rule references an action absent from the ontology', () => {

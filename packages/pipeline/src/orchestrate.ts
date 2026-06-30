@@ -5,6 +5,7 @@ import { toCanonical } from './canonical/canonical.ts';
 import { classifyInputs } from './classify/classify.ts';
 import { buildExecutionGraph } from './graph/execution/execution.ts';
 import { startNs } from './graph/execution/thread.ts';
+import { resolveGraph } from './graph/resolve/resolve.ts';
 import { enrichExecutionGraph } from './graph/semantic/semantic.ts';
 import type { ExecutionGraph, VizResult } from './graph/types.ts';
 import { routeToSessions } from './route/route.ts';
@@ -16,7 +17,9 @@ import type { CanonicalNode, ClassifiedInput, SessionInputs, UploadedFile } from
  * The orchestrator's output: every pipeline stage's result, exposed as a member.
  * The CLI dumps these to disk for inspection; the app reads the graph member it
  * wants to render. Stage 5 builds the mechanical `executionGraph`; stage 6
- * (`enrichExecutionGraph`) layers deterministic semantic labels onto it.
+ * (`enrichExecutionGraph`) layers node-local semantic entries onto it; stage 7
+ * (`resolveGraph`) grounds each entry's path with the session cwd. `resolvedGraph`
+ * is the one the DB materializes and the app renders.
  */
 export interface PipelineResult {
   classified: ClassifiedInput[]; // Stage 1 — every file tagged by type
@@ -24,7 +27,8 @@ export interface PipelineResult {
   canonicalBySession: { sessionId: string; nodes: CanonicalNode[] }[]; // Stage 3
   agentGraph: AgentGraph; // Stage 4 — node table + agent/session entities
   executionGraph: ExecutionGraph; // Stage 5 — mechanical skeleton
-  enrichedGraph: ExecutionGraph; // Stage 6 — deterministic semantic labels
+  enrichedGraph: ExecutionGraph; // Stage 6 — deterministic, node-local semantic entries
+  resolvedGraph: ExecutionGraph; // Stage 7 — entries grounded with session cwd (repo_path/package)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -48,10 +52,10 @@ function sortByTime(nodes: readonly CanonicalNode[]): CanonicalNode[] {
  * stage's output. Pure and file-system-free — the CLI and the app both call it.
  *
  *   classify → route to sessions → to canonical (per session; tool results
- *   attached here) → aggregate → execution graph → semantic enrichment
+ *   attached here) → aggregate → execution graph → semantic enrichment → resolve
  *
- * Stage 6 enrichment is deterministic and always runs, using `config` (the
- * bundled `defaultSemanticsConfig` unless overridden) — it is the final stage.
+ * Stages 6–7 are deterministic and always run, using `config` (the bundled
+ * `defaultSemanticsConfig` unless overridden) — resolve is the final stage.
  * Curated analysis is deliberately NOT a pipeline stage: every rollup it would
  * compute is a one-line query over the materialized tables (see @coach/mcp).
  * Multi-agent is out of scope: all sessions roll up under a single agent.
@@ -71,6 +75,7 @@ export function runPipeline(
   const agentGraph = aggregate(canonicalBySession.map((c) => c.nodes));
   const executionGraph = buildExecutionGraph(agentGraph);
   const enrichedGraph = enrichExecutionGraph(executionGraph, config);
+  const resolvedGraph = resolveGraph(enrichedGraph, config);
 
   return {
     classified,
@@ -79,6 +84,7 @@ export function runPipeline(
     agentGraph,
     executionGraph,
     enrichedGraph,
+    resolvedGraph,
   };
 }
 

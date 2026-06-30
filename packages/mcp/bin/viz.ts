@@ -2,7 +2,7 @@
 // `coach-viz [data-file] [focus-node-id] [--source <id>] [--dest <id>]` — serves
 // the built `@coach/app` plus the stage JSON dumped into the cwd (by `pnpm e2e` or
 // a directory `load_dataset`), opens the browser at the boot URL, and keeps serving
-// until interrupted. Defaults the data file to `06-enriched-graph.json`. Use
+// until interrupted. Defaults the data file to `07-resolved-graph.json`. Use
 // `--source`/`--dest` to highlight a related pair instead of focusing one node.
 // Errors with a build hint if the app `dist` is missing. Diagnostics go to stderr.
 
@@ -11,7 +11,7 @@ import { platform } from 'node:os';
 
 import { startVizServer } from '../src/viz-server.ts';
 
-const DEFAULT_DATA_FILE = '06-enriched-graph.json';
+const DEFAULT_DATA_FILE = '07-resolved-graph.json';
 // argv[0]=node, argv[1]=script; user args start at index 2.
 const FIRST_USER_ARG = 2;
 

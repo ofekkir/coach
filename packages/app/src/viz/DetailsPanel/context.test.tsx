@@ -1,18 +1,29 @@
-import type { ResolvedNode, SemanticContext } from '@coach/pipeline';
+import type { ResolvedNode } from '@coach/pipeline';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { contextBlock } from './context.tsx';
 
-function resolvedWith(context: SemanticContext | undefined): ResolvedNode {
-  const node = { id: 'n1', type: 'tool', sessionId: 's1' } as ResolvedNode['node'];
-  return {
-    node,
-    semantics: { what: ['read source code'], ...(context != null ? { context } : {}) },
-  };
+interface TestContext {
+  package?: string;
+  file?: string;
+  url?: string;
 }
 
-function markup(context: SemanticContext | undefined): string {
+// Builds a single semantic entry carrying the grounded argument (the repo-relative
+// path is `repoPath`, surfaced by the block as FILE).
+function resolvedWith(context: TestContext | undefined): ResolvedNode {
+  const node = { id: 'n1', type: 'tool', sessionId: 's1' } as ResolvedNode['node'];
+  const entry = {
+    action: 'read source code',
+    ...(context?.package != null ? { package: context.package } : {}),
+    ...(context?.file != null ? { repoPath: context.file } : {}),
+    ...(context?.url != null ? { url: context.url } : {}),
+  };
+  return { node, semantics: { entries: [entry] } };
+}
+
+function markup(context: TestContext | undefined): string {
   return renderToStaticMarkup(<>{contextBlock(resolvedWith(context))}</>);
 }
 

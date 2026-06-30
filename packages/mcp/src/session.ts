@@ -79,7 +79,7 @@ interface Loaded {
 // them without polluting the run dir), and make the graph queryable through a
 // fresh temp DuckDB.
 async function buildLoaded(result: PipelineResult): Promise<Loaded> {
-  const dataset: Dataset = { graph: result.enrichedGraph };
+  const dataset: Dataset = { graph: result.resolvedGraph };
   const dumped = await dumpPipelineOutputs(result, outputDir());
   return { dataset, store: await createStore(dataset.graph), dumped };
 }
