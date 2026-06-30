@@ -3,9 +3,10 @@ name: workflow-model
 description: >-
   Use the coach MCP to visualize how a developer actually worked on a project across
   their Claude Code sessions, as a CAUSAL STATE MACHINE built from coach's semantic layer.
-  Every node carries a `semantics.what` (acts) and shell tools a `semantics.comment`
-  (intent); states and edges are derived from those plus `causal_edges` — never a hardcoded
-  taxonomy. The model is built at a CHOSEN granularity along an unroll spectrum: from the
+  The `semantics` table is one row per act (`action` = an input-independent label, the
+  argument stripped into `repo_path`/`url`) plus an optional `comment`; states and edges
+  are derived from those plus `causal_edges` — never a hardcoded taxonomy. The model is
+  built at a CHOSEN granularity along an unroll spectrum: from the
   fully-unrolled atom level (one state per distinct act) up to a handful of clustered
   workflow archetypes, decorating states with the INFERENCE's real cost (output tokens +
   wall-clock) and edges with action + pass/fail outcome. The rendered diagram is the
@@ -17,15 +18,17 @@ description: >-
 # Visualizing a developer's workflows with coach
 
 Coach ingests Claude Code traces into a **queryable database** with a **semantic layer**:
-every node carries `semantics.what` (an array of acts) and, for shell tools, often
-`semantics.comment` (the free-text intent of that command). This skill turns that into a
+the `semantics` table holds **one row per atomic act** — an `action` label (input-independent:
+the filename/program/query is stripped out, into `repo_path`/`package`/`url`), ordered within
+its node by `sequence_in_node`, plus an optional `comment` (e.g. a Bash `description`). A node
+maps to N rows (an inference that fires three tools → three rows). This skill turns that into a
 **causal state machine** you can render at any **granularity along an unroll spectrum**.
 
 **Principles — violate them and the diagram lies:**
 
 1. **States and edges come from the SEMANTIC LAYER + `causal_edges`, never invented.** A
-   state is a semantic act (a `what` atom, or a cluster of them); an edge exists because a
-   `causal_edges` row connects two nodes, weighted by how many. Derive everything from THIS
+   state is a semantic act (a `semantics.action`, or a cluster of them); an edge exists
+   because a `causal_edges` row connects two nodes, weighted by how many. Derive from THIS
    DB — a different project has a different vocabulary. Names like INVESTIGATE / AUTHOR /
    VERIFY below are **example output**, not a taxonomy to apply.
 
@@ -45,7 +48,7 @@ Same semantic layer, four granularities. Build the level the request needs:
 
 | Level            | States                                   | Use                               | Render             |
 | ---------------- | ---------------------------------------- | --------------------------------- | ------------------ |
-| **L0 atom**      | every distinct `what` atom               | see the raw machine, exhaustively | Graphviz (big)     |
+| **L0 atom**      | every distinct `action`                  | see the raw machine, exhaustively | Graphviz           |
 | **L1 merged**    | L0 with `invoke X` merged into `X`       | drop the inference↔tool relay     | Graphviz           |
 | **L2 category**  | atoms clustered into ~8–15 categories    | a readable workflow map           | Graphviz / Mermaid |
 | **L3 archetype** | interactions clustered by flow-signature | "how I work", per archetype       | Mermaid            |
@@ -65,14 +68,17 @@ load_dataset(repo: "<repo-name-or-abs-path>", includeWorktrees: true)
 ```
 
 Check counts are non-trivial, then `describe_schema` ONCE — it is the source of truth for
-tables/columns; trust it over anything below. Key surfaces: `semantics(what, comment)`,
-`causal_edges(from_id, to_id)`, `nodes`/`llm_requests`/`tools`.
+tables/columns; trust it over anything below. Key surfaces: `semantics(id, sequence_in_node,
+action, repo_path, package, url, comment)` — one row per act, joined to `nodes` by `id`;
+`causal_edges(from_id, to_id)`; `nodes`/`llm_requests`/`tools`. Note `action`/`repo_path` are
+**no longer on `nodes`** (they moved to `semantics`); `tools` is a view that joins back for them.
 
 ## 2 — L0: the atom-level causal state machine (the unrolled base)
 
-Split each node's `what` array into atoms (`["plan next steps","invoke read source code"]`
-→ two states). Then build edges from `causal_edges` with these rules — **the `invoke X`
-rule is the important one**:
+Each `semantics` row is **already one atomic act** (`action`), ordered within its node by
+`sequence_in_node` — no array splitting (the old `what` array is gone). Because the label is
+input-independent, the vocabulary is compact (coach: ~120 distinct atoms). Build edges from
+`causal_edges` with these rules — **the `invoke X` rule is the important one**:
 
 - **Fan-out `invoke X → X`** — every `invoke X` atom has EXACTLY ONE outgoing edge, to the
   tool `X` it dispatched (from `causal_edges` inference→tool). An inference's other atoms
@@ -83,8 +89,7 @@ rule is the important one**:
   inference it fans into (`causal_edges` tool→inference).
 
 ```sql
-WITH base AS (SELECT id, json_extract_string(what,'$[*]') AS arr FROM semantics WHERE what IS NOT NULL),
-atoms AS (SELECT id, unnest(arr) AS atom, unnest(range(1,len(arr)+1)) AS pos FROM base),
+WITH atoms AS (SELECT id, sequence_in_node AS pos, action AS atom FROM semantics),  -- already one row per act
 toolatom AS (SELECT a.id, a.atom FROM atoms a JOIN nodes n ON n.id=a.id WHERE n.type='tool'),
 infentry AS (SELECT a.id, arg_min(a.atom,a.pos) atom FROM atoms a JOIN nodes n ON n.id=a.id WHERE n.type='llm_request' GROUP BY a.id),
 r1 AS (SELECT 'invoke '||t.atom s, t.atom d FROM causal_edges e JOIN toolatom t ON t.id=e.to_id JOIN nodes n ON n.id=e.from_id AND n.type='llm_request'),  -- invoke X -> X
@@ -94,8 +99,7 @@ SELECT s, d, COUNT(*) w FROM (SELECT s,d FROM r1 UNION ALL SELECT s,d FROM r2 UN
 ```
 
 **Sanity check:** every `invoke …` state must have out-degree 1 (only `→ X`). If not, the
-co-occurrence chaining leaked — fix before rendering. (If the DB exposes atoms/atom-edges
-natively, prefer that over this in-query split — re-check `describe_schema`.)
+co-occurrence chaining leaked — fix before rendering.
 
 ## 3 — Roll up (L1 → L2 → L3) when L0 is too dense
 
@@ -104,14 +108,19 @@ natively, prefer that over this in-query split — re-check `describe_schema`.)
   leaving pure act→act flow.
 - **L2 — cluster atoms into categories (the LLM step).** Extract the distinct atoms and the
   shell-comment leading-verbs, and cluster them by _what the developer was doing_ into
-  ~8–15 named categories (+ explicit `OTHER`). **Two tiers, because the comment matters:**
-  a structured tool's atom is precise (`edit unit test`) — use it; a **Bash atom is coarse**
-  (`run node`) and wrong ~half the time (in coach, 51% of commented `run` tools were
-  actually INVESTIGATE) — classify those by the **comment's** verb. Persist the mapping
-  (`atom→category`, `comment-verb→category`) to a file so it is inspectable and reusable,
-  then apply it backward to every node. Exclude pipeline-internal labels (coach's
-  `process result with weak model` is its own labeler). SANITY-GATE: if `OTHER` is large the
-  clustering missed vocabulary — refine and re-gate.
+  ~8–15 named categories (+ explicit `OTHER`). **Two tiers, because shell labels lost their
+  argument:** a structured tool's `action` is precise (`read source code`, `version control`,
+  `verify`) — use it. But **every shell call now labels as bare `run`** (the program is
+  stripped out), so you cannot tell a verify-run from an investigate-run from the label — the
+  **`comment`** (or `bash_command` on the `tools` view) is the ONLY signal, and in coach 51% of
+  commented `run` calls were actually investigation. Extract and cluster the shell comments:
+  ```sql
+  SELECT lower(split_part(comment,' ',1)) AS verb, COUNT(*) n
+  FROM semantics WHERE action = 'run' AND comment IS NOT NULL GROUP BY verb ORDER BY n DESC;
+  ```
+  Persist the mapping (`action→category`, `comment-verb→category`) to a file so it is
+  inspectable and reusable, then apply it backward to every entry. Exclude pipeline-internal
+  labels. SANITY-GATE: if `OTHER` is large the clustering missed vocabulary — refine and re-gate.
 - **L3 — cluster interactions into archetypes.** Reduce each interaction to its flow
   signature (ordered state sequence; normalize repeats, keep a `loopiness` scalar) and
   cluster the signatures into a few named archetypes (+ `OTHER`, + `DIRECT` for tool-less
@@ -157,8 +166,11 @@ splits; render via `node --experimental-strip-types scripts/render-mermaid.ts in
   between calls — state it). Tokens overlap across states; don't sum to one total.
 - Fan-out: one inference → 1–N parallel tools → one next inference. One transition per
   `A→B`; inference cost counted once. (~10% of coach inferences fan out, up to 8-wide.)
-- Bash is the escape hatch: its atom is coarse, so a shell step is only as good as its
-  `comment`; no comment → falls back to the coarse atom (note it).
+- `semantics` is **one row per act** (`action`), not an array; the stripped argument lives in
+  `repo_path`/`package`/`url`; `action`/`repo_path` are NOT on `nodes` anymore.
+- Shell labels are input-independent: **every shell call is bare `run`** (program stripped into
+  `bash_command`/`comment`). A run step's intent is only as good as its `comment`; no comment →
+  unknowable from the data (note it). This makes the L2 comment tier mandatory, not optional.
 - Mermaid can't render past ~150 nodes (its browser renderer OOMs) — use Graphviz for L0/L1.
 - coach has zero `hook` nodes — deterministic PostToolUse hooks are invisible; "no verify"
   means no AGENT-issued check, not "no gate ran".
