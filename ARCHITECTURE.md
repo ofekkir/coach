@@ -77,34 +77,26 @@ later drop-in with no reshaping. Three concerns are kept strictly separate:
   (`nodeData` / `deltasOf` / `semanticsOf` / `resolve`) — never an embedded object, so nothing
   re-duplicates on serialize/DB. There is **no `action`/`inference` node type**: "is this node
   enriched?" is answered by "does a `semantics[id]` row exist".
-- **Each `SemanticEntry` is INPUT-INDEPENDENT — `static` is the act with the argument stripped.**
-  Every "load a tool schema" reads the same `static` ("load tool schema", not "load EnterWorktree tool
+- **Each `SemanticEntry.action` is the INPUT-INDEPENDENT label — the act with the argument stripped.**
+  Every "load a tool schema" reads the same `action` ("load tool schema", not "load EnterWorktree tool
   schema"); the specific argument it acted on survives as the entry's structured fields — `repoPath`
   (a file path), `package`, `url` — never folded back into the label. An inference that fires three
   tools emits three entries, each carrying its own path, so per-entry context is real, not per-node.
-- **`action` is a closed activity dimension carried per entry, distinct from the free-form `static`.**
-  `static` is rich, ordered, human-readable; `action` is a single value from a small fixed set (the
-  ontology's `coarseActions`: `explore|author|edit|run|test|verify|vcs|setup|mcp|research|delegate|
-plan|other`) so the store can `GROUP BY action` (filtering to tool nodes via a join) for stable,
-  comparable counts. It is **not a second taxonomy** and it is **not hardcoded**: `action` is a
-  COARSENING of the ontology's own ~30 action ids, and the rollup lives in the ontology DATA — every
-  action carries a `coarse` field, and `@coach/semantics`'s `action.ts` is pure resolver logic
-  (`coarseAction`) that just reads it. The config layer resolves each tool call to one ontology action
-  (`toolOntologyAction`); `coarseAction` rolls that up — one classification source of truth, no
-  parallel TS table. The shell escape-hatch tools (Bash) are the one surface with no per-tool spec, so
-  their command grammar (git→vcs, pytest→test, build→setup) is also DATA — the ontology's `commands`
-  block — resolved by `shellCommandAction` into an ontology action, then rolled up the same way. A
-  Bash entry's `static` reuses that same grammar resolution (`escapeHatchEntry` in `tool-intent.ts`):
-  it renders the resolved action's label (`git commit`→"version control", `grep`→"search") rather than
-  the literal "bash", and collapses an unclassified command to the generic "run" (the program lives in
-  `bash_command`, not the label). `assembleSemanticsConfig` enforces the integrity: every action's
-  `coarse` is a declared `coarseActions` id and every command rule resolves to a real action, so the
-  dimension cannot drift into unaggregatable values. Derived deterministically (no LLM) in stage 6 for
-  **every** tool node — never NULL on a tool entry — and surfaces as `semantics.action`. The Bash
-  command is promoted to the `nodes.bash_command` column (from `tool_input.command`) by a single total
-  extractor (`extractBashCommand` in `graph/semantic/derive.ts`) reused by both the materializer and
-  the shell classifier; it is NULL for non-Bash tools and on malformed input (the extractor never
-  throws); invariant: every `name='Bash'` node has a non-NULL `bash_command`.
+  The label is **not hardcoded**: it is resolved from the ontology's own action/object vocabulary and
+  path conventions (DATA in `data/ontology/coding.json`), filled into the per-agent phrase templates
+  (`data/agents/claude-code.json`). The shell escape-hatch tools (Bash) are the one surface with no
+  per-tool spec, so their command grammar (git→vcs, pytest→test, build→setup) is also DATA — the
+  ontology's `commands` block — resolved by `shellCommandAction` (`@coach/semantics`'s `action.ts`,
+  pure resolver logic) into an ontology action whose `label` becomes the entry's `action`
+  (`escapeHatchEntry` in `tool-intent.ts`): `git commit`→"version control", `grep`→"search", an
+  unclassified command → the generic "run" (the program lives in `bash_command`, not the label).
+  `assembleSemanticsConfig` enforces the integrity: every action/object id the agent references is
+  defined in the ontology, and every command rule resolves to a real action. Derived deterministically
+  (no LLM) in stage 6 and surfaced as `semantics.action`. The Bash command is promoted to the
+  `nodes.bash_command` column (from `tool_input.command`) by a single total extractor
+  (`extractBashCommand` in `graph/semantic/derive.ts`) reused by both the materializer and the shell
+  classifier; it is NULL for non-Bash tools and on malformed input (the extractor never throws);
+  invariant: every `name='Bash'` node has a non-NULL `bash_command`.
 - **Edges are two different relations over the same nodes.** _Containment_ ("child is contained in
   time by parent") is the `parent` self-FK, surfaced per interaction as `tree` (an id-only
   `ExecutionNode` = `{ id, children }`). _Causal_ ("effect triggered by cause") is its own DAG edge
@@ -202,9 +194,9 @@ Input files (accumulating — user stages N files/folders before submitting)
         ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
    enrichExecutionGraph(graph, config)  a PURE, NODE-LOCAL TABLE PASS: iterates the
                             `nodes` table and, for each `tool` / `llm_request`, writes a
-                            `semantics[id]` row — an ordered list of input-independent
-                            `SemanticEntry` (`static` + coarse `action` + the raw
-                            argument it touched) + optional `comment`. No tree walk — a
+                            `semantics[id]` row — an ordered list of `SemanticEntry`
+                            (the input-independent `action` label + the raw argument it
+                            touched) + optional `comment`. No tree walk — a
                             node's labels depend only on its own data and its stage-5
                             deltas (read by id). tool-intent.ts + derive.ts label each
                             node deterministically (tool intent, path conventions,
@@ -253,8 +245,8 @@ generic `respond` act; a weak-model labeler that classified that act more finely
 reintroducing it. The interpreter (`graph/semantic`) is agent-agnostic, so a different domain/agent is
 a config swap, not a code change. See `packages/semantics/README.md` for the resolution order and
 what is deliberately out of scope (composition/inference roll-up). Enrichment writes into the
-`semantics` table (an ordered `SemanticEntry` list per relabeled node — each carrying `static`, the
-`coarseAction` rollup `action`, and the raw argument; `shellCommandAction` resolves shell tools) and
+`semantics` table (an ordered `SemanticEntry` list per relabeled node — each carrying the
+input-independent `action` label and the raw argument; `shellCommandAction` resolves shell tools) and
 the `intents` table (one closed `intent_category` per interaction node, derived from the prompt by
 `classifyIntent`), and leaves the `nodes`/`deltas`/edges
 untouched — the old copied twin types (`ActionNode`/`InferenceNode`) are retired.
@@ -389,7 +381,7 @@ not a reshape.
   `pickColumns`), so a per-type view can never describe a column differently from the table it projects.
   `interaction_metrics`: one row per interaction, every column a GROUP BY over that interaction's nodes
   (`prompt_len`, `tool_count`/`llm_count`/`error_count`/`distinct_files`, summed `tokens_in`/`tokens_out`/
-  `cost_usd`, `duration_ms`, `arg_min`/`arg_max`-over-`seq` `first_action`/`last_action`, and `shape` =
+  `cost_usd`, `duration_ms`, and `shape` =
   `'agentic'` iff `tool_count>0` else `'direct'`). The view SQL is proven valid + drift-free against a
   real DuckDB in `mcp/src/duckdb.test.ts` (the views exist, `interaction_metrics` agrees with a direct
   node aggregate, and each per-type view's row count matches its `nodes` slice).

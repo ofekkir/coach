@@ -18,9 +18,6 @@ import { z } from 'zod';
 const OntologyActionSchema = z.object({
   id: z.string(),
   group: z.enum(['work', 'meta', 'harness', 'escape']),
-  // The coarse analytics bucket this fine action rolls up to (a `coarseActions`
-  // id). Closed activity dimension for `GROUP BY`, distinct from the rich `what`.
-  coarse: z.string(),
   label: z.string(),
   aliases: z.array(z.string()).optional(),
   description: z.string().optional(),
@@ -56,7 +53,6 @@ const ConventionStructureRuleSchema = z.object({ match: z.string(), qualifier: z
 const OntologySchema = z.object({
   id: z.string(),
   actions: z.array(OntologyActionSchema),
-  coarseActions: z.array(z.string()),
   commands: CommandsSchema,
   objects: z.array(OntologyObjectSchema),
   escape: z.object({ action: z.string(), object: z.string() }),
@@ -210,21 +206,17 @@ function assertRefsResolve(ontology: Ontology, agent: AgentSemantics): void {
   }
 }
 
-// Every action's `coarse` must be a declared `coarseActions` id, and every command
-// rule (plus the default) must resolve to an ontology action id — so the closed
-// `action` dimension and the shell grammar cannot drift into unaggregatable values.
-function assertActionVocabulary(ontology: Ontology): void {
-  const coarse = new Set(ontology.coarseActions);
+// Every command rule (plus the default) must resolve to a declared ontology action
+// id — so the shell grammar cannot drift into labels with no ontology backing.
+function assertCommandVocabulary(ontology: Ontology): void {
   const actions = new Set(ontology.actions.map((a) => a.id));
-  const badCoarse = ontology.actions.filter((a) => !coarse.has(a.coarse)).map((a) => a.id);
   const ruleActions = [...ontology.commands.tokenRules, ...ontology.commands.taskRules].map(
     (r) => r.action,
   );
   const badCommands = [...ruleActions, ontology.commands.default].filter((id) => !actions.has(id));
-  if (badCoarse.length > 0 || badCommands.length > 0) {
+  if (badCommands.length > 0) {
     throw new Error(
       `ontology '${ontology.id}' has unresolvable vocabulary: ` +
-        `actions with unknown coarse=[${badCoarse.join(', ')}] ` +
         `command rules with unknown action=[${[...new Set(badCommands)].join(', ')}]`,
     );
   }
@@ -241,6 +233,6 @@ export function assembleSemanticsConfig(rawOntology: unknown, rawAgent: unknown)
   const ontology = OntologySchema.parse(rawOntology);
   const agent = AgentSemanticsSchema.parse(rawAgent);
   assertRefsResolve(ontology, agent);
-  assertActionVocabulary(ontology);
+  assertCommandVocabulary(ontology);
   return { ontology, agent };
 }

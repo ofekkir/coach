@@ -285,23 +285,19 @@ export interface MessageDeltas {
 
 /** Stage 6 — ONE atomic semantic entry of a relabeled node. A node "does" an ordered
  *  sequence of these (a tool call is usually one; an inference that fires three tools
- *  emits one entry per call). `static` is the INPUT-INDEPENDENT label — the act with
+ *  emits one entry per call). `action` is the INPUT-INDEPENDENT label — the act with
  *  the specific argument stripped, so every "load a tool schema" reads the same
  *  ("load tool schema", not "load EnterWorktree tool schema"). The argument the entry
- *  acted on survives as the structured fields, never folded back into `static`:
- *  - `action`: the coarse activity bucket (an ontology `coarseActions` id) this entry
- *    rolls up to, when it resolves to one; absent for pure message acts.
- *  - `repoPath`: the repo-relative, worktree+cwd-normalized path this entry touched
- *    (same basis as the old `nodes.repo_path`). Grounded in stage 7; absent for
- *    non-path entries.
+ *  acted on survives as the structured fields, never folded back into `action`:
+ *  - `repoPath`: the repo-relative, worktree+cwd-normalized path this entry touched.
+ *    Grounded in stage 7; absent for non-path entries.
  *  - `package`: the workspace deduced from the path (e.g. `pipeline`); grounded in
  *    stage 7 alongside `repoPath`.
  *  - `url`: the target URL host for web/fetch entries.
  *  - `rawPath`: INTERNAL — the un-normalized absolute path carried from stage 6 to
  *    stage 7, where it becomes `repoPath`/`package` and is dropped. Never materialized. */
 export interface SemanticEntry {
-  readonly static: string;
-  readonly action?: string;
+  readonly action: string;
   readonly repoPath?: string;
   readonly package?: string;
   readonly url?: string;

@@ -24,9 +24,9 @@ function resolved(node: ResolvedNode['node'], semantics?: ResolvedNode['semantic
   return { node, ...(semantics != null ? { semantics } : {}) };
 }
 
-// A semantics overlay from a list of static labels (one entry each).
+// A semantics overlay from a list of action labels (one entry each).
 function sem(...labels: string[]): ResolvedNode['semantics'] {
-  return { entries: labels.map((label) => ({ static: label })) };
+  return { entries: labels.map((label) => ({ action: label })) };
 }
 
 describe('buildNodeCard', () => {

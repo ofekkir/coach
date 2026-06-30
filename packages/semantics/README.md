@@ -54,7 +54,7 @@ node (tool | llm_request)
   ├─ llm_request structural prefix (agent.structuralRoles)── thinking→plan, tool_use→invoke    │
   │                                                                                            │
   └─ genuine terminal message  → ontology `respond` action ── deterministic, generic ──────────┘
-final entries = structural prefix ++ (respond, for a terminal message); each entry's `static` label
+final entries = structural prefix ++ (respond, for a terminal message); each entry's `action` label
 is INPUT-INDEPENDENT (the specific path/query/tool lives in the entry's `repoPath`/`url`, not the label)
 ```
 

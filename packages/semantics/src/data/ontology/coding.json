@@ -7,7 +7,6 @@
     {
       "id": "read",
       "group": "work",
-      "coarse": "explore",
       "label": "read",
       "aliases": ["view", "inspect", "open", "cat"],
       "description": "Look at the content of a file or resource without changing it."
@@ -15,7 +14,6 @@
     {
       "id": "search",
       "group": "work",
-      "coarse": "explore",
       "label": "search",
       "aliases": ["find", "grep", "glob", "locate"],
       "description": "Locate files or matches by name/pattern/content."
@@ -23,7 +21,6 @@
     {
       "id": "write",
       "group": "work",
-      "coarse": "author",
       "label": "write",
       "aliases": ["create", "add"],
       "description": "Create new file content."
@@ -31,7 +28,6 @@
     {
       "id": "edit",
       "group": "work",
-      "coarse": "edit",
       "label": "edit",
       "aliases": ["modify", "update", "patch"],
       "description": "Change existing file content."
@@ -39,7 +35,6 @@
     {
       "id": "delete",
       "group": "work",
-      "coarse": "edit",
       "label": "delete",
       "aliases": ["remove", "rm"],
       "description": "Remove a file or block of content."
@@ -47,7 +42,6 @@
     {
       "id": "refactor",
       "group": "work",
-      "coarse": "edit",
       "label": "refactor",
       "aliases": ["restructure", "rename", "extract"],
       "description": "Restructure code without intended behavior change. A model classification — not deterministically distinguishable from edit."
@@ -55,7 +49,6 @@
     {
       "id": "run",
       "group": "work",
-      "coarse": "run",
       "label": "run",
       "aliases": ["execute", "invoke-command"],
       "description": "Execute a command, script, or program."
@@ -63,7 +56,6 @@
     {
       "id": "build",
       "group": "work",
-      "coarse": "setup",
       "label": "build",
       "aliases": ["compile", "bundle", "emit"],
       "description": "Produce build artifacts."
@@ -71,7 +63,6 @@
     {
       "id": "test",
       "group": "work",
-      "coarse": "test",
       "label": "run tests",
       "aliases": ["test"],
       "description": "Execute a test suite. (Authoring tests is write × test-code, not this.)"
@@ -79,7 +70,6 @@
     {
       "id": "lint",
       "group": "work",
-      "coarse": "verify",
       "label": "lint",
       "aliases": ["check"],
       "description": "Run a linter / static-analysis / dead-code check."
@@ -87,7 +77,6 @@
     {
       "id": "format",
       "group": "work",
-      "coarse": "verify",
       "label": "format",
       "aliases": ["prettify"],
       "description": "Run a code formatter."
@@ -95,7 +84,6 @@
     {
       "id": "typecheck",
       "group": "work",
-      "coarse": "verify",
       "label": "typecheck",
       "aliases": ["tsc"],
       "description": "Run a type checker."
@@ -103,7 +91,6 @@
     {
       "id": "verify",
       "group": "work",
-      "coarse": "verify",
       "label": "verify",
       "aliases": ["validate", "ci"],
       "description": "Run a composite quality gate (e.g. the full CI check)."
@@ -111,7 +98,6 @@
     {
       "id": "vcs",
       "group": "work",
-      "coarse": "vcs",
       "label": "version control",
       "aliases": ["git", "commit", "push", "branch"],
       "description": "Source-control operations (commit, push, branch, rebase, …)."
@@ -119,7 +105,6 @@
     {
       "id": "debug",
       "group": "work",
-      "coarse": "run",
       "label": "debug",
       "aliases": ["diagnose", "investigate"],
       "description": "Diagnose a failure or unexpected behavior."
@@ -127,7 +112,6 @@
     {
       "id": "review",
       "group": "work",
-      "coarse": "explore",
       "label": "review",
       "aliases": ["audit"],
       "description": "Review code for correctness/quality."
@@ -135,7 +119,6 @@
     {
       "id": "fetch",
       "group": "work",
-      "coarse": "research",
       "label": "fetch",
       "aliases": ["download", "curl"],
       "description": "Retrieve a remote resource (URL)."
@@ -143,7 +126,6 @@
     {
       "id": "search-web",
       "group": "work",
-      "coarse": "research",
       "label": "search the web",
       "aliases": ["web-search"],
       "description": "Query a web search engine."
@@ -151,7 +133,6 @@
     {
       "id": "configure",
       "group": "work",
-      "coarse": "setup",
       "label": "configure",
       "aliases": ["setup", "set"],
       "description": "Change configuration or settings."
@@ -159,7 +140,6 @@
     {
       "id": "plan",
       "group": "meta",
-      "coarse": "plan",
       "label": "plan next steps",
       "aliases": ["think", "reason"],
       "description": "Internal reasoning / planning before acting (e.g. a thinking block)."
@@ -167,7 +147,6 @@
     {
       "id": "invoke",
       "group": "meta",
-      "coarse": "mcp",
       "label": "invoke",
       "aliases": ["call-tool"],
       "description": "The inference act of deciding to call a tool."
@@ -175,7 +154,6 @@
     {
       "id": "delegate",
       "group": "meta",
-      "coarse": "delegate",
       "label": "delegate",
       "aliases": ["spawn-subagent"],
       "description": "Hand work to a subagent."
@@ -183,7 +161,6 @@
     {
       "id": "respond",
       "group": "meta",
-      "coarse": "meta",
       "label": "respond",
       "aliases": ["answer", "report", "converse"],
       "description": "Emit a final assistant message or artifact to the user. The act within it is what the model classifies."
@@ -191,7 +168,6 @@
     {
       "id": "clarify",
       "group": "meta",
-      "coarse": "meta",
       "label": "ask the user",
       "aliases": ["ask", "question"],
       "description": "Ask the user a question / request a decision."
@@ -199,7 +175,6 @@
     {
       "id": "use-skill",
       "group": "meta",
-      "coarse": "delegate",
       "label": "use skill",
       "aliases": ["skill"],
       "description": "Invoke a named skill / slash command."
@@ -207,7 +182,6 @@
     {
       "id": "generate-title",
       "group": "harness",
-      "coarse": "meta",
       "label": "generate session title",
       "aliases": [],
       "description": "Harness-internal call that names the session."
@@ -215,7 +189,6 @@
     {
       "id": "predict",
       "group": "harness",
-      "coarse": "meta",
       "label": "predict next user prompt",
       "aliases": ["suggest"],
       "description": "Harness-internal call that fabricates a likely next user input (suggestion mode)."
@@ -223,7 +196,6 @@
     {
       "id": "load-schema",
       "group": "harness",
-      "coarse": "meta",
       "label": "load tool schema",
       "aliases": [],
       "description": "Harness-internal deferred-tool schema load."
@@ -231,27 +203,10 @@
     {
       "id": "act",
       "group": "escape",
-      "coarse": "other",
       "label": "act",
       "aliases": [],
       "description": "ESCAPE HATCH action. Use when no known action fits, so mislabeling is visible as 'unknown' rather than forced into a wrong bucket."
     }
-  ],
-  "coarseActions": [
-    "explore",
-    "author",
-    "edit",
-    "run",
-    "test",
-    "verify",
-    "vcs",
-    "setup",
-    "mcp",
-    "meta",
-    "research",
-    "delegate",
-    "plan",
-    "other"
   ],
   "objects": [
     {
@@ -544,7 +499,7 @@
     ]
   },
   "commands": {
-    "note": "Shell command grammar — the ONE classification surface with no per-tool spec. Escape-hatch tools (Bash) wrap an arbitrary command; the leading token (or, for package runners, the script task) maps to an ontology action, which then rolls up via each action's `coarse`.",
+    "note": "Shell command grammar — the ONE classification surface with no per-tool spec. Escape-hatch tools (Bash) wrap an arbitrary command; the leading token (or, for package runners, the script task) maps to an ontology action, whose `label` becomes the entry's `action` text.",
     "runners": ["pnpm", "npm", "yarn", "npx", "bun", "pnpx"],
     "tokenRules": [
       {

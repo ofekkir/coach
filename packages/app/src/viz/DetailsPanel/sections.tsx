@@ -15,9 +15,9 @@ const METRIC_FONT = 15;
 const MS_PER_SECOND = 1000;
 const SECONDS_DECIMALS = 2;
 
-// The static action labels come from the semantics overlay's entries, not the node.
+// The action labels come from the semantics overlay's entries, not the node.
 function whatOf(resolved: ResolvedNode | undefined): readonly string[] {
-  return (resolved?.semantics?.entries ?? []).map((entry) => entry.static);
+  return (resolved?.semantics?.entries ?? []).map((entry) => entry.action);
 }
 
 export function isActionType(type: string): boolean {

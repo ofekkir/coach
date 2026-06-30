@@ -1,13 +1,13 @@
-import { coarseAction, defaultSemanticsConfig } from '@coach/semantics';
+import { defaultSemanticsConfig } from '@coach/semantics';
 import { describe, expect, it } from 'vitest';
 
-import { toolEntries, toolOntologyAction } from './tool-intent.ts';
+import { toolEntries } from './tool-intent.ts';
 
 const config = defaultSemanticsConfig;
 
 function readPhrase(filePath: string): string {
   return toolEntries(config, 'Read', { file_path: filePath })
-    .map((e) => e.static)
+    .map((e) => e.action)
     .join(' ');
 }
 
@@ -28,23 +28,5 @@ describe('path object grounding under git worktrees', () => {
     const phrase = readPhrase('/repo/.claude/hooks/lint.sh');
     expect(phrase).toContain('claude code config');
     expect(phrase).not.toContain('source code');
-  });
-});
-
-function bucketFor(name: string): string {
-  return coarseAction(config, toolOntologyAction(config, name, {}));
-}
-
-describe('meta/harness tools resolve to a defined non-other coarse action', () => {
-  it.each([
-    ['ToolSearch', 'meta'],
-    ['AskUserQuestion', 'meta'],
-    ['SendUserFile', 'meta'],
-    ['TaskCreate', 'plan'],
-    ['TaskUpdate', 'plan'],
-  ])('%s → %s (never other)', (name, expected) => {
-    const bucket = bucketFor(name);
-    expect(bucket).toBe(expected);
-    expect(bucket).not.toBe('other');
   });
 });

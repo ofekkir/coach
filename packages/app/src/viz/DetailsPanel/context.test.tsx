@@ -15,7 +15,7 @@ interface TestContext {
 function resolvedWith(context: TestContext | undefined): ResolvedNode {
   const node = { id: 'n1', type: 'tool', sessionId: 's1' } as ResolvedNode['node'];
   const entry = {
-    static: 'read source code',
+    action: 'read source code',
     ...(context?.package != null ? { package: context.package } : {}),
     ...(context?.file != null ? { repoPath: context.file } : {}),
     ...(context?.url != null ? { url: context.url } : {}),

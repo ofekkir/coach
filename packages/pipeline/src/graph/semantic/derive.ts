@@ -1,4 +1,4 @@
-import { actionLabel, coarseAction, isRecord, type SemanticsConfig } from '@coach/semantics';
+import { actionLabel, isRecord, type SemanticsConfig } from '@coach/semantics';
 
 import type { RequestMessage, ResponseMessage, SemanticEntry } from '../../types.ts';
 
@@ -111,16 +111,16 @@ export function extractBashCommand(input: Record<string, unknown>): string | nul
 type StructuralRole = SemanticsConfig['agent']['structuralRoles']['rules'][number];
 
 /** The entry for one structural tool-call: the underlying tool's STATIC base entry
- *  (label + coarse action + the argument it touched), with its label wrapped by the
- *  role phrase ("read source code" → "invoke read source code"). An override replaces
- *  only the label; the tool's action / `rawPath` / `url` carry through, so an
- *  inference that fires two reads emits two entries each carrying its own path. */
+ *  (its `action` label + the argument it touched), with the label wrapped by the role
+ *  phrase ("read source code" → "invoke read source code"). An override replaces only
+ *  the label; the tool's `rawPath` / `url` carry through, so an inference that fires
+ *  two reads emits two entries each carrying its own path. */
 function invokeEntry(config: SemanticsConfig, rule: StructuralRole, call: ToolCall): SemanticEntry {
-  const base: SemanticEntry = toolEntries(config, call.name, call.input)[0] ?? { static: 'tool' };
+  const base: SemanticEntry = toolEntries(config, call.name, call.input)[0] ?? { action: 'tool' };
   const override = rule.overrides?.find((o) => o.when.toolName === call.name);
   const label =
-    override != null ? override.phrase : rule.phrase.replace('{toolPhrase}', base.static);
-  return { ...base, static: label };
+    override != null ? override.phrase : rule.phrase.replace('{toolPhrase}', base.action);
+  return { ...base, action: label };
 }
 
 function roleEntries(
@@ -129,15 +129,14 @@ function roleEntries(
   response: readonly ResponseMessage[],
 ): SemanticEntry[] {
   const { responseHasBlockType: hasType, responseEndsWithBlockType: endsType } = rule.when;
-  if (hasType != null && responseHasBlockType(response, hasType))
-    return [{ static: rule.phrase, action: coarseAction(config, rule.action) }];
+  if (hasType != null && responseHasBlockType(response, hasType)) return [{ action: rule.phrase }];
   if (endsType != null)
     return toolCallsOfType(response, endsType).map((call) => invokeEntry(config, rule, call));
   return [];
 }
 
 /** Deterministic prefix entries for an inference — one per matching structural role
- *  (e.g. [{static:"plan next steps"}, {static:"invoke read source code", rawPath:…}]).
+ *  (e.g. [{action:"plan next steps"}, {action:"invoke read source code", rawPath:…}]).
  *  When a turn invokes multiple tools in parallel, each generates its own entry. */
 export function structuralEntries(
   config: SemanticsConfig,
@@ -179,7 +178,5 @@ export function markerEntries(
     return false;
   });
   if (matched == null) return undefined;
-  return [
-    { static: actionLabel(config, matched.action), action: coarseAction(config, matched.action) },
-  ];
+  return [{ action: actionLabel(config, matched.action) }];
 }

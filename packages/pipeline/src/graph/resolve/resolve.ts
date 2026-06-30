@@ -48,8 +48,7 @@ function groundEntry(
   const repoPath = entry.rawPath != null ? normalizeRepoPath(entry.rawPath, cwd) : undefined;
   const pkg = repoPath != null ? structurePackage(config, repoPath) : undefined;
   return {
-    static: entry.static,
-    ...(entry.action != null ? { action: entry.action } : {}),
+    action: entry.action,
     ...(repoPath != null ? { repoPath } : {}),
     ...(pkg != null ? { package: pkg } : {}),
     ...(entry.url != null ? { url: entry.url } : {}),

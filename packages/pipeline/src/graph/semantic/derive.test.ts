@@ -10,7 +10,7 @@ import {
 } from './derive.ts';
 import { toolEntries } from './tool-intent.ts';
 
-const statics = (entries: { static: string }[]): string[] => entries.map((e) => e.static);
+const actions = (entries: { action: string }[]): string[] => entries.map((e) => e.action);
 
 describe('extractBashCommand (promoted-column source)', () => {
   it('pulls command from a Bash input', () => {
@@ -32,11 +32,7 @@ describe('toolEntries (config-driven, static labels)', () => {
       file_path: '/Users/x/.claude/settings.json',
     });
     expect(entries).toEqual([
-      {
-        static: 'read claude code user settings',
-        action: 'explore',
-        rawPath: '/Users/x/.claude/settings.json',
-      },
+      { action: 'read claude code user settings', rawPath: '/Users/x/.claude/settings.json' },
     ]);
   });
 
@@ -44,7 +40,7 @@ describe('toolEntries (config-driven, static labels)', () => {
     const entries = toolEntries(defaultSemanticsConfig, 'Edit', {
       file_path: 'packages/pipeline/src/graph/semantic/derive.ts',
     });
-    expect(statics(entries)).toEqual(['edit source code']);
+    expect(actions(entries)).toEqual(['edit source code']);
     expect(entries[0]?.rawPath).toBe('packages/pipeline/src/graph/semantic/derive.ts');
     // package / repoPath are NOT grounded here — that is stage 7 (resolve).
     expect(entries[0]?.repoPath).toBeUndefined();
@@ -56,25 +52,25 @@ describe('toolEntries (config-driven, static labels)', () => {
       url: 'https://www.example.com',
       prompt: 'Summarize the headlines',
     });
-    expect(statics(entries)).toEqual(['fetch web page', 'process result with weak model']);
+    expect(actions(entries)).toEqual(['fetch web page', 'process result with weak model']);
     expect(entries[0]?.url).toBe('example.com');
   });
 
   it('gives every "load a tool schema" the SAME static label (input stripped)', () => {
     const a = toolEntries(defaultSemanticsConfig, 'ToolSearch', { query: 'select:WebFetch' });
     const b = toolEntries(defaultSemanticsConfig, 'ToolSearch', { query: 'select:EnterWorktree' });
-    expect(statics(a)).toEqual(['load tool schema']);
-    expect(statics(b)).toEqual(['load tool schema']);
+    expect(actions(a)).toEqual(['load tool schema']);
+    expect(actions(b)).toEqual(['load tool schema']);
   });
 
   it('names the skill intent without the specific skill', () => {
     expect(
-      statics(toolEntries(defaultSemanticsConfig, 'Skill', { skill: 'update-config' })),
+      actions(toolEntries(defaultSemanticsConfig, 'Skill', { skill: 'update-config' })),
     ).toEqual(['use skill']);
   });
 
   it('falls back to the lowercased tool name for unknown tools', () => {
-    expect(statics(toolEntries(defaultSemanticsConfig, 'SomeTool', {}))).toEqual(['sometool']);
+    expect(actions(toolEntries(defaultSemanticsConfig, 'SomeTool', {}))).toEqual(['sometool']);
   });
 });
 
@@ -83,7 +79,7 @@ describe('structuralEntries (config-driven roles)', () => {
     const entries = structuralEntries(defaultSemanticsConfig, [
       { type: 'tool_use', name: 'Skill', input: { skill: 'x' } },
     ]);
-    expect(statics(entries)).toEqual(['decide on skill use']);
+    expect(actions(entries)).toEqual(['decide on skill use']);
   });
 
   it('emits thinking → plan then the derived tool intent for a trailing tool call', () => {
@@ -91,7 +87,7 @@ describe('structuralEntries (config-driven roles)', () => {
       { type: 'thinking', thinking: '<REDACTED>' },
       { type: 'tool_use', name: 'Read', input: { file_path: '/Users/x/.claude/settings.json' } },
     ]);
-    expect(statics(entries)).toEqual(['plan next steps', 'invoke read claude code user settings']);
+    expect(actions(entries)).toEqual(['plan next steps', 'invoke read claude code user settings']);
     // the invoke entry carries the call's own path, so parallel calls each keep theirs
     expect(entries[1]?.rawPath).toBe('/Users/x/.claude/settings.json');
   });
@@ -110,7 +106,7 @@ describe('markerEntries (config-driven harness markers)', () => {
       [],
       [{ type: 'text', text: '{"title": "Add Grafana MCP server"}' }],
     );
-    expect(entries != null && statics(entries)).toEqual(['generate session title']);
+    expect(entries != null && actions(entries)).toEqual(['generate session title']);
   });
 
   it('labels suggestion mode from the requestTextStartsWith rule', () => {
@@ -119,7 +115,7 @@ describe('markerEntries (config-driven harness markers)', () => {
       [{ role: 'user', content: '[SUGGESTION MODE: predict next]' }],
       [],
     );
-    expect(entries != null && statics(entries)).toEqual(['predict next user prompt']);
+    expect(entries != null && actions(entries)).toEqual(['predict next user prompt']);
   });
 
   it('returns undefined when no marker matches', () => {

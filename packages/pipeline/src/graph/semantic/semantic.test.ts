@@ -66,27 +66,25 @@ function enrich(nodes: CanonicalNode[]): ExecutionGraph {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-const statics = (id: string, enriched: ExecutionGraph): string[] | undefined =>
-  semanticsOf(enriched, id)?.entries.map((e) => e.static);
+const actions = (id: string, enriched: ExecutionGraph): string[] | undefined =>
+  semanticsOf(enriched, id)?.entries.map((e) => e.action);
 
 describe('enrichExecutionGraph', () => {
   it('writes a semantics row per relabeled node, keyed by id', () => {
     const enriched = enrich([interaction, llm1, tool1]);
     // The final text turn (no trailing tool call) gets the generic deterministic
     // respond act — no model classifies it more finely.
-    expect(semanticsOf(enriched, 'llm1')).toEqual({
-      entries: [{ static: 'respond', action: 'meta' }],
-    });
-    // `static` is the command verb resolved via the ontology command grammar
+    expect(semanticsOf(enriched, 'llm1')).toEqual({ entries: [{ action: 'respond' }] });
+    // `action` is the command verb resolved via the ontology command grammar
     // (`pnpm test` → run tests), not the literal tool name; `comment` is the
     // agent's verbatim description.
     expect(semanticsOf(enriched, 'tool1')).toEqual({
-      entries: [{ static: 'run tests', action: 'test' }],
+      entries: [{ action: 'run tests' }],
       comment: 'Run the test suite',
     });
   });
 
-  it('carries the raw path on the entry (input stripped from the static label)', () => {
+  it('carries the raw path on the entry (input stripped from the action label)', () => {
     const readNode: CanonicalNode = {
       ...tool1,
       id: 'read1',
@@ -96,13 +94,11 @@ describe('enrichExecutionGraph', () => {
     const enriched = enrich([interaction, llm1, readNode]);
     // Stage 6 is node-local: it leaves the raw path, NOT the grounded repo_path/package.
     expect(semanticsOf(enriched, 'read1')).toEqual({
-      entries: [
-        { static: 'read source code', action: 'explore', rawPath: 'packages/app/src/main.tsx' },
-      ],
+      entries: [{ action: 'read source code', rawPath: 'packages/app/src/main.tsx' }],
     });
   });
 
-  it('derives escape-hatch (Bash) `static` from the command grammar, not the tool name', () => {
+  it('derives escape-hatch (Bash) `action` from the command grammar, not the tool name', () => {
     const bashNode = (id: string, command: string): CanonicalNode => ({
       ...tool1,
       id,
@@ -115,9 +111,9 @@ describe('enrichExecutionGraph', () => {
       bashNode('git1', 'git commit -m "x"'),
       bashNode('grep1', 'grep -rn foo src/'),
     ]);
-    expect(statics('test1', enriched)).toEqual(['run tests']);
-    expect(statics('git1', enriched)).toEqual(['version control']);
-    expect(statics('grep1', enriched)).toEqual(['search']);
+    expect(actions('test1', enriched)).toEqual(['run tests']);
+    expect(actions('git1', enriched)).toEqual(['version control']);
+    expect(actions('grep1', enriched)).toEqual(['search']);
   });
 
   it('collapses an unclassified command to the generic run act (program is not in the label)', () => {
@@ -127,16 +123,7 @@ describe('enrichExecutionGraph', () => {
       tool_input: JSON.stringify({ command: 'python3 scripts/build.py' }),
     };
     const enriched = enrich([interaction, llm1, node]);
-    expect(statics('run1', enriched)).toEqual(['run']);
-  });
-
-  it('carries a coarse action on each entry (tool entry: pnpm test → test)', () => {
-    const enriched = enrich([interaction, llm1, tool1]);
-    expect(semanticsOf(enriched, 'tool1')?.entries[0]?.action).toBe('test');
-    // the terminal respond entry of the inference rolls up to meta
-    expect(semanticsOf(enriched, 'llm1')?.entries[0]?.action).toBe('meta');
-    // non-relabeled interaction nodes get no semantics row at all
-    expect(semanticsOf(enriched, 'inter')).toBeUndefined();
+    expect(actions('run1', enriched)).toEqual(['run']);
   });
 
   it('leaves the non-relabeled interaction node without a semantics row', () => {
@@ -176,7 +163,7 @@ describe('enrichExecutionGraph', () => {
     };
     const enriched = enrich([interaction, titleLlm]);
     expect(semanticsOf(enriched, 'title1')).toEqual({
-      entries: [{ static: 'generate session title', action: 'meta' }],
+      entries: [{ action: 'generate session title' }],
     });
   });
 
@@ -197,6 +184,6 @@ describe('enrichExecutionGraph', () => {
       duration_ms: 100,
     };
     const enriched = enrich([interaction, emptyLlm]);
-    expect(semanticsOf(enriched, 'empty1')).toEqual({ entries: [{ static: 'claude-haiku' }] });
+    expect(semanticsOf(enriched, 'empty1')).toEqual({ entries: [{ action: 'claude-haiku' }] });
   });
 });

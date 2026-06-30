@@ -81,7 +81,7 @@ export const NODES: TableSpec = {
       doc: 'interaction: the user prompt text (the spine head; not a separate node).',
     },
     // prettier-ignore
-    { name: 'intent_category', sqlType: 'VARCHAR', doc: "interaction: closed intent bucket, NON-NULL for every interaction node — 'debug'|'feature'|'refactor'|'explain'|'test'|'ops'|'research'|'other'. Deterministically derived from the prompt by the stage-6 labeler; GROUP BY it for stable per-intent counts. NULL for non-interaction nodes. (Per-tool activity lives on semantics.action, not here.)" },
+    { name: 'intent_category', sqlType: 'VARCHAR', doc: "interaction: closed intent bucket, NON-NULL for every interaction node — 'debug'|'feature'|'refactor'|'explain'|'test'|'ops'|'research'|'other'. Deterministically derived from the prompt by the stage-6 labeler; GROUP BY it for stable per-intent counts. NULL for non-interaction nodes. (A tool's own action label lives on semantics.action, not here.)" },
     {
       name: 'data',
       sqlType: 'JSON',

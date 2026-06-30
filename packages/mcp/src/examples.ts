@@ -26,7 +26,7 @@ ORDER BY cost_usd DESC`,
     title: 'Per-interaction rollup, pre-aggregated (the interaction_metrics view)',
     sql: `SELECT interaction_id, shape, tool_count, llm_count,
        tokens_in, tokens_out, cost_usd, duration_ms,
-       first_action, last_action, distinct_files, error_count
+       distinct_files, error_count
 FROM interaction_metrics
 ORDER BY duration_ms DESC`,
   },

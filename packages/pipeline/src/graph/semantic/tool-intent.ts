@@ -1,6 +1,5 @@
 import {
   actionLabel,
-  coarseAction,
   objectLabel,
   shellCommandAction,
   strField,
@@ -53,11 +52,11 @@ function groundedType(config: SemanticsConfig, path: string): string | undefined
   return objectLabel(config, rule.object);
 }
 
-/** The STATIC object type a path renders to: a well-known agent path keeps its
- *  semantic name, otherwise the convention object type (`source code`). The specific
- *  basename is NEVER folded in — it lives on `rawPath`. Unknown → the escape object
- *  label, so the gap is visible rather than silently dropped. */
-function staticPathObject(config: SemanticsConfig, rawPath: string): string {
+/** The object type a path renders to: a well-known agent path keeps its semantic
+ *  name, otherwise the convention object type (`source code`). The specific basename
+ *  is NEVER folded in — it lives on `rawPath`. Unknown → the escape object label, so
+ *  the gap is visible rather than silently dropped. */
+function pathObjectType(config: SemanticsConfig, rawPath: string): string {
   const path = stripWorktreeSegment(rawPath);
   return (
     wellKnownLabel(config, path) ??
@@ -115,7 +114,7 @@ function targetContext(
   return {};
 }
 
-function fillStaticPhrase(template: string, parts: { object: string; toolName: string }): string {
+function fillPhrase(template: string, parts: { object: string; toolName: string }): string {
   return template
     .replaceAll('{target}', '')
     .replaceAll('{object}', parts.object)
@@ -124,10 +123,10 @@ function fillStaticPhrase(template: string, parts: { object: string; toolName: s
     .trim();
 }
 
-/** The STATIC base label for a tool call: an explicit `label`, else the tool's
- *  phrase template with the argument stripped and `{object}` filled by the static
- *  object type, else `action object`. Never contains the specific input. */
-function staticLabel(
+/** The INPUT-INDEPENDENT `action` label for a tool call: an explicit `label`, else
+ *  the tool's phrase template with the argument stripped and `{object}` filled by the
+ *  object type, else `<action> <object>`. Never contains the specific input. */
+function entryAction(
   config: SemanticsConfig,
   name: string,
   tool: ToolSemantics,
@@ -135,15 +134,15 @@ function staticLabel(
   input: Record<string, unknown>,
 ): string {
   if (resolved.label != null) return resolved.label;
-  const object = staticObject(config, tool, resolved, input);
-  if (resolved.phrase != null) return fillStaticPhrase(resolved.phrase, { object, toolName: name });
+  const object = entryObject(config, tool, resolved, input);
+  if (resolved.phrase != null) return fillPhrase(resolved.phrase, { object, toolName: name });
   return `${actionLabel(config, resolved.action)} ${object}`.trim();
 }
 
-/** The static object type for a tool's phrase `{object}` slot: a path target grounds
- *  to its convention type, otherwise the tool's declared object label (empty when
- *  none — phrases without an `{object}` slot never read it). */
-function staticObject(
+/** The object type for a tool's phrase `{object}` slot: a path target grounds to its
+ *  convention type, otherwise the tool's declared object label (empty when none —
+ *  phrases without an `{object}` slot never read it). */
+function entryObject(
   config: SemanticsConfig,
   tool: ToolSemantics,
   resolved: Resolved,
@@ -152,25 +151,19 @@ function staticObject(
   const spec = tool.target;
   if (spec?.kind === 'path' && spec.field != null) {
     const raw = strField(input, spec.field).trim();
-    if (raw !== '') return staticPathObject(config, raw);
+    if (raw !== '') return pathObjectType(config, raw);
   }
   return resolved.object != null ? objectLabel(config, resolved.object) : '';
 }
 
 function modifierEntries(
-  config: SemanticsConfig,
   modifiers: readonly ToolModifier[] | undefined,
   input: Record<string, unknown>,
 ): SemanticEntry[] {
   return (modifiers ?? [])
     .filter((m) => matchClause(m.when, input))
-    .map((m) => ({
-      static: m.append.label,
-      ...(m.append.action != null ? { action: coarseAction(config, m.append.action) } : {}),
-    }));
+    .map((m) => ({ action: m.append.label }));
 }
-
-const MCP_TOOL_PREFIX = 'mcp__';
 
 /** The agent's configured tool spec for a tool name, falling back to the
  *  `_unknownTool` catch-all. Undefined only when neither is configured. */
@@ -178,45 +171,25 @@ function toolSpecFor(config: SemanticsConfig, name: string | undefined): ToolSem
   return (name != null ? config.agent.tools[name] : undefined) ?? config.agent.tools._unknownTool;
 }
 
-/** The single ontology action id a tool call resolves to — the input to the coarse
- *  `action` rollup. Non-shell tools use `tool.action` after `overrides`; escape-hatch
- *  shell tools (Bash) resolve their command through the ontology's command grammar;
- *  MCP tools (`mcp__*`) resolve to `invoke`. Returns `undefined` only for a tool name
- *  with no spec at all (rollup then falls back to the ontology escape action). */
-export function toolOntologyAction(
-  config: SemanticsConfig,
-  name: string | undefined,
-  input: Record<string, unknown>,
-): string | undefined {
-  if (name?.startsWith(MCP_TOOL_PREFIX)) return 'invoke';
-  const tool = toolSpecFor(config, name);
-  if (tool == null) return undefined;
-  if (tool.escapeHatch) return shellCommandAction(config, extractBashCommand(input) ?? undefined);
-  return applyOverrides(tool.overrides, input, { action: tool.action }).action;
-}
-
-/** The escape-hatch (shell) entry: the STATIC label of the ontology action the
+/** The escape-hatch (shell) entry: the `action` label of the ontology action the
  *  wrapped command resolves to (`git commit …` → "version control", `pnpm test …` →
  *  "run tests", an unclassified command → the generic "run"). The specific program /
  *  arguments are intentionally NOT in the label. */
 function escapeHatchEntry(config: SemanticsConfig, input: Record<string, unknown>): SemanticEntry {
   const ontologyAction = shellCommandAction(config, extractBashCommand(input) ?? undefined);
-  return {
-    static: actionLabel(config, ontologyAction),
-    action: coarseAction(config, ontologyAction),
-  };
+  return { action: actionLabel(config, ontologyAction) };
 }
 
 /** Ordered semantic entries for a tool call, resolved entirely from config: a base
- *  entry (static label + coarse action + the structured argument it touched) followed
- *  by any matching modifier entries. */
+ *  entry (the input-independent `action` label + the structured argument it touched)
+ *  followed by any matching modifier entries. */
 export function toolEntries(
   config: SemanticsConfig,
   name: string | undefined,
   input: Record<string, unknown>,
 ): SemanticEntry[] {
   const tool = toolSpecFor(config, name);
-  if (tool == null) return [{ static: name != null && name !== '' ? name.toLowerCase() : 'tool' }];
+  if (tool == null) return [{ action: name != null && name !== '' ? name.toLowerCase() : 'tool' }];
   if (tool.escapeHatch) return [escapeHatchEntry(config, input)];
   const resolved = applyOverrides(tool.overrides, input, {
     action: tool.action,
@@ -224,16 +197,15 @@ export function toolEntries(
     phrase: tool.phrase,
   });
   const base: SemanticEntry = {
-    static: staticLabel(config, name ?? '', tool, resolved, input),
-    action: coarseAction(config, toolOntologyAction(config, name, input)),
+    action: entryAction(config, name ?? '', tool, resolved, input),
     ...targetContext(tool, input),
   };
-  return [base, ...modifierEntries(config, tool.modifiers, input)];
+  return [base, ...modifierEntries(tool.modifiers, input)];
 }
 
 /** The agent's own intent annotation for a tool call, read verbatim from the
  *  per-agent-configured `commentField` (e.g. Bash `description`). Display only —
- *  never part of the closed `static` vocabulary. Undefined when unconfigured/empty. */
+ *  never part of the closed `action` vocabulary. Undefined when unconfigured/empty. */
 export function toolComment(
   config: SemanticsConfig,
   name: string | undefined,

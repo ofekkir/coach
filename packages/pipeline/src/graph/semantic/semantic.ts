@@ -1,7 +1,6 @@
 import {
   actionLabel,
   classifyIntent,
-  coarseAction,
   type IntentCategory,
   type SemanticsConfig,
 } from '@coach/semantics';
@@ -33,10 +32,10 @@ import { toolComment, toolEntries } from './tool-intent.ts';
 // enrichment depends only on a node's own data (and its stage-5 deltas, read by id).
 // "Is this enriched?" = "does a `semantics[id]` row exist".
 //
-// Each entry's `static` label is INPUT-INDEPENDENT (the act with the argument
-// stripped); the argument survives as the entry's `rawPath` / `url`, and the coarse
-// `action` bucket rides along. Path GROUNDING (rawPath → repo_path/package) is NOT
-// done here — it needs the session cwd and happens in stage 7 (graph/resolve). Fully
+// Each entry's `action` label is INPUT-INDEPENDENT (the act with the argument
+// stripped); the argument survives as the entry's `rawPath` / `url`. Path GROUNDING
+// (rawPath → repo_path/package) is NOT done here — it needs the session cwd and
+// happens in stage 7 (graph/resolve). Fully
 // deterministic: every label comes from the injected SemanticsConfig (tool intent,
 // path conventions, structural roles, harness markers). No model. A genuine terminal
 // assistant message (final text, turn does not end in a tool call) gets the generic
@@ -62,17 +61,9 @@ function inferenceFields(
   // precedes a tool call is preamble to the action, not a terminal message.
   const isTerminalMessage = responseText(response) != null && responseToolCall(response) == null;
   if (isTerminalMessage)
-    return {
-      entries: [
-        ...prefix,
-        {
-          static: actionLabel(config, TERMINAL_MESSAGE_ACTION),
-          action: coarseAction(config, TERMINAL_MESSAGE_ACTION),
-        },
-      ],
-    };
+    return { entries: [...prefix, { action: actionLabel(config, TERMINAL_MESSAGE_ACTION) }] };
   if (prefix.length > 0) return { entries: prefix };
-  return { entries: [{ static: node.model }] };
+  return { entries: [{ action: node.model }] };
 }
 
 function toolFields(node: ToolNode, config: SemanticsConfig): SemanticFields {

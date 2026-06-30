@@ -56,7 +56,7 @@ function schemaDescription(): unknown {
       'A normalized, id-keyed relational model of agent execution. Every node carries session_id and interaction_id FKs, so per-scope aggregation is a flat filter. Join layers by node id. Load data with `load_dataset`, then query with `query` (read-only SQL); walk the tree/DAG with `subtree` / `causal_path`.',
     tables: TABLES.map((t) => ({ name: t.name, doc: t.doc, columns: t.columns })),
     vocabulary: {
-      doc: 'The closed ontology behind the `semantics.static` action labels. Use it to interpret or filter semantic labels.',
+      doc: 'The ontology vocabulary behind the `semantics.action` labels. Use it to interpret or filter semantic labels.',
       actions: ontology.actions.map((a) => ({ id: a.id, label: a.label, group: a.group })),
       objects: ontology.objects.map((o) => ({ id: o.id, label: o.label })),
     },

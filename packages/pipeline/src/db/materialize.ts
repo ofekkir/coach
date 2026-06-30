@@ -151,7 +151,6 @@ function semanticsRecords(graph: ExecutionGraph): Record<string, unknown>[] {
     fields.entries.map((entry, sequenceInNode) => ({
       id,
       sequence_in_node: sequenceInNode,
-      static: entry.static,
       action: entry.action,
       repo_path: entry.repoPath,
       package: entry.package,
