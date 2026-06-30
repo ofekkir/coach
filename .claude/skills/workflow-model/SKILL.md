@@ -7,8 +7,8 @@ description: >-
   `respond`; an edge is the single inference that bridges two tool calls (`tool → inference →
   tool`), i.e. the "think" between two acts — plus the direct `tool → respond`. Every edge is
   split by whether the SOURCE tool errored (ok vs error/recovery). States are labeled with
-  visit count + total tool time; edges with transition count + the bridging inference's tokens
-  read (in) and produced (out). The coarse shell labels (`run`/`search`) are refined by
+  visit count + total tool time; edges with transition count + the bridging inference's think
+  time + tokens read (in) and produced (out). The coarse shell labels (`run`/`search`) are refined by
   clustering their `comment`s into 3-4 word acts — never a hardcoded taxonomy. The rendered
   diagram is the deliverable. Use when asked to "visualize my workflows", "show me how I work
   as a diagram", "draw my workflow state machine", "map how I develop", or "where does my work
@@ -121,9 +121,9 @@ the per-edge token cost below.)
 
 ## 4 — Edges: 2-hop tool→tool + tool→respond, split by source-tool error
 
-Two edge kinds, each split by whether the **source tool** errored. Edge tokens = the **bridging
-inference's** `tokens_in` (read) and `tokens_out` (produced); for `tool → respond` the bridge
-is the `respond` node itself.
+Two edge kinds, each split by whether the **source tool** errored. The edge's time + tokens are
+the **bridging inference's** `duration_ms`, `tokens_in` (read) and `tokens_out` (produced) —
+the "think" between the two tools; for `tool → respond` the bridge is the `respond` node itself.
 
 ```sql
 WITH map AS (SELECT what, comment FROM read_csv_auto('comment_whats.tsv', sep='\t', header=true)),
@@ -138,31 +138,33 @@ rn AS (SELECT n.id, n.tokens_in, n.tokens_out FROM nodes n JOIN semantics s ON s
        WHERE n.type='llm_request' AND s.action='respond'),
 tt AS (                                        -- tool_A → inference m → tool_B
   SELECT ta.act src, tb.act dst, CASE WHEN ta.err THEN 1 ELSE 0 END e,
-         COUNT(*) cnt, SUM(m.tokens_in) tin, SUM(m.tokens_out) tout
+         COUNT(*) cnt, ROUND(SUM(m.duration_ms)/60000,1) min, SUM(m.tokens_in) tin, SUM(m.tokens_out) tout
   FROM causal_edges e1 JOIN nodes m ON m.id=e1.to_id AND m.type='llm_request'
   JOIN causal_edges e2 ON e2.from_id=m.id
   JOIN tn ta ON ta.id=e1.from_id JOIN tn tb ON tb.id=e2.to_id
   GROUP BY ta.act, tb.act, ta.err),
 tr AS (                                        -- tool_A → respond (direct)
   SELECT ta.act src, 'respond' dst, CASE WHEN ta.err THEN 1 ELSE 0 END e,
-         COUNT(*) cnt, SUM(r.tokens_in) tin, SUM(r.tokens_out) tout
+         COUNT(*) cnt, ROUND(SUM(r.duration_ms)/60000,1) min, SUM(r.tokens_in) tin, SUM(r.tokens_out) tout
   FROM causal_edges ed JOIN tn ta ON ta.id=ed.from_id JOIN rn r ON r.id=ed.to_id
   GROUP BY ta.act, ta.err)
 SELECT * FROM tt UNION ALL SELECT * FROM tr;
 ```
 
-Edge label = `{✗ if error}{cnt} | {tin}k in · {tout}k out`. The **error edges are the recovery
-structure** — e.g. `edit source code ✗→ read source code` is "edit failed, go re-read".
+Edge label = `{✗ if error}{cnt} | {min}m | {tin}k in · {tout}k out` — transition count, total
+think-time, tokens read, tokens out. The **error edges are the recovery structure** — e.g.
+`edit source code ✗→ read source code` is "edit failed, go re-read".
 
-> **Token caveat — state it.** A bridging inference with _I_ incoming tools and _O_ outgoing
-> tools sits on _I×O_ tool→tool pairs, so its tokens are summed once **per pair**: the `cnt` is
-> a true path count, but the token sums over-count across fan-out and exceed real spend
-> (~10% of coach inferences fan out). `is_error` NULL (no matched result) is treated as ok.
+> **Fan-out caveat — state it.** A bridging inference with _I_ incoming tools and _O_ outgoing
+> tools sits on _I×O_ tool→tool pairs, so its time + tokens are summed once **per pair**: the
+> `cnt` is a true path count, but the time/token sums over-count across fan-out and exceed real
+> spend (~10% of coach inferences fan out). `is_error` NULL (no matched result) is treated as ok.
 
 ## 5 — Render (Graphviz)
 
-Emit a `.dot`: nodes `{state}\n{visits}x · {min}m`; ok edges grey/amber (tint `→respond`),
-**error edges red dashed** with a `✗`; `penwidth` ∝ √count. Color tool families (read/search
+Emit a `.dot`: nodes `{state}\n{visits}x · {min}m`; edges `{cnt} | {min}m | {tin}k in · {tout}k out`;
+ok edges grey/amber (tint `→respond`), **error edges red dashed** with a `✗`; `penwidth` ∝ √count.
+Color tool families (read/search
 blue, edit/write green, verify/test purple, version-control pink) and outline the
 comment-derived states so the shell refinement is visible. Then:
 
