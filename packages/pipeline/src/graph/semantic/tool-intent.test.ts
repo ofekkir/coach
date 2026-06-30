@@ -1,12 +1,14 @@
 import { coarseAction, defaultSemanticsConfig } from '@coach/semantics';
 import { describe, expect, it } from 'vitest';
 
-import { toolOntologyAction, toolPhrases } from './tool-intent.ts';
+import { toolEntries, toolOntologyAction } from './tool-intent.ts';
 
 const config = defaultSemanticsConfig;
 
 function readPhrase(filePath: string): string {
-  return toolPhrases(config, 'Read', { file_path: filePath }).join(' ');
+  return toolEntries(config, 'Read', { file_path: filePath })
+    .map((e) => e.static)
+    .join(' ');
 }
 
 describe('path object grounding under git worktrees', () => {

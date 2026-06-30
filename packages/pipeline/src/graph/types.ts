@@ -9,7 +9,8 @@ import type { Agent, CanonicalNode, MessageDeltas, SemanticFields, Session } fro
 //   1. Node data is additive per stage, keyed by a shared node id:
 //        stage 3 (canonical)  normalized node rows      → `nodes`
 //        stage 5              per-node message deltas     → `deltas`
-//        stage 6              per-node what + comment      → `semantics`
+//        stage 6              per-node semantic entries    → `semantics`
+//        stage 7              per-entry path grounding     → `semantics` (resolved)
 //   2. Edges are two different relations over the same nodes:
 //        containment ("child is contained in time by parent") — the `parent`
 //                     self-FK, surfaced as the `tree` (one parent per node).
@@ -102,13 +103,10 @@ export type ExecutionGraph = {
   readonly nodes: Readonly<Record<string, CanonicalNode>>;
   readonly deltas: Readonly<Record<string, MessageDeltas>>;
   readonly semantics: Readonly<Record<string, SemanticFields>>;
-  /** Stage-6 closed `action` per tool node, keyed by node id. A non-NULL bucket
-   *  (an ontology `coarseActions` id) for EVERY tool node — distinct from the
-   *  free-form `semantics.what`. */
-  readonly actions: Readonly<Record<string, string>>;
   /** Stage-6 closed `intent_category` per interaction node, keyed by node id. A
-   *  non-NULL bucket for EVERY interaction node (`other` is the fallback) — the
-   *  interaction-level analogue of `actions`, derived from the prompt text. */
+   *  non-NULL bucket for EVERY interaction node (`other` is the fallback), derived
+   *  from the prompt text. Stays a node-level dimension (materialized onto `nodes`),
+   *  distinct from the per-entry `action` carried inside `semantics`. */
   readonly intents: Readonly<Record<string, IntentCategory>>;
 } & (
   | { readonly kind: 'agent'; readonly data: AgentExecution }

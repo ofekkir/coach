@@ -24,6 +24,11 @@ function resolved(node: ResolvedNode['node'], semantics?: ResolvedNode['semantic
   return { node, ...(semantics != null ? { semantics } : {}) };
 }
 
+// A semantics overlay from a list of static labels (one entry each).
+function sem(...labels: string[]): ResolvedNode['semantics'] {
+  return { entries: labels.map((label) => ({ static: label })) };
+}
+
 describe('buildNodeCard', () => {
   it('collapses tool.execution to its display type with no title', () => {
     const exec: ToolExecutionNode = { id: 't', type: 'tool.execution', sessionId: SID, ...span };
@@ -73,7 +78,7 @@ describe('buildNodeCard', () => {
       ...span,
       ...tokens,
     };
-    const card = buildNodeCard(resolved(llm, { what: ['decides to read the file'] }));
+    const card = buildNodeCard(resolved(llm, sem('decides to read the file')));
     expect(card.title).toBe('decides to read the file');
     expect(JSON.stringify(card)).not.toContain('should never appear');
   });
@@ -87,15 +92,13 @@ describe('buildNodeCard', () => {
       tool_input: '{"file":"/secret/path"}',
       ...span,
     };
-    const card = buildNodeCard(resolved(tool, { what: ['edits config'] }));
+    const card = buildNodeCard(resolved(tool, sem('edits config')));
     expect(JSON.stringify(card)).not.toContain('/secret/path');
   });
 
   it('leads with the verb and carries the sub-verb + tool tag (enriched tool)', () => {
     const tool: ToolNode = { id: 'wf', type: 'tool', sessionId: SID, name: 'WebFetch', ...span };
-    const card = buildNodeCard(
-      resolved(tool, { what: ['fetch example.com', 'summarize headlines'] }),
-    );
+    const card = buildNodeCard(resolved(tool, sem('fetch example.com', 'summarize headlines')));
     expect(card.title).toBe('fetch example.com');
     expect(card.subtitle).toBe('summarize headlines');
     expect(card.tag).toBe('ACTION · WEBFETCH');
@@ -112,7 +115,7 @@ describe('buildNodeCard', () => {
       error_message: 'String to replace not found in file',
       ...span,
     };
-    const card = buildNodeCard(resolved(tool, { what: ['edits config'] }));
+    const card = buildNodeCard(resolved(tool, sem('edits config')));
     expect(card.error).toEqual({
       kind: 'invalid_args',
       message: 'String to replace not found in file',
@@ -128,7 +131,7 @@ describe('buildNodeCard', () => {
       is_error: false,
       ...span,
     };
-    expect(buildNodeCard(resolved(tool, { what: ['reads file'] })).error).toBeUndefined();
+    expect(buildNodeCard(resolved(tool, sem('reads file'))).error).toBeUndefined();
   });
 
   it('tags an inference by its off-spine source, leaving the main thread bare', () => {
@@ -141,7 +144,7 @@ describe('buildNodeCard', () => {
     } as const;
     const main: LlmRequestNode = { id: 'm', source: 'repl_main_thread', ...base };
     const bg: LlmRequestNode = { id: 'b', source: 'background', ...base };
-    const what = { what: ['plan next steps'] };
+    const what = sem('plan next steps');
     expect(buildNodeCard(resolved(main, what)).tag).toBe('INFERENCE');
     expect(buildNodeCard(resolved(bg, what)).tag).toBe('INFERENCE · BACKGROUND');
   });

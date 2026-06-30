@@ -62,13 +62,14 @@ ORDER BY duration_ms DESC`,
   },
   {
     title: 'Misleading files: most failed Edit/Write calls per file',
-    sql: `SELECT file_path,
-       COUNT(*)  AS failed_edits,
-       list(id)  AS node_ids
-FROM nodes
-WHERE type='tool' AND is_error
-  AND name IN ('Edit','Write','MultiEdit','NotebookEdit')
-GROUP BY file_path
+    sql: `SELECT s.repo_path,
+       COUNT(*)   AS failed_edits,
+       list(n.id) AS node_ids
+FROM nodes n
+JOIN semantics s ON s.id = n.id AND s.sequence_in_node = 0
+WHERE n.type='tool' AND n.is_error
+  AND n.name IN ('Edit','Write','MultiEdit','NotebookEdit')
+GROUP BY s.repo_path
 ORDER BY failed_edits DESC`,
   },
   {

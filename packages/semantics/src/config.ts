@@ -101,7 +101,6 @@ const ToolSemanticsSchema = z.object({
   object: z.string().optional(),
   target: TargetSpecSchema.optional(),
   phrase: z.string().optional(),
-  fallbackPhrase: z.string().optional(),
   escapeHatch: z.boolean().optional(),
   overrides: z.array(ToolOverrideSchema).optional(),
   modifiers: z.array(ToolModifierSchema).optional(),

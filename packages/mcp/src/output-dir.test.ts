@@ -24,6 +24,7 @@ const DUMPED_FILES = [
   '04-agent-graph.json',
   '05-execution-graph.json',
   '06-enriched-graph.json',
+  '07-resolved-graph.json',
   'graph.db',
 ];
 

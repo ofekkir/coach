@@ -73,17 +73,17 @@
     "Glob": {
       "action": "search",
       "target": { "field": "pattern", "kind": "literal" },
-      "phrase": "find files matching {target}"
+      "phrase": "find files"
     },
     "Grep": {
       "action": "search",
       "target": { "field": "pattern", "kind": "literal" },
-      "phrase": "search files for {target}"
+      "phrase": "search files"
     },
     "WebFetch": {
       "action": "fetch",
       "target": { "field": "url", "kind": "host" },
-      "phrase": "fetch {target}",
+      "phrase": "fetch web page",
       "commentField": "prompt",
       "modifiers": [
         {
@@ -95,17 +95,17 @@
     "WebSearch": {
       "action": "search-web",
       "target": { "field": "query", "kind": "literal" },
-      "phrase": "search the web for {target}"
+      "phrase": "search the web"
     },
     "Task": {
       "action": "delegate",
       "target": { "field": "subagent_type", "kind": "literal" },
-      "phrase": "delegate to {target} subagent"
+      "phrase": "delegate to subagent"
     },
     "Agent": {
       "action": "delegate",
       "target": { "field": "subagent_type", "kind": "literal" },
-      "phrase": "delegate to {target} subagent",
+      "phrase": "delegate to subagent",
       "note": "current name for Task"
     },
     "TodoWrite": {
@@ -129,20 +129,19 @@
     "Skill": {
       "action": "use-skill",
       "target": { "field": "skill", "kind": "literal" },
-      "phrase": "use {target} skill"
+      "phrase": "use skill"
     },
     "SlashCommand": {
       "action": "run",
       "target": { "field": "command", "kind": "literal", "extract": "^/?([A-Za-z0-9_-]+)" },
-      "phrase": "run {target} command",
+      "phrase": "run command",
       "note": "A user/project-defined command whose effect is arbitrary (it expands to a prompt), so it is `run`, not `use-skill`. Field is `command` (e.g. '/review-pr 123')."
     },
     "ToolSearch": {
       "action": "load-schema",
       "object": "tool",
       "target": { "field": "query", "kind": "literal", "extract": "select:([A-Za-z0-9_]+)" },
-      "phrase": "load {target} tool schema",
-      "fallbackPhrase": "load tool schema"
+      "phrase": "load tool schema"
     },
     "TaskCreate": {
       "action": "plan",

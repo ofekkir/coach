@@ -49,7 +49,7 @@ describe('pipeline e2e', () => {
     const closed: ReadonlySet<string> = new Set(defaultSemanticsConfig.ontology.coarseActions);
     const toolIds = toolNodeIds(first);
     expect(toolIds.length).toBeGreaterThan(0);
-    const actions = toolIds.map((id) => first.actions[id]);
+    const actions = toolIds.map((id) => toolAction(first, id));
     expect(actions.every((action) => action != null && closed.has(action))).toBe(true);
     expect(actionCounts(first)).toEqual(actionCounts(second));
   });
@@ -74,10 +74,15 @@ function toolNodeIds(graph: ExecutionGraph): string[] {
     .map((node) => node.id);
 }
 
+// A tool node is single-entry, so its coarse action is its entry[0].action.
+function toolAction(graph: ExecutionGraph, id: string): string | undefined {
+  return graph.semantics[id]?.entries[0]?.action;
+}
+
 function actionCounts(graph: ExecutionGraph): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const id of toolNodeIds(graph)) {
-    const action = graph.actions[id] ?? 'other';
+    const action = toolAction(graph, id) ?? 'other';
     counts[action] = (counts[action] ?? 0) + 1;
   }
   return counts;

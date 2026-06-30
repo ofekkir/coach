@@ -156,7 +156,6 @@ export function buildExecutionGraph(agentGraph: AgentGraph): ExecutionGraph {
     nodes: state.nodes,
     deltas: state.deltas,
     semantics: {},
-    actions: {},
     intents: {},
   };
 }

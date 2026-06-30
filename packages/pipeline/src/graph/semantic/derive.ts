@@ -1,11 +1,11 @@
-import { actionLabel, isRecord, type SemanticsConfig } from '@coach/semantics';
+import { actionLabel, coarseAction, isRecord, type SemanticsConfig } from '@coach/semantics';
 
-import type { RequestMessage, ResponseMessage } from '../../types.ts';
+import type { RequestMessage, ResponseMessage, SemanticEntry } from '../../types.ts';
 
-import { toolPhrases } from './tool-intent.ts';
+import { toolEntries } from './tool-intent.ts';
 
 // ════════════════════════════════════════════════════════════════════════════
-// derive.ts — turns a raw llm_request node into deterministic label phrases,
+// derive.ts — turns a raw llm_request node into deterministic semantic entries,
 // reading all harness-specific knowledge from the injected SemanticsConfig. It is
 // HARNESS-AGNOSTIC: the only thing baked in is the pipeline's normalized message
 // shape (a ResponseMessage has a `type`; text blocks have `text`; tool-call blocks
@@ -14,11 +14,11 @@ import { toolPhrases } from './tool-intent.ts';
 // markers — comes from config, not from this file.
 //
 // Three deterministic signals, in the order the stage applies them:
-//   1. markerLabel()      harness-internal calls (session title, suggestion mode)
-//                         that fully determine the label — no model needed.
-//   2. structuralPrefix() roles read from the response shape: a thinking block →
-//                         "plan…", a trailing tool call → "invoke <tool intent>".
-//   3. toolPhrases()      (tool-intent.ts) the tool/command intent itself.
+//   1. markerEntries()     harness-internal calls (session title, suggestion mode)
+//                          that fully determine the label — no model needed.
+//   2. structuralEntries() roles read from the response shape: a thinking block →
+//                          "plan…", a trailing tool call → "invoke <tool intent>".
+//   3. toolEntries()       (tool-intent.ts) the tool/command intent itself.
 // What is left — the act of a genuine final text message — is the model's job.
 //
 // Pure module (no node:* imports), like the stage that consumes it.
@@ -86,11 +86,9 @@ export function parseToolInput(input: string | undefined): Record<string, unknow
   }
 }
 
-// Promoted-column source: the single source of truth for the file path and bash
-// command carried in a tool node's `tool_input`. Both the materializer (nodes.
-// file_path / nodes.bash_command) and the action classifier read from here.
-const PATH_FIELDS = ['file_path', 'notebook_path'] as const;
-
+// Promoted-column source: the single source of truth for the bash command carried
+// in a tool node's `tool_input` — read by the materializer (nodes.bash_command) and
+// the shell-command action classifier.
 function firstNonEmptyField(
   input: Record<string, unknown>,
   keys: readonly string[],
@@ -100,13 +98,6 @@ function firstNonEmptyField(
     if (typeof value === 'string' && value !== '') return value;
   }
   return null;
-}
-
-/** The path-bearing field of a file tool's input (Read/Edit/Write → `file_path`,
- *  NotebookEdit → `notebook_path`), or NULL when none is present. Total: never
- *  throws — malformed/missing input yields NULL. */
-export function extractFilePath(input: Record<string, unknown>): string | null {
-  return firstNonEmptyField(input, PATH_FIELDS);
 }
 
 /** The shell command of a Bash tool's input (`command`), or NULL when absent.
@@ -119,35 +110,40 @@ export function extractBashCommand(input: Record<string, unknown>): string | nul
 
 type StructuralRole = SemanticsConfig['agent']['structuralRoles']['rules'][number];
 
-function invokePhrase(config: SemanticsConfig, rule: StructuralRole, call: ToolCall): string {
+/** The entry for one structural tool-call: the underlying tool's STATIC base entry
+ *  (label + coarse action + the argument it touched), with its label wrapped by the
+ *  role phrase ("read source code" → "invoke read source code"). An override replaces
+ *  only the label; the tool's action / `rawPath` / `url` carry through, so an
+ *  inference that fires two reads emits two entries each carrying its own path. */
+function invokeEntry(config: SemanticsConfig, rule: StructuralRole, call: ToolCall): SemanticEntry {
+  const base: SemanticEntry = toolEntries(config, call.name, call.input)[0] ?? { static: 'tool' };
   const override = rule.overrides?.find((o) => o.when.toolName === call.name);
-  if (override != null) return override.phrase;
-  const toolPhrase = toolPhrases(config, call.name, call.input)[0] ?? 'tool';
-  return rule.phrase.replace('{toolPhrase}', toolPhrase);
+  const label =
+    override != null ? override.phrase : rule.phrase.replace('{toolPhrase}', base.static);
+  return { ...base, static: label };
 }
 
-function rolePhrases(
+function roleEntries(
   config: SemanticsConfig,
   rule: StructuralRole,
   response: readonly ResponseMessage[],
-): string[] {
+): SemanticEntry[] {
   const { responseHasBlockType: hasType, responseEndsWithBlockType: endsType } = rule.when;
-  if (hasType != null && responseHasBlockType(response, hasType)) return [rule.phrase];
-  if (endsType != null) {
-    const calls = toolCallsOfType(response, endsType);
-    return calls.map((call) => invokePhrase(config, rule, call));
-  }
+  if (hasType != null && responseHasBlockType(response, hasType))
+    return [{ static: rule.phrase, action: coarseAction(config, rule.action) }];
+  if (endsType != null)
+    return toolCallsOfType(response, endsType).map((call) => invokeEntry(config, rule, call));
   return [];
 }
 
-/** Deterministic prefix phrases for an inference — one per matching structural
- *  role (e.g. ["plan next steps", "invoke read package.json"]). When a turn
- *  invokes multiple tools in parallel, each generates its own phrase. */
-export function structuralPrefix(
+/** Deterministic prefix entries for an inference — one per matching structural role
+ *  (e.g. [{static:"plan next steps"}, {static:"invoke read source code", rawPath:…}]).
+ *  When a turn invokes multiple tools in parallel, each generates its own entry. */
+export function structuralEntries(
   config: SemanticsConfig,
   response: readonly ResponseMessage[],
-): string[] {
-  return config.agent.structuralRoles.rules.flatMap((rule) => rolePhrases(config, rule, response));
+): SemanticEntry[] {
+  return config.agent.structuralRoles.rules.flatMap((rule) => roleEntries(config, rule, response));
 }
 
 // ── Harness markers (session-title, suggestion-mode) ───────────────────────────
@@ -166,13 +162,14 @@ function requestStartsWith(request: readonly RequestMessage[], prefix: string): 
   return request.some((m) => textFromContent(m.content).trimStart().startsWith(prefix));
 }
 
-/** The deterministic label for a harness-internal call (session title,
- *  suggestion mode, …), or undefined when no marker matches. */
-export function markerLabel(
+/** The deterministic entry for a harness-internal call (session title, suggestion
+ *  mode, …), or undefined when no marker matches. A single static entry carrying the
+ *  marker's action label + coarse bucket. */
+export function markerEntries(
   config: SemanticsConfig,
   request: readonly RequestMessage[],
   response: readonly ResponseMessage[],
-): readonly string[] | undefined {
+): SemanticEntry[] | undefined {
   const respText = responseText(response) ?? '';
   const matched = config.agent.markers.rules.find((marker) => {
     const { responseJsonHasStringKey, requestTextStartsWith } = marker.when;
@@ -181,5 +178,8 @@ export function markerLabel(
     if (requestTextStartsWith != null) return requestStartsWith(request, requestTextStartsWith);
     return false;
   });
-  return matched != null ? [actionLabel(config, matched.action)] : undefined;
+  if (matched == null) return undefined;
+  return [
+    { static: actionLabel(config, matched.action), action: coarseAction(config, matched.action) },
+  ];
 }

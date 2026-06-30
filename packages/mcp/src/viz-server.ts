@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { outputDir } from './output-dir.ts';
 
-const DEFAULT_DATA_FILE = '06-enriched-graph.json';
+const DEFAULT_DATA_FILE = '07-resolved-graph.json';
 
 // packages/mcp/src/viz-server.ts → packages/app/dist
 const APP_DIST = fileURLToPath(new URL('../../app/dist', import.meta.url));

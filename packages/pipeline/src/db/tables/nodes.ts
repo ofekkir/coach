@@ -61,14 +61,7 @@ export const NODES: TableSpec = {
       doc: 'tool: serialized tool input. Identical (name, tool_input) ≥2× in one interaction is the redundant-tool signal.',
     },
     // prettier-ignore
-    { name: 'file_path', sqlType: 'VARCHAR', doc: 'tool: the file path a path-bearing file tool targets (Read/Edit/Write → file_path, NotebookEdit → notebook_path), promoted from tool_input. NULL for non-file tools and on malformed input.' },
-    // prettier-ignore
     { name: 'bash_command', sqlType: 'VARCHAR', doc: 'tool: the shell command a Bash tool runs, promoted from tool_input.command. NULL for non-Bash tools and on malformed input. Invariant: every name=\'Bash\' node carries a non-NULL command.' },
-    {
-      name: 'action',
-      sqlType: 'VARCHAR',
-      doc: "tool: closed activity bucket, NON-NULL for every tool node — 'explore'|'author'|'edit'|'run'|'test'|'verify'|'vcs'|'setup'|'mcp'|'meta'|'research'|'delegate'|'plan'|'other'. Deterministically derived from (name, bash command); GROUP BY it for stable counts. Coarse dimension, distinct from the free-form semantics.what.",
-    },
     // prettier-ignore
     { name: 'is_error', sqlType: 'BOOLEAN', doc: "tool: did the matched tool_result carry is_error=true? Matched by tool_use_id from the consuming inference's request messages. NULL when no result was matched (those stay NULL, queryable as such)." },
     // prettier-ignore
@@ -88,9 +81,7 @@ export const NODES: TableSpec = {
       doc: 'interaction: the user prompt text (the spine head; not a separate node).',
     },
     // prettier-ignore
-    { name: 'repo_path', sqlType: 'VARCHAR', doc: "tool: repo-relative file path derived from tool_input (Read/Edit/Write/etc). Worktree-normalized — a path under …/.claude/worktrees/<id>/<rest> collapses to <rest>, so the same file under two worktrees yields ONE repo_path. Never contains '/.claude/worktrees/' and never has a leading '/'. NULL when the tool input carries no file path." },
-    // prettier-ignore
-    { name: 'intent_category', sqlType: 'VARCHAR', doc: "interaction: closed intent bucket, NON-NULL for every interaction node — 'debug'|'feature'|'refactor'|'explain'|'test'|'ops'|'research'|'other'. Deterministically derived from the prompt by the stage-6 labeler; GROUP BY it for stable per-intent counts. NULL for non-interaction nodes." },
+    { name: 'intent_category', sqlType: 'VARCHAR', doc: "interaction: closed intent bucket, NON-NULL for every interaction node — 'debug'|'feature'|'refactor'|'explain'|'test'|'ops'|'research'|'other'. Deterministically derived from the prompt by the stage-6 labeler; GROUP BY it for stable per-intent counts. NULL for non-interaction nodes. (Per-tool activity lives on semantics.action, not here.)" },
     {
       name: 'data',
       sqlType: 'JSON',

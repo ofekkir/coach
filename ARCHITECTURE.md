@@ -38,25 +38,26 @@ scripts/          Node CLI — reads from disk, writes JSON artifacts
 
 ## Package layout
 
-| Package / dir        | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `packages/pipeline`  | Staged pipeline: classify → route → canonical → aggregate → execution graph → semantic enrichment, plus orchestration, plus the graph→DB SQL (`db/`: the relational schema specs + `materializeSql`), plus filesystem **intake** (`intake/`: directory/repo-name → `PipelineResult`, shared by the MCP and the e2e CLI). Ends at the enriched graph — curated analysis is queries, not a stage. Organizes data losslessly; carries no presentation. The staged transform + graph + DB SQL are pure (zero `node:*`); `intake/` is the one node-only surface (`node:fs`/`node:os`), kept in its own module so the browser app — which imports only the pure graph/types/orchestration exports — never reaches it (its exports tree-shake out of the browser bundle). |
-| `packages/app`       | React SPA: renders a pre-computed `ExecutionGraph` (loaded from a file or fetched via `?data=<url>`); graph visualization + data-source seam. Does not run the pipeline in the browser.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `packages/mcp`       | MCP server over the stage-6 graph. Owns the backend-neutral query core (`query-core.ts` + `guard.ts`/`result.ts`: read-only UX guard, capped JSON-safe results, graph traversal) over a `Connection` port, plus the node-api `Connection` (`duckdb.ts`) that runs `@coach/pipeline`'s `materializeSql` into a temp file-backed DuckDB and serves it through a READ_ONLY handle. Exposes read-only SQL + graph-traversal tools so an analyst agent drives its own analyses. Node-only (filesystem + native DuckDB). See "MCP query surface".                                                                                                                                                                                                                        |
-| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `scripts/`           | Node CLI over the same pipeline. `pnpm e2e <dir \| repo-name>` calls `@coach/pipeline`'s `loadFromSource` (the same intake the MCP uses) and writes `out/*.json` + `.db` artifacts. Uses `@coach/logger` for structured log output.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Package / dir        | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/logger`    | Shared pino logger; the transport/stream is the single seam for sending logs to OTEL/Coralogix/Datadog later.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `packages/pipeline`  | Staged pipeline: classify → route → canonical → aggregate → execution graph → semantic enrichment → resolve, plus orchestration, plus the graph→DB SQL (`db/`: the relational schema specs + `materializeSql`), plus filesystem **intake** (`intake/`: directory/repo-name → `PipelineResult`, shared by the MCP and the e2e CLI). Ends at the resolved graph — curated analysis is queries, not a stage. Organizes data losslessly; carries no presentation. The staged transform + graph + DB SQL are pure (zero `node:*`); `intake/` is the one node-only surface (`node:fs`/`node:os`), kept in its own module so the browser app — which imports only the pure graph/types/orchestration exports — never reaches it (its exports tree-shake out of the browser bundle). |
+| `packages/app`       | React SPA: renders a pre-computed `ExecutionGraph` (loaded from a file or fetched via `?data=<url>`); graph visualization + data-source seam. Does not run the pipeline in the browser.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `packages/mcp`       | MCP server over the stage-7 resolved graph. Owns the backend-neutral query core (`query-core.ts` + `guard.ts`/`result.ts`: read-only UX guard, capped JSON-safe results, graph traversal) over a `Connection` port, plus the node-api `Connection` (`duckdb.ts`) that runs `@coach/pipeline`'s `materializeSql` into a temp file-backed DuckDB and serves it through a READ_ONLY handle. Exposes read-only SQL + graph-traversal tools so an analyst agent drives its own analyses. Node-only (filesystem + native DuckDB). See "MCP query surface".                                                                                                                                                                                                                         |
+| `packages/semantics` | Semantics config as a pure package: Zod schemas + `assembleSemanticsConfig` + the bundled JSON artifacts (`src/data/ontology`, `agents`) + `defaultSemanticsConfig`. JSON is imported (bundled), never read from disk. See its README.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `scripts/`           | Node CLI over the same pipeline. `pnpm e2e <dir \| repo-name>` calls `@coach/pipeline`'s `loadFromSource` (the same intake the MCP uses) and writes `out/*.json` + `.db` artifacts. Uses `@coach/logger` for structured log output.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ## Data flow
 
-`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — six
+`packages/pipeline/src/orchestrate.ts` exposes `runPipeline(files, config?): PipelineResult` — seven
 named stages, each surfaced as a member: `classified`, `sessions`, `canonicalBySession`,
-`agentGraph`, `executionGraph`, `enrichedGraph`. The transform itself is pure and
+`agentGraph`, `executionGraph`, `enrichedGraph`, `resolvedGraph`. The transform itself is pure and
 file-system-free (the app calls it directly); the directory/repo gather that feeds it lives
 beside it in `intake/` (`loadPipelineResult`, `loadPipelineResultFromDirs`, `loadFromSource`),
-which the MCP and the e2e CLI share. Stage 6 enrichment is deterministic, always runs (using `config`,
-defaulting to the bundled `defaultSemanticsConfig`), and is the final stage — curated analysis is
-not a pipeline stage (every rollup is a query; see "MCP query surface").
+which the MCP and the e2e CLI share. Stages 6–7 (enrich, then resolve) are deterministic, always run
+(using `config`, defaulting to the bundled `defaultSemanticsConfig`); `resolvedGraph` is the final
+stage — the one the DB materializes and the app renders — and curated analysis is not a pipeline
+stage (every rollup is a query; see "MCP query surface").
 `buildVizResultFromExecutionGraph` is a thin adapter that wraps a pre-computed execution graph in the
 `VizResult` shape the renderer consumes (used by the app's pipeline-output loader).
 
@@ -64,46 +65,46 @@ The pipeline **organizes** data; it does not decide how to render it. The execut
 **normalized, stage-layered, id-keyed model** that maps 1:1 to a relational DB, so persistence is a
 later drop-in with no reshaping. Three concerns are kept strictly separate:
 
-- **Node data is additive per stage, keyed by a shared node id.** Three id-keyed tables hang off the
+- **Node data is additive per stage, keyed by a shared node id.** The id-keyed tables hang off the
   `ExecutionGraph`: `nodes` (stage 3 canonical data — the value type is `CanonicalNode`), `deltas`
   (stage 5 — per-`llm_request` `requestMessagesDelta` / `responseMessagesDelta`, the messages new to
-  that step vs. the previous request in the same thread), `semantics` (stage 6 — per-node `what`
-  plus an optional `comment`), `actions` (stage 6 — one **closed `action`** per tool node), and
-  `intents` (stage 6 — one **closed `intent_category`** per interaction node, derived from the
-  prompt; the interaction-level analogue of `action`).
-  `node.id == data.id` across every layer (1:1 joins). A node "points
-  to" its data **by id, resolved through a table** (`nodeData` / `deltasOf` / `semanticsOf` /
-  `resolve`) — never an embedded object, so nothing re-duplicates on serialize/DB. There is **no
-  `action`/`inference` node type**: "is this node enriched?" is answered by "does a `semantics[id]`
-  row exist".
-- **`action` is a closed activity dimension, distinct from the free-form `semantics.what`.** `what`
-  is rich, ordered, open-ended human-readable phrasing; `action` is a single value from a small fixed
-  set (the ontology's `coarseActions`: `explore|author|edit|run|test|verify|vcs|setup|mcp|research|
-delegate|plan|other`) so the store can `GROUP BY action` for stable, comparable counts. It is **not a
-  second taxonomy** and it is **not hardcoded**: `action` is a COARSENING of the ontology's own ~30
-  action ids, and the rollup lives in the ontology DATA — every action carries a `coarse` field, and
-  `@coach/semantics`'s `action.ts` is pure resolver logic (`coarseAction`) that just reads it. The config
-  layer resolves each tool call to one ontology action (`toolOntologyAction`); `coarseAction` rolls that
-  up — one classification source of truth, no parallel TS table. The shell escape-hatch tools (Bash) are
-  the one surface with no per-tool spec, so their command grammar (git→vcs, pytest→test, build→setup) is
-  also DATA — the ontology's `commands` block — resolved by `shellCommandAction` into an ontology action,
-  then rolled up the same way (so even Bash flows through the single rollup). The free-form
-  `semantics.what` for a Bash node reuses that same grammar resolution (`escapeHatchPhrase` in
-  `tool-intent.ts`): it renders the resolved action's label (`git commit`→"version control",
-  `grep`→"search") rather than the literal "bash", qualifying the generic `run` fallback with the
-  invoked program (`python3 build.py`→"run python3") so the phrase always names what ran.
-  `assembleSemanticsConfig`
-  enforces the integrity: every action's `coarse` is a declared `coarseActions` id and every command rule
-  resolves to a real action, so the dimension cannot drift into unaggregatable values. Derived
-  deterministically (no LLM) in stage 6 for **every** tool node — never NULL — and surfaces as the
-  non-NULL `nodes.action` column. The Bash command and file path are promoted to their own `nodes`
-  columns — `bash_command` (from `tool_input.command`) and `file_path` (from
-  `tool_input.file_path`/`notebook_path`) — by a single total extractor (`extractBashCommand` /
-  `extractFilePath` in `graph/semantic/derive.ts`) reused by both the materializer and the shell
-  classifier, so
-  there is one source of truth for the command. Both
-  are NULL for tools that don't carry them and on malformed input (the extractor never throws);
-  invariant: every `name='Bash'` node has a non-NULL `bash_command`, and every Read node a `file_path`.
+  that step vs. the previous request in the same thread), `semantics` (stages 6–7 — per-node
+  `SemanticFields`: an ordered list of `SemanticEntry` plus an optional `comment`), and `intents`
+  (stage 6 — one **closed `intent_category`** per interaction node, derived from the prompt).
+  `node.id == data.id` across every layer. `semantics` is the one **1:N** layer — a node maps to N
+  entries, materialized one DB row per entry ordered by `sequence_in_node` — so its join is by id, not
+  necessarily 1:1; the others are 1:1. A node "points to" its data **by id, resolved through a table**
+  (`nodeData` / `deltasOf` / `semanticsOf` / `resolve`) — never an embedded object, so nothing
+  re-duplicates on serialize/DB. There is **no `action`/`inference` node type**: "is this node
+  enriched?" is answered by "does a `semantics[id]` row exist".
+- **Each `SemanticEntry` is INPUT-INDEPENDENT — `static` is the act with the argument stripped.**
+  Every "load a tool schema" reads the same `static` ("load tool schema", not "load EnterWorktree tool
+  schema"); the specific argument it acted on survives as the entry's structured fields — `repoPath`
+  (a file path), `package`, `url` — never folded back into the label. An inference that fires three
+  tools emits three entries, each carrying its own path, so per-entry context is real, not per-node.
+- **`action` is a closed activity dimension carried per entry, distinct from the free-form `static`.**
+  `static` is rich, ordered, human-readable; `action` is a single value from a small fixed set (the
+  ontology's `coarseActions`: `explore|author|edit|run|test|verify|vcs|setup|mcp|research|delegate|
+plan|other`) so the store can `GROUP BY action` (filtering to tool nodes via a join) for stable,
+  comparable counts. It is **not a second taxonomy** and it is **not hardcoded**: `action` is a
+  COARSENING of the ontology's own ~30 action ids, and the rollup lives in the ontology DATA — every
+  action carries a `coarse` field, and `@coach/semantics`'s `action.ts` is pure resolver logic
+  (`coarseAction`) that just reads it. The config layer resolves each tool call to one ontology action
+  (`toolOntologyAction`); `coarseAction` rolls that up — one classification source of truth, no
+  parallel TS table. The shell escape-hatch tools (Bash) are the one surface with no per-tool spec, so
+  their command grammar (git→vcs, pytest→test, build→setup) is also DATA — the ontology's `commands`
+  block — resolved by `shellCommandAction` into an ontology action, then rolled up the same way. A
+  Bash entry's `static` reuses that same grammar resolution (`escapeHatchEntry` in `tool-intent.ts`):
+  it renders the resolved action's label (`git commit`→"version control", `grep`→"search") rather than
+  the literal "bash", and collapses an unclassified command to the generic "run" (the program lives in
+  `bash_command`, not the label). `assembleSemanticsConfig` enforces the integrity: every action's
+  `coarse` is a declared `coarseActions` id and every command rule resolves to a real action, so the
+  dimension cannot drift into unaggregatable values. Derived deterministically (no LLM) in stage 6 for
+  **every** tool node — never NULL on a tool entry — and surfaces as `semantics.action`. The Bash
+  command is promoted to the `nodes.bash_command` column (from `tool_input.command`) by a single total
+  extractor (`extractBashCommand` in `graph/semantic/derive.ts`) reused by both the materializer and
+  the shell classifier; it is NULL for non-Bash tools and on malformed input (the extractor never
+  throws); invariant: every `name='Bash'` node has a non-NULL `bash_command`.
 - **Edges are two different relations over the same nodes.** _Containment_ ("child is contained in
   time by parent") is the `parent` self-FK, surfaced per interaction as `tree` (an id-only
   `ExecutionNode` = `{ id, children }`). _Causal_ ("effect triggered by cause") is its own DAG edge
@@ -199,25 +200,34 @@ Input files (accumulating — user stages N files/folders before submitting)
                             OTEL gets it via enrich (from the tool decision log).
         │
         ▼  Stage 6 — graph/semantic/semantic.ts  → ExecutionGraph (enriched)
-   enrichExecutionGraph(graph, config)  a PURE TABLE PASS: iterates the `nodes`
-                            table and, for each `tool` / `llm_request`, writes a
-                            `semantics[id]` row (`what` + optional `comment`). No tree
-                            walk — a node's label depends only on its own data and its
-                            stage-5 deltas (read by id). tool-intent.ts + derive.ts label
-                            each node deterministically (tool intent, path conventions,
+   enrichExecutionGraph(graph, config)  a PURE, NODE-LOCAL TABLE PASS: iterates the
+                            `nodes` table and, for each `tool` / `llm_request`, writes a
+                            `semantics[id]` row — an ordered list of input-independent
+                            `SemanticEntry` (`static` + coarse `action` + the raw
+                            argument it touched) + optional `comment`. No tree walk — a
+                            node's labels depend only on its own data and its stage-5
+                            deltas (read by id). tool-intent.ts + derive.ts label each
+                            node deterministically (tool intent, path conventions,
                             thinking→plan, tool_use→invoke, session-title,
                             suggestion-mode) by interpreting the injected SemanticsConfig
                             — no hardcoded tool tables, no model. A genuine terminal
-                            assistant message is labeled with the generic `respond`
-                            act.
-        │   (Stage 6 is the final pipeline stage — there is NO curated-analysis
+                            assistant message is labeled with the generic `respond` act.
+        │
+        ▼  Stage 7 — graph/resolve/resolve.ts  → ExecutionGraph (resolved)
+   resolveGraph(graph, config)  GROUNDING pass: the seam where node-local labels meet
+                            SESSION data. For each entry, grounds the raw path with the
+                            owning session's cwd → `repoPath` (worktree + cwd normalized)
+                            + deduced `package`, dropping the raw path. The one
+                            cwd-dependent step, kept out of stage 6 so enrichment stays
+                            node-local and `materialize.ts` stays a mechanical writer.
+        │   (Stage 7 is the final pipeline stage — there is NO curated-analysis
         │    stage. Every rollup one would compute — per-interaction shape /
         │    cost / tokens / longest step, redundant tools, misleading files — is
         │    a one-line query over the materialized tables; see "MCP query
         │    surface". The renderer's one need, the longest main-thread step it
         │    accents, is a small render-time pick in the app's `viz/layout`, not a
         │    shared stage.)
-        ▼  buildVizResultFromExecutionGraph() adapter → VizResult  (execution graph)
+        ▼  buildVizResultFromExecutionGraph() adapter → VizResult  (resolved graph)
         ▼  packages/app/src/viz/App  (React Flow graph renderer)
 ```
 
@@ -243,9 +253,10 @@ generic `respond` act; a weak-model labeler that classified that act more finely
 reintroducing it. The interpreter (`graph/semantic`) is agent-agnostic, so a different domain/agent is
 a config swap, not a code change. See `packages/semantics/README.md` for the resolution order and
 what is deliberately out of scope (composition/inference roll-up). Enrichment writes into the
-`semantics` table (one row per relabeled node), the `actions` table (one closed `action` per tool
-node, the ontology-action rollup `coarseAction`, with `shellCommandAction` for shell tools), and the `intents` table (one closed `intent_category` per
-interaction node, derived from the prompt by `classifyIntent`), and leaves the `nodes`/`deltas`/edges
+`semantics` table (an ordered `SemanticEntry` list per relabeled node — each carrying `static`, the
+`coarseAction` rollup `action`, and the raw argument; `shellCommandAction` resolves shell tools) and
+the `intents` table (one closed `intent_category` per interaction node, derived from the prompt by
+`classifyIntent`), and leaves the `nodes`/`deltas`/edges
 untouched — the old copied twin types (`ActionNode`/`InferenceNode`) are retired.
 
 **`nodes.cost_usd` is the traced cost only — never an estimate.** The canonical builder fills it
@@ -323,7 +334,7 @@ panel; the raw `canonical` node stays one click away in the JSON viewer.
 
 There is deliberately **no curated-analysis stage or tool**: a fixed set of hardcoded findings is the
 wrong shape for a problem this open-ended. `@coach/mcp` is the **flexible** alternative: it exposes the
-stage-6 `ExecutionGraph` as a queryable relational surface so an analyst agent composes its own
+stage-7 resolved `ExecutionGraph` as a queryable relational surface so an analyst agent composes its own
 analyses, and `describe_schema` ships the would-be findings (cost/shape/repetition/hotspot/misleading
 files) as example SQL to extend. This is the deliberate payoff of the normalized, id-keyed model — the
 graph "maps 1:1 to a relational DB" (see the node-data/edge tables above), so making it queryable is a
@@ -335,8 +346,9 @@ not a reshape.
   (the single source of truth for both the DDL **and** the `describe_schema` tool, so they cannot drift).
   Each relation's spec lives in its own file — one per table under `db/tables/` and one per view under
   `db/views/` — and `schema.ts` only imports them and orders them into `TABLES` (materialized tables
-  first, views last). Tables mirror the model: the three id-keyed node-data layers (`nodes` / `deltas` /
-  `semantics`), the two edge relations (`containment` / `causal_edges`), `threads` (layout lanes), and
+  first, views last). Tables mirror the model: the id-keyed node-data layers (`nodes` / `deltas` 1:1,
+  `semantics` 1:N — one row per `SemanticEntry`, keyed `(id, sequence_in_node)`), the two edge relations
+  (`containment` / `causal_edges`), `threads` (layout lanes), and
   the `agents` / `sessions` dimension entities. The `nodes` table promotes common + type-specific columns
   and keeps the full raw node in a `data` JSON column (the escape hatch for un-promoted fields). Span
   timing is the numeric `start_time_ns`/`end_time_ns` **BIGINT** columns — full-precision int64
@@ -348,16 +360,17 @@ not a reshape.
   (ties are possible), and a gap-free positional index for "n-th step" / "next step" (`seq+1`)
   arithmetic and adjacency self-joins: `ORDER BY seq` == `ORDER BY start_time_ns, id`. The `sessions` dimension carries `cwd` and
   `branch` (the working directory + git branch a session ran in; populated for native Claude
-  sessions, NULL for OTEL traces, which expose neither). The `nodes` table adds a worktree-normalized
-  `repo_path` (`db/repo-path.ts`): the file path a tool touched, derived from `tool_input`, collapsed
-  to a single repo-relative form so the SAME file accessed under two different git worktrees yields ONE
-  `repo_path`. The rule strips any `…/.claude/worktrees/<id>/<rest>` (or bare `worktrees/<id>/`) segment
-  to `<rest>`, else makes the path relative to the session's (worktree-normalized) `cwd`; a path that
-  lives under any other `.claude/` directory (e.g. the home `~/.claude/projects|plans`) anchors at that
-  `.claude/` segment so config files outside the project still read as `.claude/<rest>`; the result
-  never contains `/.claude/worktrees/` and never has a leading `/`. No hard-coded prefix. This lives in
-  the pipeline because the graph→DB mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it.
-  The stage-6 path→object grounding (`graph/semantic/tool-intent.ts`) reuses the same worktree strip
+  sessions, NULL for OTEL traces, which expose neither). The per-entry `semantics.repo_path` is the
+  worktree-normalized file path an entry touched (`db/repo-path.ts`), **grounded in stage 7** with the
+  session's `cwd` (the one cwd-dependent step), collapsed to a single repo-relative form so the SAME
+  file accessed under two different git worktrees yields ONE `repo_path`. The rule strips any
+  `…/.claude/worktrees/<id>/<rest>` (or bare `worktrees/<id>/`) segment to `<rest>`, else makes the path
+  relative to the session's (worktree-normalized) `cwd`; a path that lives under any other `.claude/`
+  directory (e.g. the home `~/.claude/projects|plans`) anchors at that `.claude/` segment so config
+  files outside the project still read as `.claude/<rest>`; the result never contains
+  `/.claude/worktrees/` and never has a leading `/`. No hard-coded prefix. This lives in the pipeline
+  because the mapping is pure (no `node:*`): the pipeline owns it, the MCP runs it. The stage-6
+  path→object grounding (`graph/semantic/tool-intent.ts`) reuses the same worktree strip
   (`stripWorktreeSegment`) before applying the ontology path conventions, so a source file edited inside
   a worktree grounds to its real object type (source code, documentation) instead of matching the
   `.claude/` agent-config rule on its raw absolute path.
@@ -391,7 +404,7 @@ not a reshape.
   blocklist; the `Store`'s guard only rejects non-`SELECT`/multi-statement input for a friendly error.
   DuckDB was chosen over the workload scale (tiny) — for JSON columns, analytical SQL, and recursive
   CTEs.
-- **`.db` export (`coach-build-db`).** `writePersistedDb(graph, dbPath)` materializes a stage-6 graph
+- **`.db` export (`coach-build-db`).** `writePersistedDb(graph, dbPath)` materializes a stage-7 resolved graph
   into a standalone, queryable `.db` — **the query tables only** (no embedded graph). It's a SQL
   snapshot for ad-hoc inspection in the duckdb CLI; coach itself does **not** re-load it (the MCP always
   re-derives from source). `coach-build-db <traces-dir> [out.db]` (root `pnpm build-db`) writes one:
@@ -410,9 +423,9 @@ not a reshape.
   the last directory load, and hand back a boot URL — `?data=<file>` plus either `&focus=<nodeId>`
   to center one node or `&source=<id>&dest=<id>` to highlight a related pair and fit both into view).
   There is **no** `get_analysis` tool and no curated-analysis stage: every rollup one would compute is a
-  one-line query over these tables (`interaction_metrics`, the promoted `is_error`/`file_path`/`action`
-  columns), so the findings ship as `describe_schema` example queries the agent composes — not a frozen
-  tool. Tools carry a Zod input shape; the MCP layer validates args.
+  one-line query over these tables (`interaction_metrics`, the promoted `nodes.is_error`, and
+  `semantics.repo_path`/`action`), so the findings ship as `describe_schema` example queries the agent
+  composes — not a frozen tool. Tools carry a Zod input shape; the MCP layer validates args.
 - **Stage dump + viz server (`dump.ts`, `viz-server.ts`, `bin/viz.ts`).** `dumpPipelineOutputs(result,
 outDir)` writes the six `01..06` stage JSON files + a standalone `graph.db` (the tables-only export)
   for one pipeline run and returns the written paths; the `pnpm e2e` CLI and a directory `load_dataset`
@@ -432,8 +445,8 @@ outDir)` writes the six `01..06` stage JSON files + a standalone `graph.db` (the
   projects layout; `intake.ts` just consumes absolute directories. `loadPipelineResultFromDirs` gathers
   all of them — each rooted at its own parent so the route stage's per-directory grouping survives —
   and runs **one** pipeline, so a repo's sessions across all worktrees aggregate into a single forest
-  (the store already normalizes worktree `file_path`s to a repo-relative form, so cross-worktree
-  analysis lines up). `loadFromSource(source)` wraps both: an existing directory loads literally,
+  (the store already normalizes worktree paths to a repo-relative `semantics.repo_path`, so
+  cross-worktree analysis lines up). `loadFromSource(source)` wraps both: an existing directory loads literally,
   anything else resolves as a repo name — the one-positional convenience the e2e CLI exposes.
 - **Session + loading (`session.ts`, `@coach/pipeline` `intake/`, `server.ts`, `bin/mcp.ts`).** The server holds one
   mutable session: the dataset currently loaded. `load_dataset` takes either a `repo` name (resolved
@@ -446,7 +459,7 @@ outDir)` writes the six `01..06` stage JSON files + a standalone `graph.db` (the
   directory — omit it and the agent loads at runtime. Load-once / serve-many, one dataset at a time.
   Diagnostics go to **stderr only** — stdout is the JSON-RPC channel.
 
-This is the payoff of ending the pipeline at the enriched graph: the same normalized model feeds the
+This is the payoff of ending the pipeline at the resolved graph: the same normalized model feeds the
 app's renderer and the MCP's flexible SQL surface, and "analysis" is whatever query the agent writes
 against it — not a fixed set of findings baked into a stage.
 
@@ -498,14 +511,15 @@ MCP's `load_dataset` exposes. It dumps every stage member to `out/<name>/`, so e
 independently inspectable. (The earlier per-stage scripts — `scripts/viz.ts`, `scripts/enrich.ts`,
 `scripts/etl.ts` — were removed; `e2e` covers the full pipeline.)
 
-| Member file                    | Stage | Contents                                                             |
-| ------------------------------ | ----- | -------------------------------------------------------------------- |
-| `01-classified.json`           | 1     | each file's name/path/type                                           |
-| `02-sessions.json`             | 2     | session id, kind, and member filenames per session                   |
-| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session (each node carries its `sessionId` FK) |
-| `04-agent-graph.json`          | 4     | `AgentGraph` — the `nodes` table + `agent`/`sessions` entities       |
-| `05-execution-graph.json`      | 5     | `ExecutionGraph` (id-keyed skeleton; `semantics` table empty)        |
-| `06-enriched-graph.json`       | 6     | `ExecutionGraph` with the `semantics` table populated (final stage)  |
+| Member file                    | Stage | Contents                                                                            |
+| ------------------------------ | ----- | ----------------------------------------------------------------------------------- |
+| `01-classified.json`           | 1     | each file's name/path/type                                                          |
+| `02-sessions.json`             | 2     | session id, kind, and member filenames per session                                  |
+| `03-canonical-by-session.json` | 3     | `CanonicalNode[]` per session (each node carries its `sessionId` FK)                |
+| `04-agent-graph.json`          | 4     | `AgentGraph` — the `nodes` table + `agent`/`sessions` entities                      |
+| `05-execution-graph.json`      | 5     | `ExecutionGraph` (id-keyed skeleton; `semantics` table empty)                       |
+| `06-enriched-graph.json`       | 6     | `ExecutionGraph` — node-local `semantics` entries (paths not yet grounded)          |
+| `07-resolved-graph.json`       | 7     | `ExecutionGraph` — entries grounded with `repo_path`/`package` (render + DB target) |
 
 Native `.jsonl`, single/multi-trace OTEL sets, and mixes of both in one gather all flow through
 the same pipeline. The CLI populates `UploadedFile.path` relative to the gather root so the

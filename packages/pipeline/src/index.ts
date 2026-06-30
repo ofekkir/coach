@@ -19,7 +19,7 @@ export type {
   OtlpSpan,
   RequestMessage,
   ResponseMessage,
-  SemanticContext,
+  SemanticEntry,
   SemanticFields,
   Session,
   TempoTrace,
